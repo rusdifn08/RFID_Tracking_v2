@@ -1,4 +1,14 @@
-# React + TypeScript + Vite
+# RFID_Tracking
+RFID Tracking For Gistex Garment Indonesia
+
+## Tech Stack
+
+- React + TypeScript + Vite
+- Laravel 11
+- Laravel Filament 4
+- Tailwind CSS 4
+
+## Getting Started
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
