@@ -36,9 +36,19 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
             setRfidInput('');
             if (inputRef.current) {
                 inputRef.current.value = '';
-                setTimeout(() => {
-                    inputRef.current?.focus();
-                }, 100);
+                // Focus langsung tanpa delay untuk memastikan input siap menerima input
+                const focusInput = () => {
+                    if (inputRef.current) {
+                        inputRef.current.focus();
+                        // Pastikan input benar-benar focused
+                        inputRef.current.click();
+                    }
+                };
+                // Multiple attempts untuk memastikan focus
+                focusInput();
+                setTimeout(focusInput, 50);
+                setTimeout(focusInput, 150);
+                setTimeout(focusInput, 300);
             }
         }
     }, [isOpen]);
@@ -112,7 +122,7 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
             };
 
             // Insert langsung ke MySQL database melalui server.js local
-            const response = await fetch('http://10.8.10.160:8000/garment', {
+            const response = await fetch('http://10.8.10.104:8000/garment', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -166,7 +176,7 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
             let errorMessage = 'Gagal menyimpan';
             if (error instanceof Error) {
                 if (error.message.includes('Failed to fetch')) {
-                    errorMessage = 'Tidak dapat terhubung ke server. Pastikan server.js berjalan di http://10.8.10.160:8000';
+                    errorMessage = 'Tidak dapat terhubung ke server. Pastikan server.js berjalan di http://10.8.10.104:8000';
                 } else {
                     errorMessage = error.message;
                 }
@@ -198,7 +208,15 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
 
     // Handle input change
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setRfidInput(e.target.value);
+        const value = e.target.value;
+        setRfidInput(value);
+        
+        // Auto-submit jika input panjang (untuk RFID reader yang mengirim data lengkap sekaligus)
+        // Biasanya RFID reader mengirim data dengan Enter di akhir, tapi beberapa mengirim langsung
+        if (value.length > 8 && !value.includes('\n') && !value.includes('\r')) {
+            // Jika input sudah cukup panjang dan tidak ada newline, mungkin dari RFID reader
+            // Tapi kita tetap tunggu Enter untuk konsistensi
+        }
     };
 
     if (!isOpen) return null;
@@ -220,13 +238,13 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
             >
                 <div 
                     ref={containerRef}
-                    className="bg-white rounded-3xl shadow-2xl w-[90%] max-w-[680px] max-h-[85vh] flex flex-col overflow-hidden"
+                    className="bg-white rounded-3xl shadow-2xl w-[95%] max-w-[900px] max-h-[95vh] flex flex-col overflow-hidden"
                     style={{
                         background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(148, 163, 184, 0.1), 0 8px 16px -8px rgba(59, 130, 246, 0.1)',
                         animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
                         border: '1px solid rgba(226, 232, 240, 0.8)',
-                        padding: '0.9rem'
+                        padding: '1.5rem'
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
@@ -309,9 +327,15 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
                         ))}
                     </div>
 
-                    {/* Scan Area */}
+                    {/* Scan Area - Clickable untuk focus input */}
                     <div 
-                        className="mb-2 relative"
+                        className="mb-2 relative cursor-text"
+                        onClick={() => {
+                            // Focus input ketika area scan di-click
+                            if (inputRef.current && !isProcessing) {
+                                inputRef.current.focus();
+                            }
+                        }}
                         style={{
                             background: 'linear-gradient(135deg, rgba(238, 242, 255, 0.8) 0%, rgba(224, 231, 255, 0.8) 100%), radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.1) 0%, transparent 70%), radial-gradient(circle at 70% 70%, rgba(99, 102, 241, 0.1) 0%, transparent 70%)',
                             borderRadius: '6px',
@@ -444,7 +468,7 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
                         </div>
                     </div>
 
-                    {/* Input Field (Hidden but functional) */}
+                    {/* Input Field - Hidden, langsung aktif tanpa perlu click */}
                     <input
                         ref={inputRef}
                         type="text"
@@ -454,23 +478,25 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
                         disabled={isProcessing}
                         className="sr-only"
                         autoFocus
+                        autoComplete="off"
                         key={isOpen ? 'open' : 'closed'} // Force re-render saat modal buka/tutup
                     />
 
                     {/* Scanned List */}
                     <div 
-                        className="mb-2 flex flex-col"
+                        className="mb-2 flex flex-col flex-1 min-h-0"
                         style={{
                             border: '2px solid #E2E8F0',
                             borderRadius: '6px',
                             overflow: 'hidden',
-                            maxHeight: '130px',
                             background: 'white',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)'
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+                            display: 'flex',
+                            flexDirection: 'column'
                         }}
                     >
                         <div 
-                            className="px-3 py-2 flex justify-between items-center border-b-2 border-gray-200"
+                            className="px-3 py-2 flex justify-between items-center border-b-2 border-gray-200 flex-shrink-0"
                             style={{
                                 background: 'linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%)'
                             }}
@@ -490,15 +516,18 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
                         </div>
 
                         {scannedItems.length === 0 ? (
-                            <div className="py-12 text-center" style={{ color: '#94A3B8', fontSize: '0.95rem', fontWeight: 500 }}>
+                            <div className="py-12 text-center flex-1 flex items-center justify-center" style={{ color: '#94A3B8', fontSize: '0.95rem', fontWeight: 500 }}>
                                 Belum ada RFID yang di-scan
                             </div>
                         ) : (
                             <div 
-                                className="overflow-y-auto p-1.5"
+                                className="overflow-y-auto p-1.5 flex-1"
                                 style={{
-                                    maxHeight: '80px',
-                                    background: '#FAFBFC'
+                                    maxHeight: '280px',
+                                    minHeight: '200px',
+                                    background: '#FAFBFC',
+                                    scrollbarWidth: 'thin',
+                                    scrollbarColor: '#93C5FD #F1F5F9'
                                 }}
                             >
                                 {scannedItems.map((item, index) => {
@@ -748,6 +777,23 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
                         opacity: 1;
                         transform: translateX(0);
                     }
+                }
+                
+                /* Custom Scrollbar untuk scanned list */
+                .overflow-y-auto::-webkit-scrollbar {
+                    width: 8px;
+                }
+                .overflow-y-auto::-webkit-scrollbar-track {
+                    background: #F1F5F9;
+                    border-radius: 4px;
+                }
+                .overflow-y-auto::-webkit-scrollbar-thumb {
+                    background: #93C5FD;
+                    border-radius: 4px;
+                    border: 2px solid #F1F5F9;
+                }
+                .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+                    background: #60A5FA;
                 }
             `}</style>
         </>

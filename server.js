@@ -10,7 +10,7 @@ import mysql from 'mysql2/promise';
 const app = express();
 const PORT = process.env.PORT || 8000; // Port untuk API server
 const HOST = '0.0.0.0'; // Listen di semua network interface (bisa diakses dari 10.5.0.7)
-const SERVER_IP = '10.8.10.160'; // IP yang digunakan untuk akses dari frontend (untuk akses dari komputer lain)
+const SERVER_IP = '10.8.10.104'; // IP yang digunakan untuk akses dari frontend (untuk akses dari komputer lain)
 // Backend API URL - jika backend API ada di server yang sama, gunakan localhost untuk menghindari loop
 const BACKEND_API_URL = process.env.BACKEND_API_URL || `http://localhost:${PORT}`;
 
@@ -1678,16 +1678,16 @@ app.listen(PORT, HOST, () => {
 
     // Test API endpoints
     console.log('\n📡 Test Koneksi MySQL & Cek Data API:');
-    console.log(`   GET  http://10.8.10.160:${PORT}/user?nik= (Login dengan NIK)`);
-    console.log(`   GET  http://10.8.10.160:${PORT}/login?rfid_user=`);
-    console.log(`   GET  http://10.8.10.160:${PORT}/garment?rfid_garment=`);
-    console.log(`   POST http://10.8.10.160:${PORT}/garment (Insert data langsung ke MySQL)`);
-    console.log(`   GET  http://10.8.10.160:${PORT}/tracking/line?line= (Tracking data by line)`);
-    console.log(`   GET  http://10.8.10.160:${PORT}/wo/production_branch?production_branch=&line= (WO/Production data)`);
-    console.log(`   GET  http://10.8.10.160:${PORT}/tracking?rfid_garment=`);
+    console.log(`   GET  http://10.8.10.104:${PORT}/user?nik= (Login dengan NIK)`);
+    console.log(`   GET  http://10.8.10.104:${PORT}/login?rfid_user=`);
+    console.log(`   GET  http://10.8.10.104:${PORT}/garment?rfid_garment=`);
+    console.log(`   POST http://10.8.10.104:${PORT}/garment (Insert data langsung ke MySQL)`);
+    console.log(`   GET  http://10.8.10.104:${PORT}/tracking/line?line= (Tracking data by line)`);
+    console.log(`   GET  http://10.8.10.104:${PORT}/wo/production_branch?production_branch=&line= (WO/Production data)`);
+    console.log(`   GET  http://10.8.10.104:${PORT}/tracking?rfid_garment=`);
     console.log(`\n🚀 Server running on:`);
     console.log(`   - http://localhost:${PORT} (Local access)`);
-    console.log(`   - http://10.8.10.160:${PORT} (Network access - gunakan IP ini untuk akses dari komputer lain)`);
+    console.log(`   - http://10.8.10.104:${PORT} (Network access - gunakan IP ini untuk akses dari komputer lain)`);
     console.log(`   - http://${SERVER_IP}:${PORT} (Alternative network access)`);
     console.log(`\n💾 MySQL Database: ${MYSQL_CONFIG.host}/${MYSQL_CONFIG.database}/${MYSQL_CONFIG.table}\n`);
 });

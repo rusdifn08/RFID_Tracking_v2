@@ -11,16 +11,16 @@
 const isDevelopment = import.meta.env.DEV;
 
 // Base URL untuk API Server
-// Frontend memanggil server.js yang berjalan di 10.8.10.160:8000
+// Frontend memanggil server.js yang berjalan di 10.8.10.104:8000
 // Server.js kemudian akan memanggil backend API di 10.8.10.120:8000
 export const API_BASE_URL = isDevelopment
-    ? 'http://10.8.10.160:8000'  // Server.js (IP: 10.8.10.160, Port: 8000)
-    : import.meta.env.VITE_API_URL || 'http://10.8.10.160:8000';
+    ? 'http://10.8.10.104:8000'  // Server.js (IP: 10.8.10.104, Port: 8000)
+    : import.meta.env.VITE_API_URL || 'http://10.8.10.104:8000';
 
 // Base URL untuk WebSocket (jika diperlukan)
 export const WS_BASE_URL = isDevelopment
-    ? 'ws://10.8.10.160:8000'
-    : import.meta.env.VITE_WS_URL || 'ws://10.8.10.160:8000';
+    ? 'ws://10.8.10.104:8000'
+    : import.meta.env.VITE_WS_URL || 'ws://10.8.10.104:8000';
 
 // ============================================
 // TYPES
@@ -245,7 +245,7 @@ export const apiRequest = async <T = any>(
         if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
             return {
                 success: false,
-                error: 'Tidak dapat terhubung ke server. Pastikan server.js berjalan di http://10.8.10.160:8000',
+                error: 'Tidak dapat terhubung ke server. Pastikan server.js berjalan di http://10.8.10.104:8000',
                 data: undefined,
                 status: 500
             };

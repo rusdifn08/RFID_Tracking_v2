@@ -36,7 +36,7 @@ Frontend akan berjalan di `http://localhost:5173` (atau port yang tersedia)
 ```bash
 npm run server
 ```
-Server akan berjalan di `http://10.8.10.160:8000` dan berfungsi sebagai proxy ke backend API.
+Server akan berjalan di `http://10.8.10.104:8000` dan berfungsi sebagai proxy ke backend API.
 
 **Catatan:** Pastikan kedua terminal berjalan bersamaan agar aplikasi dapat berfungsi dengan baik.
 
@@ -61,9 +61,9 @@ Table: garment
 ### IP Backend yang Digunakan
 
 #### Frontend Server (Proxy Server)
-- **IP:** `10.8.10.160`
+- **IP:** `10.8.10.104`
 - **Port:** `8000`
-- **URL:** `http://10.8.10.160:8000`
+- **URL:** `http://10.8.10.104:8000`
 - **Fungsi:** Server proxy yang menghubungkan frontend dengan backend API
 
 #### Backend API Server

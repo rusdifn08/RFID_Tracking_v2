@@ -34,9 +34,9 @@ window.addEventListener('unhandledrejection', (event) => {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
     </ErrorBoundary>
   </StrictMode>,
 )

@@ -363,15 +363,7 @@ export default function DaftarRFID() {
                 isOpen={isModalOpen}
                 onClose={() => {
                     setIsModalOpen(false);
-                    // Reset form setelah modal ditutup
-                    setFormData({
-                        workOrder: '',
-                        style: '',
-                        buyer: '',
-                        item: '',
-                        color: '',
-                        size: ''
-                    });
+                    // Form data tidak di-reset, tetap tersimpan untuk registrasi berikutnya
                 }}
                 workOrderData={formData}
             />

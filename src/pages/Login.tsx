@@ -52,9 +52,9 @@ export default function Login() {
                 if (err.message === 'NIK tidak ada' || err.message.includes('NIK tidak ada')) {
                     errorMessage = 'NIK tidak ada';
                 } else if (err.message.includes('Failed to fetch') || err.message.includes('Tidak dapat terhubung')) {
-                    errorMessage = 'Tidak dapat terhubung ke server. Pastikan server.js berjalan.';
+                    errorMessage = 'Tidak dapat terhubung ke server. Pastikan server.js berjalan di http://10.8.10.104:8000';
                 } else {
-                    errorMessage = err.message || errorMessage;
+                errorMessage = err.message || errorMessage;
                 }
             }
 
@@ -82,16 +82,16 @@ export default function Login() {
     return (
         <div className="fixed inset-0 w-screen h-screen flex m-0 p-0 overflow-y-auto overflow-x-hidden">
             {/* Background SVG - Di belakang semua konten (left dan right side) */}
-            <div 
+                    <div
                 className="fixed inset-0 z-0"
-                style={{
-                    backgroundImage: `url(${backgroundImage})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center top',
-                    backgroundRepeat: 'no-repeat',
+                        style={{
+                            backgroundImage: `url(${backgroundImage})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center top',
+                            backgroundRepeat: 'no-repeat',
                     width: '100%',
-                    height: '100%',
-                }}
+                            height: '100%',
+                        }}
             />
 
             {/* Grid Layout 2 Kolom */}
@@ -123,21 +123,21 @@ export default function Login() {
                     <div className="w-full max-w-md lg:max-w-lg xl:max-w-xl mx-auto">
                         {/* Cards Container */}
                         <div className="bg-gray-100 rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl overflow-hidden p-4 sm:p-6 md:p-8 lg:p-10 xl:p-12"
-                            style={{
+                    style={{
                                 padding: '2rem'
-                            }}
-                        >
+                    }}
+                >
                             {/* Title */}
                             <div className="text-center mb-4 sm:mb-6 md:mb-8 lg:mb-10">
                                 <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
-                                    Sign In as Employee
+                                Sign In as Employee
                                 </h2>
                             </div>
 
                             {/* Sub-title */}
                             <div className="text-center mb-4 sm:mb-6 md:mb-8">
                                 <p className="text-sm sm:text-base md:text-lg text-gray-600 px-2">
-                                    Hey, Enter the NIK & Password registered with GCC or HRIS to enter your account.
+                                Hey, Enter the NIK & Password registered with GCC or HRIS to enter your account.
                                 </p>
                             </div>
 
@@ -188,16 +188,16 @@ export default function Login() {
                                         Password
                                     </label>
                                     <div className="relative">
-                                        <input
+                                    <input
                                             type={showPassword ? "text" : "password"}
                                             className="form-control borderInput w-full px-3 sm:px-4 py-2.5 sm:py-3 md:py-4 pr-10 sm:pr-12 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder-gray-400 text-gray-900 bg-white"
-                                            name="password"
-                                            id="password"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="Password"
-                                            required
-                                        />
+                                        name="password"
+                                        id="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="Password"
+                                        required
+                                    />
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
