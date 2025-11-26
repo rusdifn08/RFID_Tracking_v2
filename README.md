@@ -12,6 +12,16 @@ RFID Tracking For Gistex Garment Indonesia
 
 ### Menjalankan Aplikasi
 
+#### 1. Install Dependencies
+
+Pertama, install semua module yang diperlukan:
+
+```bash
+npm install
+```
+
+#### 2. Menjalankan Aplikasi
+
 Aplikasi ini memerlukan **2 terminal** untuk berjalan dengan baik:
 
 #### Terminal 1 - Frontend (React + Vite)
