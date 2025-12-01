@@ -13,11 +13,11 @@ export default function HomeContent() {
             subtitle: 'Real-time Garment Data',
             location: '6 Locations',
             icon: Rss,
-            color: 'text-emerald-500',
-            bgStart: 'from-emerald-400',
-            bgEnd: 'to-teal-500',
-            shadow: 'shadow-emerald-200',
-            lightBg: 'bg-emerald-50'
+            color: 'text-[#0073EE]',
+            bgStart: 'from-blue-400',
+            bgEnd: 'to-blue-600',
+            shadow: 'shadow-blue-200',
+            lightBg: 'bg-blue-50'
         },
     ];
 
@@ -115,9 +115,10 @@ export default function HomeContent() {
                                 </div>
 
                                 {/* TEXT (Centered) */}
-                                <h3 className="text-4xl font-bold text-slate-800 mb-2 text-center group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-slate-800 group-hover:to-slate-600 "
+                                <h3 className="text-4xl font-bold mb-2 text-center transition-colors duration-300"
                                     style={{
                                         paddingTop: '2%',
+                                        color: isHovered ? '#0073EE' : '#0073EE'
                                     }}
                                 >
                                     {module.title}

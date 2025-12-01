@@ -113,7 +113,7 @@ export default function LineDetail() {
 
             {/* Main Content Area */}
             <div
-                className="flex flex-col w-full h-full transition-all duration-300 ease-in-out"
+                className="flex flex-col w-full h-screen transition-all duration-300 ease-in-out"
                 style={{
                     marginLeft: isOpen ? '15%' : '5rem',
                     width: isOpen ? 'calc(100% - 15%)' : 'calc(100% - 5rem)'
@@ -126,19 +126,19 @@ export default function LineDetail() {
 
                 {/* Main Content */}
                 <main
-                    className="flex-1 w-full overflow-y-auto bg-[#F8F9FA] pt-8 pb-8 px-6 md:px-8 lg:px-10"
+                    className="flex-1 w-full overflow-y-auto bg-[#F8F9FA] pt-8 pb-8 px-6 md:px-8 lg:px-10 h-full"
                     style={{
                         marginTop: '1rem'
                     }}
                 >
 
                     {/* --- TITLE SECTION --- */}
-                    <div className="flex flex-col items-center justify-center mb-12 animate-fade-in-down text-center">
-                        <div className="w-20 h-20 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mb-6">
+                    <div className="flex flex-col items-center justify-center animate-fade-in-down text-center">
+                        <div className="w-20 h-20 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center">
                             <FactoryIcon sx={{ fontSize: 42, color: '#334155' }} />
                         </div>
 
-                        <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-4">
+                        <h1 className="text-2xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">
                             {currentLine.title}
                         </h1>
 
@@ -156,7 +156,7 @@ export default function LineDetail() {
                     </div>
 
                     {/* --- CARDS GRID --- */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-7xl mx-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6 lg:gap-8 max-w-7xl mx-auto">
                         {cards.map((card, index) => {
                             const isHovered = hoveredCard === card.id;
                             const isDimmed = hoveredCard !== null && hoveredCard !== card.id;
@@ -181,11 +181,11 @@ export default function LineDetail() {
                                 >
                                     <Paper
                                         elevation={0}
-                                        className="relative flex items-center p-6 min-h-[170px] bg-white border transition-all duration-500"
+                                        className="relative flex items-center p-4 sm:p-5 md:p-6 lg:p-8 min-h-[140px] sm:min-h-[160px] md:min-h-[170px] lg:min-h-[180px] bg-white border-2 transition-all duration-500"
                                         style={{
                                             borderRadius: '35px',
                                             overflow: 'visible',
-                                            borderColor: isHovered ? card.color.main : 'transparent',
+                                            borderColor: isHovered ? card.color.main : '#ECF5FF',
                                             boxShadow: isHovered
                                                 ? `0 30px 60px -15px ${card.color.shadow}`
                                                 : '0 10px 30px -10px rgba(0,0,0,0.05)',
@@ -194,27 +194,27 @@ export default function LineDetail() {
                                     >
                                         {/* Icon Container */}
                                         <div
-                                            className="w-[80px] h-[80px] md:w-[88px] md:h-[88px] rounded-[20px] flex items-center justify-center mr-5 shrink-0 transition-transform duration-500"
+                                            className="w-[60px] h-[60px] sm:w-[70px] sm:h-[70px] md:w-[80px] md:h-[80px] lg:w-[88px] lg:h-[88px] rounded-[16px] sm:rounded-[18px] md:rounded-[20px] flex items-center justify-center shrink-0 transition-transform duration-500"
                                             style={{
                                                 backgroundColor: card.color.light,
                                                 color: card.color.main,
                                                 transform: isHovered ? 'scale(1.1) rotate(-5deg)' : 'scale(1)',
-                                                marginLeft: '-40px',
-                                                marginRight: '10%',
+                                                marginLeft: '-30px',
+                                                marginRight: '8%',
                                             }}
                                         >
-                                            <card.icon sx={{ fontSize: 40 }} />
+                                            <card.icon sx={{ fontSize: 'clamp(28px, 4vw, 40px)' }} />
                                         </div>
 
                                         {/* Text Content */}
-                                        <div className="flex-1 pr-8 overflow-hidden">
+                                        <div className="flex-1 pr-6 sm:pr-8 overflow-hidden">
                                             <h3
-                                                className="text-lg md:text-xl font-black text-slate-800 leading-tight mb-1.5 transition-colors duration-300 truncate"
-                                                style={{ color: isHovered ? card.color.main : '#1e293b' }}
+                                                className="text-base sm:text-sm md:text-md lg:text-lg font-black leading-tight mb-1 sm:mb-1.5 transition-colors duration-300 truncate"
+                                                style={{ color: isHovered ? card.color.main : '#0073EE' }}
                                             >
                                                 {card.title}
                                             </h3>
-                                            <p className="text-xs md:text-sm font-semibold text-slate-400 tracking-wide truncate">
+                                            <p className="text-xs sm:text-sm md:text-base font-semibold text-slate-400 tracking-wide truncate">
                                                 {card.subtitle}
                                             </p>
                                         </div>
@@ -223,8 +223,8 @@ export default function LineDetail() {
                                         <div
                                             className="absolute top-1/2 right-0 flex items-center justify-center shadow-lg transition-all duration-500"
                                             style={{
-                                                width: '60px',
-                                                height: '60px',
+                                                width: 'clamp(50px, 6vw, 60px)',
+                                                height: 'clamp(50px, 6vw, 60px)',
                                                 borderRadius: '50%',
                                                 transform: 'translate(50%, -50%) scale(1)',
                                                 backgroundColor: isHovered ? card.color.main : '#F1F5F9',
@@ -234,7 +234,7 @@ export default function LineDetail() {
                                         >
                                             <ArrowRightIcon
                                                 sx={{
-                                                    fontSize: 28,
+                                                    fontSize: 'clamp(22px, 3vw, 28px)',
                                                     transition: 'transform 0.3s',
                                                     transform: isHovered ? 'translateX(4px)' : 'translateX(0)'
                                                 }}

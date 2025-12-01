@@ -80,34 +80,34 @@ export default function Login() {
     };
 
     return (
-        <div className="fixed inset-0 w-screen h-screen flex m-0 p-0 overflow-y-auto overflow-x-hidden">
+        <div className="fixed inset-0 w-screen h-screen flex m-0 p-0 overflow-hidden">
             {/* Background SVG - Di belakang semua konten (left dan right side) */}
-                    <div
+            <div
                 className="fixed inset-0 z-0"
-                        style={{
-                            backgroundImage: `url(${backgroundImage})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center top',
-                            backgroundRepeat: 'no-repeat',
+                style={{
+                    backgroundImage: `url(${backgroundImage})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center top',
+                    backgroundRepeat: 'no-repeat',
                     width: '100%',
-                            height: '100%',
-                        }}
+                    height: '100%',
+                }}
             />
 
             {/* Grid Layout 2 Kolom */}
-            <div className="w-full min-h-screen flex flex-col lg:flex-row relative z-10">
+            <div className="w-full h-screen flex flex-col lg:flex-row relative z-10 overflow-hidden">
                 {/* Left Side - Aksen SVG & Login SVG - Hidden on Mobile */}
-                <div className="hidden lg:flex w-full lg:w-1/2 relative min-h-screen bg-transparent">
+                <div className="hidden lg:flex w-full lg:w-1/2 relative h-screen bg-transparent overflow-hidden">
                     {/* Content Overlay */}
                     <div className="relative z-10 flex flex-col h-full w-full px-6 xl:px-12 py-8 xl:py-12 text-white">
                         {/* Title - Centered */}
                         <div className="flex-1 flex flex-col justify-center items-center text-center px-4">
-                            <h1 className="text-xl xl:text-2xl 2xl:text-3xl 3xl:text-4xl font-bold mb-6 xl:mb-8 2xl:mb-12 leading-tight max-w-2xl">
+                            <h1 className="text-xl xl:text-2xl 2xl:text-3xl font-bold mb-4 xl:mb-6 leading-tight max-w-2xl">
                                 Enterprise Resource Monitoring System PT. Gistex Garment Indonesia
                             </h1>
 
                             {/* Illustration - Login SVG */}
-                            <div className="relative w-full max-w-md xl:max-w-lg mt-4 xl:mt-8">
+                            <div className="relative w-full max-w-md xl:max-w-lg mt-2 xl:mt-4">
                                 <img
                                     src={loginSvg}
                                     alt="Login Illustration"
@@ -119,32 +119,29 @@ export default function Login() {
                 </div>
 
                 {/* Right Side - Login Form - Transparan agar background terlihat */}
-                <div className="w-full lg:w-1/2 flex items-center justify-center relative min-h-screen py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 bg-transparent">
-                    <div className="w-full max-w-md lg:max-w-lg xl:max-w-xl mx-auto">
+                <div className="w-full lg:w-1/2 flex items-center justify-center relative h-screen overflow-y-auto bg-transparent">
+                    <div className="w-full max-w-md lg:max-w-lg xl:max-w-xl mx-auto py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 xl:px-12">
                         {/* Cards Container */}
-                        <div className="bg-gray-100 rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl overflow-hidden p-4 sm:p-6 md:p-8 lg:p-10 xl:p-12"
-                    style={{
-                                padding: '2rem'
-                    }}
-                >
+                        <div className="bg-gray-100 rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl overflow-hidden p-4 sm:p-6 md:p-8"
+                        >
                             {/* Title */}
-                            <div className="text-center mb-4 sm:mb-6 md:mb-8 lg:mb-10">
-                                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">
-                                Sign In as Employee
+                            <div className="text-center mb-3 sm:mb-4 md:mb-5">
+                                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
+                                    Sign In as Employee
                                 </h2>
                             </div>
 
                             {/* Sub-title */}
-                            <div className="text-center mb-4 sm:mb-6 md:mb-8">
-                                <p className="text-sm sm:text-base md:text-lg text-gray-600 px-2">
-                                Hey, Enter the NIK & Password registered with GCC or HRIS to enter your account.
+                            <div className="text-center mb-3 sm:mb-4 md:mb-5">
+                                <p className="text-xs sm:text-sm md:text-base text-gray-600 px-2">
+                                    Hey, Enter the NIK & Password registered with GCC or HRIS to enter your account.
                                 </p>
                             </div>
 
                             {/* Hidden Input for dev_id */}
                             <input type="hidden" className="form-control borderInput" name="dev_id" id="dev_id" />
 
-                            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6">
+                            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
                                 {/* Error Message */}
                                 {error && (
                                     <div className="w-full p-3 sm:p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-lg text-xs sm:text-sm md:text-base animate-fade-in">
@@ -167,12 +164,12 @@ export default function Login() {
 
                                 {/* NIK Block */}
                                 <div className="w-full">
-                                    <label htmlFor="nik" className="block text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">
+                                    <label htmlFor="nik" className="block text-sm font-semibold text-gray-900 mb-1.5">
                                         NIK
                                     </label>
                                     <input
                                         type="text"
-                                        className="form-control borderInput w-full px-3 sm:px-4 py-2.5 sm:py-3 md:py-4 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder-gray-400 text-gray-900 bg-white"
+                                        className="form-control borderInput w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder-gray-400 text-gray-900 bg-white"
                                         name="nik"
                                         id="nik"
                                         value={nik}
@@ -184,32 +181,32 @@ export default function Login() {
 
                                 {/* Password Block */}
                                 <div className="w-full">
-                                    <label htmlFor="password" className="block text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">
+                                    <label htmlFor="password" className="block text-sm font-semibold text-gray-900 mb-1.5">
                                         Password
                                     </label>
                                     <div className="relative">
-                                    <input
+                                        <input
                                             type={showPassword ? "text" : "password"}
-                                            className="form-control borderInput w-full px-3 sm:px-4 py-2.5 sm:py-3 md:py-4 pr-10 sm:pr-12 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder-gray-400 text-gray-900 bg-white"
-                                        name="password"
-                                        id="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="Password"
-                                        required
-                                    />
+                                            className="form-control borderInput w-full px-3 py-2.5 pr-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder-gray-400 text-gray-900 bg-white"
+                                            name="password"
+                                            id="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="Password"
+                                            required
+                                        />
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none transition-colors"
+                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none transition-colors"
                                             aria-label={showPassword ? "Hide password" : "Show password"}
                                         >
                                             {showPassword ? (
-                                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                                                 </svg>
                                             ) : (
-                                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                 </svg>
@@ -219,43 +216,48 @@ export default function Login() {
                                 </div>
 
                                 {/* Remember Me Checkbox */}
-                                <div className="flex items-center justify-center sm:justify-start mb-2 sm:mb-4">
+                                <div className="flex items-center justify-center sm:justify-start mb-2">
                                     <input
                                         type="checkbox"
                                         name="remember"
                                         id="checkAll2"
-                                        className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                                         checked={rememberMe}
                                         onChange={(e) => setRememberMe(e.target.checked)}
                                     />
-                                    <label htmlFor="checkAll2" className="ml-2 text-xs sm:text-sm md:text-base text-gray-700 cursor-pointer">
+                                    <label htmlFor="checkAll2" className="ml-2 text-xs sm:text-sm text-gray-700 cursor-pointer">
                                         Remember Me
                                     </label>
                                 </div>
 
-                                {/* Sign In Button Block */}
-                                <div className="w-full pt-2 sm:pt-4">
+                                {/* Sign In & Register Buttons Block */}
+                                <div className="w-full pt-2 flex flex-col items-center gap-3">
                                     <button
                                         type="submit"
                                         disabled={loginMutation.isPending}
-                                        className="w-full py-2.5 sm:py-3 md:py-4 px-4 sm:px-6 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm sm:text-base md:text-lg focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-1/2 py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm sm:text-base focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {loginMutation.isPending ? 'Loading...' : 'Sign In'}
+                                    </button>
+                                    
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate('/register')}
+                                        className="w-1/2 py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg bg-gray-600 hover:bg-gray-700 text-white font-semibold text-sm sm:text-base focus:outline-none focus:ring-4 focus:ring-gray-500 focus:ring-offset-2 transition-all shadow-sm hover:shadow-md"
+                                    >
+                                        Register
                                     </button>
                                 </div>
 
                                 {/* Forgot Password Block - Centered */}
-                                <div className="w-full text-center pt-2 sm:pt-3">
+                                <div className="w-full text-center pt-2">
                                     <a
                                         href="https://gcc.gistexgarmenindonesia.com:7186/forget-password"
-                                        className="text-xs sm:text-sm md:text-base text-gray-600 hover:text-gray-900 hover:underline transition-colors"
+                                        className="text-xs sm:text-sm text-gray-600 hover:text-gray-900 hover:underline transition-colors"
                                     >
                                         Forgot Password..?
                                     </a>
                                 </div>
-
-                                {/* Serial Number */}
-                                <div className="relative text-[8px] sm:text-[10px] text-center mt-2 sm:mt-4 text-gray-500" id="serialno"></div>
                             </form>
                         </div>
                     </div>

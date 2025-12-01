@@ -203,18 +203,21 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
                 size: workOrderData.size
             };
 
-            // Insert langsung ke MySQL database melalui server.js local
-            const response = await fetch(`${API_BASE_URL}/garment`, {
+            // Insert menggunakan API inputRFID
+            const response = await fetch(`${API_BASE_URL}/inputRFID`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                 },
                 body: JSON.stringify(dataToInsert)
             });
 
             const responseData = await response.json();
+            console.log('📥 [ScanningRFIDNew] API Response:', responseData);
             
-            if (response.ok) {
+            // Handle response sesuai format API: { success, message, data }
+            if (response.ok && responseData.success) {
                 // Success - cek lagi apakah tidak ada duplikasi di local state
                 const trimmedRfid = rfid.trim();
                 const isDuplicateInList = scannedItems.some(item => item.rfid === trimmedRfid && item.status === 'success');
@@ -232,21 +235,21 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
                         return newItems.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
                     });
                 } else {
-                    // Success
+                    // Success - gunakan message dari API
                     setScannedItems(prev => {
                         const newItems: ScannedItem[] = [...prev, {
                             rfid: trimmedRfid,
                             timestamp,
                             status: 'success' as const,
-                            message: responseData.message || 'Berhasil disimpan'
+                            message: responseData.message || 'Garment berhasil ditambahkan'
                         }];
                         // Sort berdasarkan timestamp (terlama di atas, terbaru di bawah)
                         return newItems.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
                     });
                 }
             } else {
-                // Check if it's a duplicate (409 status)
-                if (response.status === 409 || responseData.isDuplicate) {
+                // Check if it's a duplicate (409 status) or success: false
+                if (response.status === 409 || responseData.isDuplicate || (responseData.success === false && responseData.message?.toLowerCase().includes('duplikasi'))) {
                     // Duplicate - tampilkan dengan status error (akan ditampilkan merah)
                     setScannedItems(prev => {
                         const newItems: ScannedItem[] = [...prev, {

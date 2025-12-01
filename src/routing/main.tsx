@@ -1,5 +1,6 @@
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import Login from '../pages/Login.tsx';
+import Register from '../pages/Register.tsx';
 import Home from '../pages/Home.tsx';
 import Dashboard from '../pages/Dashboard.tsx';
 import DaftarRFID from '../pages/DaftarRFID.tsx';
@@ -19,6 +20,10 @@ const router = createBrowserRouter([
     {
         path: '/login',
         element: <Login />,
+    },
+    {
+        path: '/register',
+        element: <Register />,
     },
     {
         path: '/home',

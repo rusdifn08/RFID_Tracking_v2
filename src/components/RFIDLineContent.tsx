@@ -166,7 +166,7 @@ export default function ProductionLine() {
                     Real-time monitoring of sewing and cutting lines.
                 </p>
                 {/* Decorative line under title */}
-                <div className="w-24 h-1.5 bg-gradient-to-r from-orange-400 to-yellow-400 rounded-full mx-auto opacity-80"></div>
+                <div className="w-1/2 h-1.5 bg-gradient-to-r from-orange-400 to-yellow-400 rounded-full mx-auto opacity-80"></div>
             </div>
 
             {/* Grid System */}
@@ -180,22 +180,24 @@ export default function ProductionLine() {
                             onClick={() => navigate(`/line/${line.id}`)}
                             onMouseEnter={() => setHoveredCard(line.id)}
                             onMouseLeave={() => setHoveredCard(null)}
-                            style={{ animationDelay: `${index * 100}ms` }}
+                            style={{ 
+                                animationDelay: `${index * 100}ms`,
+                                backgroundColor: isHovered ? '#0073ee' : 'white',
+                                transition: 'background-color 0.3s ease-out, transform 0.3s ease-out, box-shadow 0.3s ease-out'
+                            }}
                             className={`
                                 group relative 
-                                bg-white 
                                 rounded-2xl 
                                 shadow-sm
                                 border-2
                                 hover:shadow-xl
                                 hover:-translate-y-1
-                                transition-all duration-300 ease-out
                                 cursor-pointer
-                                min-h-[200px]
                                 flex flex-col
                                 overflow-visible
                                 animate-fade-in-up
-                                p-6
+                                p-3 sm:p-4
+                                aspect-[2/1]
                                 ${line.borderColor}
                             `}
                         >
@@ -217,17 +219,19 @@ export default function ProductionLine() {
                             </div>
 
                             {/* --- CARD CONTENT --- */}
-                            <div className="flex flex-col justify-between h-full pt-8 flex-1">
+                            <div className="flex flex-col justify-between h-full pt-4 sm:pt-5 flex-1">
 
                                 {/* Title Section - Centered */}
-                                <div className="flex-1 flex items-center justify-center mb-6">
-                                    <h3 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight text-center">
+                                <div className="flex items-center justify-center mb-2 sm:mb-3">
+                                    <h3 className={`text-xs sm:text-sm md:text-base font-bold tracking-tight text-center truncate w-full transition-colors duration-300 ${
+                                        isHovered ? 'text-white' : 'text-[#0073ee]'
+                                    }`}>
                                         {line.title}
                                     </h3>
                                 </div>
 
                                 {/* Footer Info (Supervisor & Arrow) */}
-                                <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+                                <div className="flex items-center justify-between pt-2 border-t border-slate-200">
 
                                     {/* Supervisor Info */}
                                     <div className="flex items-center gap-2.5 flex-1">
