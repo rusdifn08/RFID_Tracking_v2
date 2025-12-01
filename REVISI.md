@@ -199,8 +199,8 @@ setRfidData([]); // Sementara kosong sampai API siap
 
 1. **Port Configuration:**
    - Frontend Vite React: `5173` (default)
-   - Frontend Proxy Server (server.js): `7000`
-   - Backend API: `8000`
+   - Frontend Proxy Server (server.js): `6000`
+   - Backend API: `7000`
 
 2. **IP Address:**
    - Semua menggunakan local network IP yang dideteksi otomatis
@@ -219,8 +219,8 @@ setRfidData([]); // Sementara kosong sampai API siap
 ## Testing
 
 Sebelum deploy, pastikan:
-1. Backend API berjalan di local IP dengan port 8000
-2. Proxy server (server.js) berjalan di local IP dengan port 7000
+1. Backend API berjalan di local IP dengan port 7000
+2. Proxy server (server.js) berjalan di local IP dengan port 6000
 3. Frontend (Vite) berjalan di port 5173
 4. Semua endpoint baru dapat diakses melalui proxy server
 5. Tidak ada error saat fetch data dari API

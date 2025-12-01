@@ -31,11 +31,11 @@ function getLocalIP() {
 }
 
 const LOCAL_IP = getLocalIP();
-const PORT = process.env.PORT || 7000; // Port untuk proxy server (frontend proxy)
+const PORT = process.env.PORT || 6000; // Port untuk proxy server (frontend proxy)
 const HOST = '0.0.0.0'; // Listen di semua network interface
-const BACKEND_PORT = 8000; // Port untuk backend API
+const BACKEND_PORT = 7000; // Port untuk backend API
 
-// Backend API URL - menggunakan local IP dengan port 8000
+// Backend API URL - menggunakan local IP dengan port 7000
 const BACKEND_API_URL = process.env.BACKEND_API_URL || `http://${LOCAL_IP}:${BACKEND_PORT}`;
 
 // Middleware
@@ -606,7 +606,7 @@ app.post('/api/auth/login', async (req, res) => {
 /**
  * Query data user dari API backend berdasarkan NIK
  * GET /user?nik=
- * Endpoint ini memanggil API backend menggunakan local IP dengan port 8000
+ * Endpoint ini memanggil API backend menggunakan local IP dengan port 7000
  */
 app.get('/user', async (req, res) => {
     const { nik } = req.query;

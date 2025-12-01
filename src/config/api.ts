@@ -14,13 +14,13 @@ const isDevelopment = import.meta.env.DEV;
 import { getApiBaseUrl, getLocalIP } from '../utils/network';
 
 // Base URL untuk API Server (Proxy Server)
-// Frontend memanggil server.js (proxy) yang berjalan di local IP:7000
-// Server.js kemudian akan memanggil backend API di local IP:8000
-const PROXY_PORT = 7000; // Port untuk proxy server (server.js)
-const BACKEND_PORT = 8000; // Port untuk backend API
+// Frontend memanggil server.js (proxy) yang berjalan di local IP:6000
+// Server.js kemudian akan memanggil backend API di local IP:7000
+const PROXY_PORT = 6000; // Port untuk proxy server (server.js)
+// const BACKEND_PORT = 7000; // Port untuk backend API (hanya untuk referensi, tidak digunakan di frontend)
 
 export const API_BASE_URL = isDevelopment
-    ? getApiBaseUrl(PROXY_PORT)  // Server.js (Proxy) - menggunakan local IP dengan port 7000
+    ? getApiBaseUrl(PROXY_PORT)  // Server.js (Proxy) - menggunakan local IP dengan port 6000
     : import.meta.env.VITE_API_URL || getApiBaseUrl(PROXY_PORT);
 
 // Base URL untuk WebSocket (jika diperlukan)
@@ -251,7 +251,7 @@ export const apiRequest = async <T = any>(
         if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
             return {
                 success: false,
-                error: 'Tidak dapat terhubung ke server. Pastikan server.js berjalan di http://10.8.10.104:8000',
+                error: `Tidak dapat terhubung ke server. Pastikan server.js berjalan di http://${getLocalIP()}:6000`,
                 data: undefined,
                 status: 500
             };
