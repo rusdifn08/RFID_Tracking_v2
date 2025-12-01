@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { useSidebar } from '../context/SidebarContext';
 import ExportModal from '../components/ExportModal';
 import { exportToExcel } from '../utils/exportToExcel';
+import { API_BASE_URL } from '../config/api';
 import {
     Search,
     Filter,
@@ -21,7 +23,6 @@ import {
 interface RFIDItem {
     id: string | number;
     rfid: string;
-    // timestamp removed
     style?: string;
     buyer?: string;
     nomor_wo?: string;
@@ -33,12 +34,58 @@ interface RFIDItem {
     line?: string;
 }
 
+// Interface untuk response dari API tracking/rfid_garment
+interface TrackingRFIDGarmentResponse {
+    count: number;
+    data: Array<{
+        bagian: string;
+        buyer: string;
+        color: string;
+        id: number;
+        id_garment: number;
+        item: string;
+        last_status: string;
+        line: string;
+        nama: string;
+        rejectCount: number;
+        reworkCount: number;
+        rfid_garment: string;
+        rfid_user: string;
+        size: string;
+        style: string;
+        timestamp: string;
+        wo: string;
+    }>;
+}
+
 const ListRFID: React.FC = () => {
     const { isOpen } = useSidebar();
+    const location = useLocation();
     const [rfidData, setRfidData] = useState<RFIDItem[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
-    const [error] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState<string>('');
+    
+    // Deteksi line dari URL query parameter atau default ke line 1
+    const getLineFromUrl = (): string => {
+        // Cek query parameter ?line=1
+        const urlParams = new URLSearchParams(location.search);
+        const lineParam = urlParams.get('line');
+        if (lineParam) {
+            return lineParam;
+        }
+        
+        // Cek path parameter /list-rfid/:line
+        const lineMatch = location.pathname.match(/\/list-rfid\/?(\d+)?/);
+        if (lineMatch && lineMatch[1]) {
+            return lineMatch[1];
+        }
+        
+        // Default ke line 1 untuk /list-rfid
+        return '1';
+    };
+    
+    const currentLine = getLineFromUrl();
 
     // Filters
     const [filterWO, setFilterWO] = useState<string>('');
@@ -140,32 +187,147 @@ const ListRFID: React.FC = () => {
         exportToExcel(exportData, lineId, format);
     };
 
-    // Fetch data dari database - Mockdata dihapus
+    // Fetch data dari API tracking/rfid_garment
     const fetchRFIDData = async () => {
         try {
             setLoading(true);
-            // TODO: Implementasi fetch dari API backend
-            // Contoh: const response = await fetch(`${API_BASE_URL}/garment?line=${lineId}`);
-            // const result = await response.json();
-            // if (result.success && result.data) {
-            //     setRfidData(result.data);
-            //     setError(null);
-            // }
+            setError(null);
             
-            // Sementara kosongkan data sampai API siap
-            setRfidData([]);
+            // Panggil API: http://10.8.0.104:7000/tracking/rfid_garment
+            // API ini akan dipanggil melalui proxy server (server.js)
+            const apiUrl = `${API_BASE_URL}/tracking/rfid_garment`;
+            console.log('🔍 [ListRFID] Fetching data from:', apiUrl);
+            console.log('🔍 [ListRFID] Current line filter:', currentLine);
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+            });
+
+            console.log('📥 [ListRFID] Response status:', response.status, response.statusText);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ [ListRFID] HTTP Error:', errorText);
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            }
+
+            const rawResult = await response.json();
+            console.log('📦 [ListRFID] Raw API Response:', rawResult);
+            
+            // Handle berbagai format response
+            let result: TrackingRFIDGarmentResponse;
+            if (rawResult.data && Array.isArray(rawResult.data)) {
+                // Format: { count, data: [...] }
+                result = rawResult as TrackingRFIDGarmentResponse;
+            } else if (Array.isArray(rawResult)) {
+                // Format: [...] (langsung array)
+                result = {
+                    count: rawResult.length,
+                    data: rawResult
+                };
+            } else {
+                // Format lain, coba ambil data dari berbagai kemungkinan key
+                result = {
+                    count: rawResult.count || 0,
+                    data: rawResult.data || rawResult.items || rawResult.results || []
+                };
+            }
+            
+            console.log('📦 [ListRFID] Parsed Response:', {
+                count: result.count,
+                dataLength: result.data?.length || 0,
+                firstItem: result.data?.[0]
+            });
+            
+            // Pastikan result.data adalah array
+            if (!result.data || !Array.isArray(result.data)) {
+                console.warn('⚠️ [ListRFID] Data is not an array:', result);
+                setRfidData([]);
+                setLoading(false);
+                return;
+            }
+            
+            // Mapping data dari API ke format RFIDItem
+            const mappedData: RFIDItem[] = result.data.map((item) => {
+                // Convert last_status ke format yang sesuai (Good, Rework, Reject)
+                let status = 'Unknown';
+                if (item.last_status) {
+                    const upperStatus = item.last_status.toUpperCase();
+                    if (upperStatus === 'GOOD') {
+                        status = 'Good';
+                    } else if (upperStatus === 'REWORK') {
+                        status = 'Rework';
+                    } else if (upperStatus === 'REJECT') {
+                        status = 'Reject';
+                    } else {
+                        status = item.last_status;
+                    }
+                }
+                
+                const itemLine = item.line?.toString() || '1';
+                
+                return {
+                    id: item.id,
+                    rfid: item.rfid_garment,
+                    style: item.style,
+                    buyer: item.buyer,
+                    nomor_wo: item.wo,
+                    item: item.item,
+                    color: item.color,
+                    size: item.size,
+                    status: status,
+                    lokasi: item.bagian || '', // bagian -> lokasi
+                    line: `Line ${itemLine}`,
+                };
+            });
+            
+            console.log('🔄 [ListRFID] Mapped data count:', mappedData.length);
+            
+            // Filter berdasarkan line jika currentLine ada
+            // Untuk sementara, tampilkan semua data tanpa filter line
+            // Karena semua data dari API sudah memiliki line yang sesuai
+            let filteredByLine = mappedData;
+            
+            if (currentLine && currentLine !== 'all') {
+                filteredByLine = mappedData.filter(item => {
+                    // Extract line number dari format "Line 1" atau langsung dari item.line
+                    let itemLineNumber = '1';
+                    if (item.line) {
+                        const lineMatch = item.line.toString().match(/\d+/);
+                        if (lineMatch) {
+                            itemLineNumber = lineMatch[0];
+                        }
+                    }
+                    const matches = itemLineNumber === currentLine;
+                    if (!matches && mappedData.length < 20) {
+                        // Hanya log jika data sedikit untuk debugging
+                        console.log(`🔍 [ListRFID] Filtered out: line ${itemLineNumber} !== ${currentLine}`, item);
+                    }
+                    return matches;
+                });
+            }
+            
+            console.log('✅ [ListRFID] Final filtered data count:', filteredByLine.length);
+            console.log('✅ [ListRFID] Sample data:', filteredByLine.slice(0, 3));
+            
+            setRfidData(filteredByLine);
             setLoading(false);
         } catch (error) {
-            console.error('Error fetching RFID data:', error);
-            setError('Gagal memuat data RFID');
+            console.error('❌ [ListRFID] Error fetching RFID data:', error);
+            setError(error instanceof Error ? error.message : 'Gagal memuat data RFID');
+            setRfidData([]);
             setLoading(false);
         }
     };
 
-    // Load data saat component mount
+    // Load data saat component mount dan saat line berubah
     useEffect(() => {
         fetchRFIDData();
-    }, []);
+    }, [currentLine]);
 
     // Filter data
     const filteredData = rfidData.filter(item => {
@@ -277,11 +439,12 @@ const ListRFID: React.FC = () => {
 
                 {/* Page Content */}
                 <main
-                    className="flex-1 overflow-hidden flex flex-col h-screen"
+                    className="flex-1 overflow-hidden flex flex-col min-h-0"
                     style={{
                         marginTop: '80px', // Jarak dari atas agar tidak tertutup header
                         padding: '20px',   // Padding konten
-                        height: 'calc(100vh - 80px)' // Sesuaikan tinggi agar tidak double scroll
+                        height: 'calc(100vh - 80px)', // Sesuaikan tinggi agar tidak double scroll
+                        maxHeight: 'calc(100vh - 80px)'
                     }}
                 >
                     {/* Page Header */}
@@ -396,13 +559,12 @@ const ListRFID: React.FC = () => {
 
                     {/* Table Section */}
                     <div
-                        className="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col min-h-0 mb-4"
-                        style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+                        className="bg-white rounded-2xl shadow-lg border border-slate-200/50 overflow-hidden flex flex-col flex-1 min-h-0"
                     >
                         {loading ? (
                             <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                                <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-                                <p>Loading RFID data...</p>
+                                <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+                                <p className="text-base font-medium">Loading RFID data...</p>
                             </div>
                         ) : error ? (
                             <div className="flex flex-col items-center justify-center h-full text-red-500">
@@ -411,7 +573,7 @@ const ListRFID: React.FC = () => {
                                 <p className="text-sm mb-4">{error}</p>
                                 <button
                                     onClick={handleRefresh}
-                                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-md"
                                 >
                                     Retry
                                 </button>
@@ -423,85 +585,136 @@ const ListRFID: React.FC = () => {
                                 <p className="text-sm">Belum ada data RFID atau tidak ditemukan dengan filter yang dipilih</p>
                             </div>
                         ) : (
-                            <div className="flex flex-col h-full">
-                                {/* Table Header - Sticky, Taller, Bolder, High Contrast */}
-                                <div className="bg-slate-800 border-b border-slate-700 shrink-0">
-                                    <div className="flex items-center px-4 h-16 text-sm font-extrabold text-white uppercase tracking-wider">
-                                        <div className="w-12 shrink-0 text-center" style={{ textAlign: 'center' }}>No</div>
-                                        <div className="flex-1 min-w-[150px] text-center" style={{ textAlign: 'center' }}>RFID ID</div>
-                                        <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>WO</div>
-                                        <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>Style</div>
-                                        <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>Buyer</div>
-                                        <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>Item</div>
-                                        <div className="flex-1 min-w-[80px] text-center" style={{ textAlign: 'center' }}>Color</div>
-                                        <div className="flex-1 min-w-[60px] text-center" style={{ textAlign: 'center' }}>Size</div>
-                                        <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>Status</div>
-                                        <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>Lokasi</div>
-                                        <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>Line</div>
-                                        <div className="w-24 shrink-0 text-center" style={{ textAlign: 'center' }}>Actions</div>
+                            <div className="flex flex-col h-full overflow-x-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #f1f5f9' }}>
+                                {/* Wrapper untuk header dan body dengan scroll horizontal bersama */}
+                                <div className="min-w-max flex flex-col h-full">
+                                    {/* Table Header - Sticky dengan gradient yang menarik */}
+                                    <div className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 border-b-2 border-slate-600 shrink-0 sticky top-0 z-10 shadow-md">
+                                        <div className="flex items-center px-3 h-14 text-xs font-extrabold text-white uppercase tracking-wider gap-2">
+                                            <div className="w-[130px] shrink-0 text-center font-semibold">RFID ID</div>
+                                            <div className="w-[75px] shrink-0 text-center font-semibold">WO</div>
+                                            <div className="w-[85px] shrink-0 text-center font-semibold">Style</div>
+                                            <div className="w-[140px] shrink-0 text-center font-semibold">Buyer</div>
+                                            <div className="w-[180px] shrink-0 text-center font-semibold">Item</div>
+                                            <div className="w-[80px] shrink-0 text-center font-semibold">Color</div>
+                                            <div className="w-[55px] shrink-0 text-center font-semibold">Size</div>
+                                            <div className="w-[85px] shrink-0 text-center font-semibold">Status</div>
+                                            <div className="w-[85px] shrink-0 text-center font-semibold">Lokasi</div>
+                                            <div className="w-[75px] shrink-0 text-center font-semibold">Line</div>
+                                            <div className="w-20 shrink-0 text-center font-semibold">Actions</div>
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Table Body - Scrollable */}
-                                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                    {/* Table Body - Scrollable dengan custom scrollbar */}
+                                    <div 
+                                        className="flex-1 overflow-y-auto min-h-0"
+                                        style={{
+                                            scrollbarWidth: 'thin',
+                                            scrollbarColor: '#cbd5e1 #f1f5f9',
+                                            WebkitOverflowScrolling: 'touch' // Smooth scrolling untuk mobile/tablet
+                                        }}
+                                    >
+                                    <style>{`
+                                        div[class*="overflow-y-auto"]::-webkit-scrollbar {
+                                            width: 8px;
+                                            height: 8px;
+                                        }
+                                        div[class*="overflow-y-auto"]::-webkit-scrollbar-track {
+                                            background: #f1f5f9;
+                                            border-radius: 4px;
+                                        }
+                                        div[class*="overflow-y-auto"]::-webkit-scrollbar-thumb {
+                                            background: #cbd5e1;
+                                            border-radius: 4px;
+                                        }
+                                        div[class*="overflow-y-auto"]::-webkit-scrollbar-thumb:hover {
+                                            background: #94a3b8;
+                                        }
+                                    `}</style>
                                     {filteredData.map((item, index) => (
                                         <div
                                             key={item.id}
-                                            className="flex items-center px-4 py-4 border-b border-slate-100 hover:bg-slate-50 transition-colors text-sm text-slate-700 font-medium"
+                                            className={`flex items-center px-3 py-3.5 border-b border-slate-100 transition-all duration-200 text-sm font-medium group gap-2 min-w-max ${
+                                                index % 2 === 0 
+                                                    ? 'bg-white hover:bg-blue-50/50' 
+                                                    : 'bg-slate-50/50 hover:bg-blue-50/50'
+                                            }`}
                                         >
-                                            <div className="w-12 shrink-0 font-bold text-slate-500 text-center" style={{ textAlign: 'center' }}>{index + 1}</div>
-                                            <div className="flex-1 min-w-[150px] text-center" style={{ textAlign: 'center' }}>
-                                                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100 font-mono">
+                                            <div className="w-[130px] shrink-0 text-center">
+                                                <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-extrabold bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200 font-mono shadow-sm group-hover:shadow-md transition-shadow">
                                                     {item.rfid}
                                                 </span>
                                             </div>
-                                            <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>{item.nomor_wo}</div>
-                                            <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>{item.style}</div>
-                                            <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>{item.buyer}</div>
-                                            <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>{item.item}</div>
-                                            <div className="flex-1 min-w-[80px] text-center" style={{ textAlign: 'center' }}>
-                                                <span className="inline-flex items-center gap-1">
-                                                    <span className="w-3 h-3 rounded-full border border-slate-200" style={{ backgroundColor: item.color?.toLowerCase() }}></span>
-                                                    {item.color}
+                                            <div className="w-[75px] shrink-0 text-center text-slate-700 font-semibold text-sm">
+                                                {item.nomor_wo || '-'}
+                                            </div>
+                                            <div className="w-[85px] shrink-0 text-center text-slate-700 text-sm">
+                                                {item.style || '-'}
+                                            </div>
+                                            <div className="w-[140px] shrink-0 text-center text-slate-700 text-sm">
+                                                <span className="truncate block" title={item.buyer || '-'}>
+                                                    {item.buyer || '-'}
                                                 </span>
                                             </div>
-                                            <div className="flex-1 min-w-[60px] text-center font-bold" style={{ textAlign: 'center' }}>{item.size}</div>
-                                            <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>
-                                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${item.status === 'Good' ? 'bg-green-100 text-green-800' :
-                                                        item.status === 'Reject' ? 'bg-red-100 text-red-800' :
-                                                            'bg-yellow-100 text-yellow-800'
-                                                    }`}>
-                                                    {item.status}
+                                            <div className="w-[180px] shrink-0 text-center text-slate-700 text-sm">
+                                                <span className="truncate block" title={item.item || '-'}>
+                                                    {item.item || '-'}
                                                 </span>
                                             </div>
-                                            <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>
-                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${item.lokasi === 'Dryroom' ? 'bg-purple-50 text-purple-700' :
-                                                        'bg-slate-100 text-slate-700'
-                                                    }`}>
-                                                    {item.lokasi || '-'}
+                                            <div className="w-[80px] shrink-0 text-center">
+                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-semibold">
+                                                    <span className="w-3 h-3 rounded-full border-2 border-slate-300 shadow-sm" style={{ backgroundColor: item.color?.toLowerCase() || '#ccc' }}></span>
+                                                    <span className="text-slate-700 truncate">{item.color || '-'}</span>
                                                 </span>
                                             </div>
-                                            <div className="flex-1 min-w-[100px] text-center" style={{ textAlign: 'center' }}>
-                                                <span className="text-slate-600 font-semibold">{item.line}</span>
+                                            <div className="w-[55px] shrink-0 text-center font-bold text-slate-700 text-sm">
+                                                {item.size || '-'}
                                             </div>
-                                            <div className="w-24 shrink-0 flex justify-center gap-2" style={{ textAlign: 'center' }}>
+                                            <div className="w-[85px] shrink-0 text-center">
+                                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold shadow-sm transition-all ${
+                                                    item.status === 'Good' 
+                                                        ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-200' 
+                                                        : item.status === 'Reject' 
+                                                        ? 'bg-gradient-to-r from-red-100 to-rose-100 text-red-800 border border-red-200'
+                                                        : 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-800 border border-yellow-200'
+                                                }`}>
+                                                    {item.status || 'Unknown'}
+                                                </span>
+                                            </div>
+                                            <div className="w-[85px] shrink-0 text-center">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold shadow-sm ${
+                                                    item.lokasi === 'Dryroom' 
+                                                        ? 'bg-gradient-to-r from-purple-50 to-violet-50 text-purple-700 border border-purple-200'
+                                                        : 'bg-gradient-to-r from-slate-50 to-slate-100 text-slate-700 border border-slate-200'
+                                                }`}>
+                                                    <MapPin size={11} />
+                                                    <span className="truncate">{item.lokasi || '-'}</span>
+                                                </span>
+                                            </div>
+                                            <div className="w-[75px] shrink-0 text-center">
+                                                <span className="inline-flex items-center px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold text-xs border border-blue-200 shadow-sm">
+                                                    {item.line || '-'}
+                                                </span>
+                                            </div>
+                                            <div className="w-20 shrink-0 flex justify-center gap-1.5">
                                                 <button
                                                     onClick={() => handleView(item)}
-                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
                                                     title="View Details"
                                                 >
-                                                    <Eye size={18} />
+                                                    <Eye size={16} />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete(item)}
-                                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    className="p-2 text-red-600 hover:text-red-700 hover:bg-red-100 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
                                                     title="Delete Data"
                                                 >
-                                                    <Trash2 size={18} />
+                                                    <Trash2 size={16} />
                                                 </button>
                                             </div>
                                         </div>
                                     ))}
+                                    </div>
                                 </div>
                             </div>
                         )}

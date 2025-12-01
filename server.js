@@ -1445,6 +1445,26 @@ app.get('/report/wira', async (req, res) => {
     return await proxyRequest('/report/wira', req, res);
 });
 
+/**
+ * POST /inputRFID - Input RFID garment ke database
+ * Body: { rfid_garment, wo, style, buyer, item, color, size }
+ */
+app.post('/inputRFID', async (req, res) => {
+    console.log(`\n📥 [POST /inputRFID] Request received`);
+    console.log(`📥 [POST /inputRFID] Body:`, req.body);
+    return await proxyRequest('/inputRFID', req, res);
+});
+
+/**
+ * POST /inputUser - Input user baru ke database
+ * Body: { rfid_user, password, nama, nik, bagian, line, telegram, no_hp }
+ */
+app.post('/inputUser', async (req, res) => {
+    console.log(`\n📥 [POST /inputUser] Request received`);
+    console.log(`📥 [POST /inputUser] Body:`, req.body);
+    return await proxyRequest('/inputUser', req, res);
+});
+
 // ============================================
 // ERROR HANDLING
 // ============================================
@@ -1508,6 +1528,8 @@ app.listen(PORT, HOST, () => {
     console.log(`   GET  http://${LOCAL_IP}:${PORT}/wo/production_branch (Proxy ke Backend API)`);
     console.log(`   GET  http://${LOCAL_IP}:${PORT}/monitoring/line (Proxy ke Backend API)`);
     console.log(`   GET  http://${LOCAL_IP}:${PORT}/report/wira (Proxy ke Backend API)`);
+    console.log(`   POST http://${LOCAL_IP}:${PORT}/inputRFID (Proxy ke Backend API)`);
+    console.log(`   POST http://${LOCAL_IP}:${PORT}/inputUser (Proxy ke Backend API)`);
     console.log(`\n🚀 Server running on:`);
     console.log(`   - http://localhost:${PORT} (Local access)`);
     console.log(`   - http://${LOCAL_IP}:${PORT} (Network access - gunakan IP ini untuk akses dari komputer lain)`);

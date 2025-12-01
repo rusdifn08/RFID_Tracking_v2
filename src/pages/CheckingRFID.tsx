@@ -149,7 +149,7 @@ export default function CheckingRFID() {
 
             {/* Main Content */}
             <div
-                className="flex flex-col w-full transition-all duration-300 ease-in-out"
+                className="flex flex-col w-full h-screen transition-all duration-300 ease-in-out"
                 style={{
                     marginLeft: sidebarWidth,
                     width: `calc(100% - ${sidebarWidth})`
@@ -161,7 +161,7 @@ export default function CheckingRFID() {
                 </div>
 
                 {/* Page Content */}
-                <main className="flex-1 p-6 space-y-6">
+                <main className="flex-1 p-6 space-y-6 pt-16 overflow-y-auto h-full">
                     {/* Page Title */}
                     <div className="text-center mb-8">
                         <div className="flex items-center justify-center gap-4 mb-4">

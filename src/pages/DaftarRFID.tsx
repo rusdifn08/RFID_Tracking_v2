@@ -2,10 +2,36 @@ import { useState, useRef, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { useSidebar } from '../context/SidebarContext';
-import { QrCode } from 'lucide-react';
+import { QrCode, Calendar } from 'lucide-react';
 import ScanningRFIDNew from '../components/ScanningRFIDNew';
+import { API_BASE_URL } from '../config/api';
 
-// Data dummy untuk Work Order
+// Interface untuk data dari API
+interface ProductionBranchData {
+    breakdown_sizes: string;
+    buyer: string;
+    colors: string;
+    line: string;
+    product_name: string;
+    production_branch: string;
+    start_date: string;
+    style: string;
+    total_qty_order: string;
+    wo_id: number;
+    wo_no: string;
+}
+
+interface ProductionBranchResponse {
+    count: number;
+    data: ProductionBranchData[];
+    date_from: string;
+    date_to: string;
+    line: string;
+    production_branch: string;
+    success: boolean;
+}
+
+// Interface untuk Work Order Data yang sudah diproses
 interface WorkOrderData {
     workOrder: string;
     styles: string[];
@@ -15,27 +41,23 @@ interface WorkOrderData {
     sizes: string[];
 }
 
-const workOrderData: Record<string, WorkOrderData> = {
-    '186401': {
-        workOrder: '186401',
-        styles: ['1128733', '1128734'],
-        buyers: ['HEXAPOLE COMPANY LIMITED'],
-        items: ['STORM CRUISER JACKET M\'S (M-R)'],
-        colors: ['Black', 'Blue', 'Red', 'Yellow', 'Pink'],
-        sizes: ['S', 'M', 'L', 'XL', 'XXL']
-    },
-    '186402': {
-        workOrder: '186402',
-        styles: ['193385', '199987'],
-        buyers: ['Montbell'],
-        items: ['Jacket Storm '],
-        colors: ['Pink', 'Blue', 'Green'],
-        sizes: ['L', 'XL', 'XXL']
-    }
-};
-
 export default function DaftarRFID() {
     const { isOpen } = useSidebar();
+    
+    // Date range state - default hari ini
+    const getTodayDate = () => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    
+    const [dateFrom, setDateFrom] = useState<string>(getTodayDate());
+    const [dateTo, setDateTo] = useState<string>(getTodayDate());
+    const [workOrderData, setWorkOrderData] = useState<Record<string, WorkOrderData>>({});
+    const [loading, setLoading] = useState<boolean>(false);
+    
     const [formData, setFormData] = useState({
         workOrder: '',
         style: '',
@@ -56,6 +78,116 @@ export default function DaftarRFID() {
     const availableItems = selectedWOData?.items || [];
     const availableColors = selectedWOData?.colors || [];
     const availableSizes = selectedWOData?.sizes || [];
+    
+    // Fetch data dari API
+    const fetchProductionBranchData = async () => {
+        try {
+            setLoading(true);
+            // Format date untuk API: YYYY-M-D (tanpa leading zero di bulan dan hari jika < 10)
+            const formatDateForAPI = (dateStr: string) => {
+                const [year, month, day] = dateStr.split('-');
+                return `${year}-${parseInt(month)}-${parseInt(day)}`;
+            };
+            
+            const apiUrl = `${API_BASE_URL}/wo/production_branch?production_branch=CJL&line=L1&start_date_from=${formatDateForAPI(dateFrom)}&start_date_to=${formatDateForAPI(dateTo)}`;
+            console.log('🔍 [DaftarRFID] Fetching data from:', apiUrl);
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result: ProductionBranchResponse = await response.json();
+            console.log('📦 [DaftarRFID] API Response:', result);
+            
+            // Process data dari API
+            const processedData: Record<string, WorkOrderData> = {};
+            
+            if (result.data && Array.isArray(result.data)) {
+                result.data.forEach((item) => {
+                    const woNo = item.wo_no;
+                    
+                    if (!processedData[woNo]) {
+                        processedData[woNo] = {
+                            workOrder: woNo,
+                            styles: [],
+                            buyers: [],
+                            items: [],
+                            colors: [],
+                            sizes: []
+                        };
+                    }
+                    
+                    // Process style - split by comma jika ada
+                    const styles = item.style ? item.style.split(',').map(s => s.trim()).filter(s => s) : [];
+                    styles.forEach(style => {
+                        if (!processedData[woNo].styles.includes(style)) {
+                            processedData[woNo].styles.push(style);
+                        }
+                    });
+                    
+                    // Process buyer
+                    if (item.buyer && !processedData[woNo].buyers.includes(item.buyer)) {
+                        processedData[woNo].buyers.push(item.buyer);
+                    }
+                    
+                    // Process item (product_name)
+                    if (item.product_name && !processedData[woNo].items.includes(item.product_name)) {
+                        processedData[woNo].items.push(item.product_name);
+                    }
+                    
+                    // Process colors - split by comma
+                    const colors = item.colors ? item.colors.split(',').map(c => c.trim()).filter(c => c) : [];
+                    colors.forEach(color => {
+                        if (!processedData[woNo].colors.includes(color)) {
+                            processedData[woNo].colors.push(color);
+                        }
+                    });
+                    
+                    // Process sizes - split by comma
+                    const sizes = item.breakdown_sizes ? item.breakdown_sizes.split(',').map(s => s.trim()).filter(s => s) : [];
+                    sizes.forEach(size => {
+                        if (!processedData[woNo].sizes.includes(size)) {
+                            processedData[woNo].sizes.push(size);
+                        }
+                    });
+                });
+            }
+            
+            console.log('✅ [DaftarRFID] Processed data:', processedData);
+            setWorkOrderData(processedData);
+            
+            // Reset form jika work order yang dipilih tidak ada lagi
+            if (formData.workOrder && !processedData[formData.workOrder]) {
+                setFormData({
+                    workOrder: '',
+                    style: '',
+                    buyer: '',
+                    item: '',
+                    color: '',
+                    size: ''
+                });
+            }
+            
+            setLoading(false);
+        } catch (error) {
+            console.error('❌ [DaftarRFID] Error fetching data:', error);
+            setWorkOrderData({});
+            setLoading(false);
+        }
+    };
+    
+    // Fetch data saat component mount dan saat date berubah
+    useEffect(() => {
+        fetchProductionBranchData();
+    }, [dateFrom, dateTo]);
     
     // Sync ref dengan state
     useEffect(() => {
@@ -161,16 +293,47 @@ export default function DaftarRFID() {
 
                             {/* Header Section - Compact untuk Mobile */}
                             <div className="flex-shrink-0 mb-2 sm:mb-4">
-                                {/* Icon RFID di atas dengan animasi */}
-                                <div className="flex justify-center items-center mb-1.5 sm:mb-3">
-                                    <div
-                                        className={`w-10 h-10 sm:w-14 sm:h-14 bg-blue-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg transition-all duration-500 ${hoveredCard ? 'scale-110 rotate-3 shadow-blue-500/50' : 'scale-100 rotate-0'}`}
-                                    >
-                                        <QrCode
-                                            className={`w-6 h-6 sm:w-8 sm:h-8 text-white transition-all duration-500 ${hoveredCard ? 'scale-110' : 'scale-100'}`}
-                                            strokeWidth={2.5}
-                                        />
+                                {/* Date Range Picker dan Icon RFID */}
+                                <div className="flex items-center justify-between mb-1.5 sm:mb-3 gap-2">
+                                    {/* Date Range Picker */}
+                                    <div className="flex items-center gap-2 flex-1">
+                                        <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5">
+                                            <Calendar size={16} className="text-blue-600" />
+                                            <input
+                                                type="date"
+                                                value={dateFrom}
+                                                onChange={(e) => setDateFrom(e.target.value)}
+                                                className="text-xs sm:text-sm text-gray-700 bg-transparent border-none outline-none focus:ring-0 cursor-pointer"
+                                                title="Tanggal Dari"
+                                            />
+                                        </div>
+                                        <span className="text-gray-500 text-xs">s/d</span>
+                                        <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5">
+                                            <Calendar size={16} className="text-blue-600" />
+                                            <input
+                                                type="date"
+                                                value={dateTo}
+                                                onChange={(e) => setDateTo(e.target.value)}
+                                                className="text-xs sm:text-sm text-gray-700 bg-transparent border-none outline-none focus:ring-0 cursor-pointer"
+                                                title="Tanggal Sampai"
+                                            />
+                                        </div>
                                     </div>
+                                    
+                                    {/* Icon RFID di tengah */}
+                                    <div className="flex-shrink-0">
+                                        <div
+                                            className={`w-10 h-10 sm:w-14 sm:h-14 bg-blue-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg transition-all duration-500 ${hoveredCard ? 'scale-110 rotate-3 shadow-blue-500/50' : 'scale-100 rotate-0'}`}
+                                        >
+                                            <QrCode
+                                                className={`w-6 h-6 sm:w-8 sm:h-8 text-white transition-all duration-500 ${hoveredCard ? 'scale-110' : 'scale-100'}`}
+                                                strokeWidth={2.5}
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Spacer untuk balance */}
+                                    <div className="flex-1"></div>
                                 </div>
 
                                 {/* Title */}
@@ -207,9 +370,12 @@ export default function DaftarRFID() {
                                             onChange={handleInputChange}
                                             onFocus={() => setFocusedInput('workOrder')}
                                             onBlur={() => setFocusedInput(null)}
-                                            className="w-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all duration-300 hover:border-blue-400 bg-white cursor-pointer"
+                                            disabled={loading}
+                                            className="w-full h-9 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all duration-300 hover:border-blue-400 bg-white cursor-pointer disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
                                         >
-                                            <option value="">Pilih Work Order</option>
+                                            <option value="">
+                                                {loading ? 'Loading...' : Object.keys(workOrderData).length === 0 ? 'Tidak ada data' : 'Pilih Work Order'}
+                                            </option>
                                             {Object.keys(workOrderData).map(wo => (
                                                 <option key={wo} value={wo}>{wo}</option>
                                             ))}
