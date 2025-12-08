@@ -1492,6 +1492,34 @@ app.post('/scrap', async (req, res) => {
     return await proxyRequest('/scrap', req, res);
 });
 
+/**
+ * GET /card - Get summary data card (done, progress, total_cards, waiting)
+ */
+app.get('/card', async (req, res) => {
+    return await proxyRequest('/card', req, res);
+});
+
+/**
+ * GET /card/progress - Get data card dengan status progress
+ */
+app.get('/card/progress', async (req, res) => {
+    return await proxyRequest('/card/progress', req, res);
+});
+
+/**
+ * GET /card/done - Get data card dengan status done
+ */
+app.get('/card/done', async (req, res) => {
+    return await proxyRequest('/card/done', req, res);
+});
+
+/**
+ * GET /card/waiting - Get data card dengan status waiting
+ */
+app.get('/card/waiting', async (req, res) => {
+    return await proxyRequest('/card/waiting', req, res);
+});
+
 // ============================================
 // ERROR HANDLING
 // ============================================
@@ -1556,6 +1584,10 @@ app.listen(PORT, HOST, () => {
     console.log(`   GET  http://${LOCAL_IP}:${PORT}/monitoring/line (Proxy ke Backend API)`);
     console.log(`   GET  http://${LOCAL_IP}:${PORT}/wira (Proxy ke Backend API)`);
     console.log(`   GET  http://${LOCAL_IP}:${PORT}/report/wira (Proxy ke Backend API)`);
+    console.log(`   GET  http://${LOCAL_IP}:${PORT}/card (Proxy ke Backend API)`);
+    console.log(`   GET  http://${LOCAL_IP}:${PORT}/card/progress (Proxy ke Backend API)`);
+    console.log(`   GET  http://${LOCAL_IP}:${PORT}/card/done (Proxy ke Backend API)`);
+    console.log(`   GET  http://${LOCAL_IP}:${PORT}/card/waiting (Proxy ke Backend API)`);
     console.log(`   POST http://${LOCAL_IP}:${PORT}/inputRFID (Proxy ke Backend API)`);
     console.log(`   POST http://${LOCAL_IP}:${PORT}/inputUser (Proxy ke Backend API)`);
     console.log(`\n🚀 Server running on:`);

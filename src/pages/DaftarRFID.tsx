@@ -197,27 +197,89 @@ export default function DaftarRFID() {
         }
     };
     
-    // Fetch data registered RFID
+    // Fetch data registered RFID dari 3 endpoint baru
     const fetchRegisteredRFID = async () => {
         try {
             setLoadingRegistered(true);
-            const response = await fetch(`${API_BASE_URL}/garment`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-            });
+            
+            // Fetch data dari 3 endpoint secara parallel melalui proxy server
+            const [progressResponse, doneResponse, waitingResponse] = await Promise.all([
+                fetch(`${API_BASE_URL}/card/progress`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                }),
+                fetch(`${API_BASE_URL}/card/done`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                }),
+                fetch(`${API_BASE_URL}/card/waiting`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                }),
+            ]);
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            // Parse responses dengan error handling
+            let progressData = { data: [] };
+            let doneData = { data: [] };
+            let waitingData = { data: [] };
+
+            if (progressResponse.ok) {
+                try {
+                    progressData = await progressResponse.json();
+                } catch (e) {
+                    console.error('Error parsing progress response:', e);
+                }
+            } else {
+                console.error('Progress response not OK:', progressResponse.status, progressResponse.statusText);
             }
 
-            const result = await response.json();
-            // Handle berbagai format response
-            const data = result.data || result || [];
-            setRegisteredRFIDData(Array.isArray(data) ? data : []);
+            if (doneResponse.ok) {
+                try {
+                    doneData = await doneResponse.json();
+                } catch (e) {
+                    console.error('Error parsing done response:', e);
+                }
+            } else {
+                console.error('Done response not OK:', doneResponse.status, doneResponse.statusText);
+            }
+
+            if (waitingResponse.ok) {
+                try {
+                    waitingData = await waitingResponse.json();
+                } catch (e) {
+                    console.error('Error parsing waiting response:', e);
+                }
+            } else {
+                console.error('Waiting response not OK:', waitingResponse.status, waitingResponse.statusText);
+            }
+
+            // Gabungkan semua data dari ketiga endpoint dengan menambahkan identifier
+            // untuk membedakan status "Waiting" dari "In Progress"
+            const allData = [
+                ...(progressData.data || []).map((item: any) => ({ ...item, _source: 'progress' })),
+                ...(doneData.data || []).map((item: any) => ({ ...item, _source: 'done' })),
+                ...(waitingData.data || []).map((item: any) => ({ ...item, _source: 'waiting', isDone: 'waiting' })),
+            ];
+
+            console.log('Fetched registered RFID data:', {
+                progress: progressData.data?.length || 0,
+                done: doneData.data?.length || 0,
+                waiting: waitingData.data?.length || 0,
+                total: allData.length
+            });
+
+            setRegisteredRFIDData(Array.isArray(allData) ? allData : []);
         } catch (error) {
+            console.error('Error fetching registered RFID:', error);
             setRegisteredRFIDData([]);
         } finally {
             setLoadingRegistered(false);

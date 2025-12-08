@@ -598,3 +598,67 @@ export const getTrackingLineData = async (line: string | number): Promise<ApiRes
     return await apiGet<TrackingLineData>(endpoint);
 };
 
+// ============================================
+// CARD DATA ENDPOINTS
+// ============================================
+
+export interface CardSummaryData {
+    done: string;
+    progress: string;
+    total_cards: number;
+    waiting: string;
+}
+
+export interface CardData {
+    buyer: string;
+    color: string;
+    id_garment: number;
+    isDone: string;
+    isMove: string;
+    item: string;
+    rfid_garment: string;
+    size: string;
+    style: string;
+    timestamp: string;
+    updated: string;
+    wo: string;
+}
+
+export interface CardResponse {
+    count: number;
+    data: CardData[];
+    success?: boolean;
+}
+
+/**
+ * Get card summary data
+ * @returns Card summary data (done, progress, total_cards, waiting)
+ */
+export const getCardSummary = async (): Promise<ApiResponse<{ data: CardSummaryData[]; success: boolean }>> => {
+    return await apiGet('/card');
+};
+
+/**
+ * Get card data with progress status
+ * @returns Card data with progress status
+ */
+export const getCardProgress = async (): Promise<ApiResponse<CardResponse>> => {
+    return await apiGet<CardResponse>('/card/progress');
+};
+
+/**
+ * Get card data with done status
+ * @returns Card data with done status
+ */
+export const getCardDone = async (): Promise<ApiResponse<CardResponse>> => {
+    return await apiGet<CardResponse>('/card/done');
+};
+
+/**
+ * Get card data with waiting status
+ * @returns Card data with waiting status
+ */
+export const getCardWaiting = async (): Promise<ApiResponse<CardResponse>> => {
+    return await apiGet<CardResponse>('/card/waiting');
+};
+
