@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import { useSidebar } from '../context/SidebarContext';
 import { API_BASE_URL } from '../config/api';
 import ExportModal from '../components/ExportModal';
+import type { ExportType } from '../components/ExportModal';
 import { exportToExcel } from '../utils/exportToExcel';
 import {
     PieChart, Pie, Cell, ResponsiveContainer,
@@ -202,38 +203,59 @@ export default function DashboardRFID() {
 
                 if (!isMounted) return;
 
+                console.log('WIRA API Response:', {
+                    url,
+                    success: data.success,
+                    total: data.total,
+                    dataLength: data.data?.length || 0,
+                    data: data.data,
+                    filters: data.filters
+                });
+
                 // Parse data dari API
-                // Struktur API: { success: true, data: [{ line, Good, Rework, Reject, WIRA, ... }], total }
+                // Struktur API: { success: true, data: [{ Line, Good, Rework, Reject, WIRA, ... }], total }
                 if (data && data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
+                    // Helper function untuk parse number dari string atau number
+                    const parseNumber = (value: any): number => {
+                        if (value === null || value === undefined || value === '') return 0;
+                        const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+                        return isNaN(num) ? 0 : num;
+                    };
+
                     // Filter data berdasarkan line yang dipilih
-                    // Coba match dengan line sebagai string atau number
+                    // Coba match dengan line sebagai string atau number (case-insensitive)
                     const lineData = data.data.find((item: any) => {
-                        const itemLine = String(item.line || '').trim();
+                        // Cek field Line (kapital) atau line (huruf kecil)
+                        const itemLine = String(item.Line || item.line || item.LINE || '').trim();
                         const targetLine = String(lineId || '').trim();
-                        return itemLine === targetLine;
+                        // Match exact atau match sebagai number
+                        const itemLineNum = parseInt(itemLine, 10);
+                        const targetLineNum = parseInt(targetLine, 10);
+                        return itemLine === targetLine || 
+                               (!isNaN(itemLineNum) && !isNaN(targetLineNum) && itemLineNum === targetLineNum);
                     });
                     
                     if (lineData) {
-                        // Helper function untuk parse number dari string atau number
-                        const parseNumber = (value: any): number => {
-                            if (value === null || value === undefined || value === '') return 0;
-                            const num = typeof value === 'string' ? parseFloat(value) : Number(value);
-                            return isNaN(num) ? 0 : num;
-                        };
-
                         // Parse dengan Number() dan fallback ke 0
                         // Field names dari API: "Good", "Rework", "Reject", "WIRA", "Output Sewing", "PQC Good", "PQC Rework", "PQC Reject", "PQC WIRA"
+                        // Menggunakan fallback untuk berbagai variasi field name untuk kompatibilitas
                         const newData = {
-                            good: parseNumber(lineData.Good),
-                            rework: parseNumber(lineData.Rework),
-                            reject: parseNumber(lineData.Reject),
-                            wiraQc: parseNumber(lineData.WIRA),
-                            pqcGood: parseNumber(lineData['PQC Good']),
-                            pqcRework: parseNumber(lineData['PQC Rework']),
-                            pqcReject: parseNumber(lineData['PQC Reject']),
-                            wiraPqc: parseNumber(lineData['PQC WIRA']),
-                            outputLine: parseNumber(lineData['Output Sewing']),
+                            good: parseNumber(lineData.Good || lineData.good || 0),
+                            rework: parseNumber(lineData.Rework || lineData.rework || 0),
+                            reject: parseNumber(lineData.Reject || lineData.reject || 0),
+                            wiraQc: parseNumber(lineData.WIRA || lineData.wira || 0),
+                            pqcGood: parseNumber(lineData['PQC Good'] || lineData['PQC Good'] || lineData['pqc_good'] || lineData.pqcGood || 0),
+                            pqcRework: parseNumber(lineData['PQC Rework'] || lineData['PQC Rework'] || lineData['pqc_rework'] || lineData.pqcRework || 0),
+                            pqcReject: parseNumber(lineData['PQC Reject'] || lineData['PQC Reject'] || lineData['pqc_reject'] || lineData.pqcReject || 0),
+                            wiraPqc: parseNumber(lineData['PQC WIRA'] || lineData['PQC WIRA'] || lineData['pqc_wira'] || lineData.pqcWira || 0),
+                            outputLine: parseNumber(lineData['Output Sewing'] || lineData['Output Sewing'] || lineData['output_sewing'] || lineData.outputSewing || 0),
                         };
+
+                        console.log('WIRA Data parsed:', {
+                            lineId,
+                            rawLineData: lineData,
+                            parsed: newData
+                        });
 
                         // Update state langsung tanpa cek perubahan (untuk memastikan data muncul)
                         setTrackingData(data);
@@ -249,6 +271,7 @@ export default function DashboardRFID() {
                         // Update ref untuk perbandingan berikutnya
                         previousDataRef.current = newData;
                     } else {
+                        console.warn('No data found for line:', lineId, 'Available lines in data:', data.data.map((item: any) => item.Line || item.line));
                         // Jika tidak ada data untuk line ini, set semua ke 0
                         const emptyData = {
                             good: 0,
@@ -273,6 +296,12 @@ export default function DashboardRFID() {
                         previousDataRef.current = emptyData;
                     }
                 } else {
+                    console.warn('WIRA API response invalid or empty:', {
+                        success: data?.success,
+                        hasData: !!data?.data,
+                        isArray: Array.isArray(data?.data),
+                        dataLength: data?.data?.length || 0
+                    });
                     // Jika response tidak valid atau data kosong, set semua ke 0
                     const emptyData = {
                         good: 0,
@@ -298,6 +327,7 @@ export default function DashboardRFID() {
                 }
             } catch (error) {
                 // Error handling - set semua ke 0 jika terjadi error
+                console.error('[DashboardRFID] Error fetching data dari API /wira:', error);
                 if (isMounted) {
                     const emptyData = {
                         good: 0,
@@ -457,44 +487,206 @@ export default function DashboardRFID() {
         { name: 'Reject', value: pqcReject, color: COLORS.red },
     ].filter(d => d.value > 0);
 
-    // Fungsi untuk handle export
-    const handleExport = async (format: 'excel' | 'csv') => {
-        const now = new Date();
-        const tanggal = now.toLocaleDateString('id-ID', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        });
+    // Fungsi untuk fetch data per hari
+    const fetchDailyData = async (): Promise<any[]> => {
+        try {
+            // Tentukan range tanggal
+            const startDate = filterDateFrom ? new Date(filterDateFrom) : new Date();
+            const endDate = filterDateTo ? new Date(filterDateTo) : new Date();
+            
+            // Jika tidak ada filter, gunakan hari ini saja
+            if (!filterDateFrom && !filterDateTo) {
+                startDate.setHours(0, 0, 0, 0);
+                endDate.setHours(23, 59, 59, 999);
+            }
 
+            const dailyData: any[] = [];
+            const currentDate = new Date(startDate);
+            
+            // Loop setiap hari dalam range
+            while (currentDate <= endDate) {
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const formattedDate = formatDateForAPI(dateStr);
+                
+                // Fetch data untuk hari ini
+                const url = `${API_BASE_URL}/wira?line=${encodeURIComponent(lineId)}&tanggalfrom=${encodeURIComponent(formattedDate)}&tanggalto=${encodeURIComponent(formattedDate)}`;
+                
+                try {
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        cache: 'no-cache',
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data && data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
+                            const lineData = data.data.find((item: any) => {
+                                // Cek field Line (kapital) atau line (huruf kecil)
+                                const itemLine = String(item.Line || item.line || item.LINE || '').trim();
+                                const targetLine = String(lineId || '').trim();
+                                // Match exact atau match sebagai number
+                                const itemLineNum = parseInt(itemLine, 10);
+                                const targetLineNum = parseInt(targetLine, 10);
+                                return itemLine === targetLine || 
+                                       (!isNaN(itemLineNum) && !isNaN(targetLineNum) && itemLineNum === targetLineNum);
+                            });
+                            
+                            if (lineData) {
+                                const parseNumber = (value: any): number => {
+                                    if (value === null || value === undefined || value === '') return 0;
+                                    const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+                                    return isNaN(num) ? 0 : num;
+                                };
+
+                                dailyData.push({
+                                    tanggal: dateStr,
+                                    line: `LINE ${lineId}`,
+                                    wo: woData?.wo || '-',
+                                    style: woData?.style || '-',
+                                    item: woData?.item || '-',
+                                    buyer: woData?.buyer || '-',
+                                    color: woData?.color || '-',
+                                    size: woData?.breakdown_sizes || '-',
+                                    outputSewing: parseNumber(lineData['Output Sewing'] || lineData['output_sewing'] || lineData.outputSewing || 0),
+                                    qcRework: parseNumber(lineData.Rework || lineData.rework || 0),
+                                    qcWira: parseNumber(lineData.WIRA || lineData.wira || 0),
+                                    qcReject: parseNumber(lineData.Reject || lineData.reject || 0),
+                                    qcGood: parseNumber(lineData.Good || lineData.good || 0),
+                                    pqcRework: parseNumber(lineData['PQC Rework'] || lineData['PQC Rework'] || lineData['pqc_rework'] || lineData.pqcRework || 0),
+                                    pqcWira: parseNumber(lineData['PQC WIRA'] || lineData['PQC WIRA'] || lineData['pqc_wira'] || lineData.pqcWira || 0),
+                                    pqcReject: parseNumber(lineData['PQC Reject'] || lineData['PQC Reject'] || lineData['pqc_reject'] || lineData.pqcReject || 0),
+                                    pqcGood: parseNumber(lineData['PQC Good'] || lineData['PQC Good'] || lineData['pqc_good'] || lineData.pqcGood || 0),
+                                    goodSewing: parseNumber(lineData['PQC Good'] || lineData['PQC Good'] || lineData['pqc_good'] || lineData.pqcGood || 0),
+                                    balance: parseNumber(lineData['Output Sewing'] || lineData['output_sewing'] || lineData.outputSewing || 0) - parseNumber(lineData['PQC Good'] || lineData['PQC Good'] || lineData['pqc_good'] || lineData.pqcGood || 0),
+                                });
+                            } else {
+                                // Jika tidak ada data, tetap tambahkan baris dengan nilai 0
+                                dailyData.push({
+                                    tanggal: dateStr,
+                                    line: `LINE ${lineId}`,
+                                    wo: woData?.wo || '-',
+                                    style: woData?.style || '-',
+                                    item: woData?.item || '-',
+                                    buyer: woData?.buyer || '-',
+                                    color: woData?.color || '-',
+                                    size: woData?.breakdown_sizes || '-',
+                                    outputSewing: 0,
+                                    qcRework: 0,
+                                    qcWira: 0,
+                                    qcReject: 0,
+                                    qcGood: 0,
+                                    pqcRework: 0,
+                                    pqcWira: 0,
+                                    pqcReject: 0,
+                                    pqcGood: 0,
+                                    goodSewing: 0,
+                                    balance: 0,
+                                });
+                            }
+                        } else {
+                            // Jika tidak ada data, tetap tambahkan baris dengan nilai 0
+                            dailyData.push({
+                                tanggal: dateStr,
+                                line: `LINE ${lineId}`,
+                                wo: woData?.wo || '-',
+                                style: woData?.style || '-',
+                                item: woData?.item || '-',
+                                buyer: woData?.buyer || '-',
+                                color: woData?.color || '-',
+                                size: woData?.breakdown_sizes || '-',
+                                outputSewing: 0,
+                                qcRework: 0,
+                                qcWira: 0,
+                                qcReject: 0,
+                                qcGood: 0,
+                                pqcRework: 0,
+                                pqcWira: 0,
+                                pqcReject: 0,
+                                pqcGood: 0,
+                                goodSewing: 0,
+                                balance: 0,
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error fetching data for ${dateStr}:`, error);
+                    // Tetap tambahkan baris dengan nilai 0 jika error
+                    dailyData.push({
+                        tanggal: dateStr,
+                        line: `LINE ${lineId}`,
+                        wo: woData?.wo || '-',
+                        style: woData?.style || '-',
+                        item: woData?.item || '-',
+                        buyer: woData?.buyer || '-',
+                        color: woData?.color || '-',
+                        size: woData?.breakdown_sizes || '-',
+                        outputSewing: 0,
+                        qcRework: 0,
+                        qcWira: 0,
+                        qcReject: 0,
+                        qcGood: 0,
+                        pqcRework: 0,
+                        pqcWira: 0,
+                        pqcReject: 0,
+                        pqcGood: 0,
+                        goodSewing: 0,
+                        balance: 0,
+                    });
+                }
+                
+                // Pindah ke hari berikutnya
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            return dailyData;
+        } catch (error) {
+            console.error('Error fetching daily data:', error);
+            return [];
+        }
+    };
+
+    // Fungsi untuk handle export
+    const handleExport = async (format: 'excel' | 'csv', exportType: ExportType) => {
         // Ambil data WO jika ada
         const firstWo = woData || null;
 
-        // Siapkan data untuk export
-        const exportData = [{
-            tanggal: tanggal,
-            line: `LINE ${lineId}`,
-            wo: firstWo?.wo || '-',
-            style: firstWo?.style || '-',
-            item: firstWo?.item || '-',
-            buyer: firstWo?.buyer || '-',
-            color: firstWo?.color || '-',
-            size: firstWo?.breakdown_sizes || '-',
-            outputSewing: outputLine,
-            qcRework: rework,
-            qcWira: wiraQc,
-            qcReject: reject,
-            qcGood: good,
-            pqcRework: pqcRework,
-            pqcWira: wiraPqc,
-            pqcReject: pqcReject,
-            pqcGood: pqcGood,
-            goodSewing: good, // Good sewing sama dengan good QC untuk sementara
-            balance: outputLine - (good + wiraQc + reject), // Balance calculation
-            qcChartImage: undefined,
-            pqcChartImage: undefined
-        }];
+        let exportData: any[] = [];
 
-        await exportToExcel(exportData, lineId, format);
+        if (exportType === 'daily') {
+            // Fetch data per hari
+            exportData = await fetchDailyData();
+        } else if (exportType === 'all') {
+            // Data yang ditampilkan di dashboard (default)
+            exportData = [{
+                tanggal: '', // Akan diisi di exportToExcel berdasarkan filter
+                line: `LINE ${lineId}`,
+                wo: firstWo?.wo || '-',
+                style: firstWo?.style || '-',
+                item: firstWo?.item || '-',
+                buyer: firstWo?.buyer || '-',
+                color: firstWo?.color || '-',
+                size: firstWo?.breakdown_sizes || '-',
+                outputSewing: outputLine,
+                qcRework: rework,
+                qcWira: wiraQc,
+                qcReject: reject,
+                qcGood: good,
+                pqcRework: pqcRework,
+                pqcWira: wiraPqc,
+                pqcReject: pqcReject,
+                pqcGood: pqcGood,
+                goodSewing: pqcGood, // Good sewing sama dengan Good PQC
+                balance: outputLine - pqcGood, // Balance = output sewing - good pqc
+                qcChartImage: undefined,
+                pqcChartImage: undefined
+            }];
+        }
+
+        await exportToExcel(exportData, lineId, format, filterDateFrom, filterDateTo, exportType);
     };
 
     // LOGIKA SIZE SIDEBAR (PENTING UNTUK MENGHINDARI TABRAKAN)

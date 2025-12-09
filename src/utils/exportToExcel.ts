@@ -24,10 +24,15 @@ interface ExportData {
     pqcChartImage?: string; // Base64 PNG
 }
 
+export type ExportType = 'all' | 'daily' | 'summary' | 'detail';
+
 export async function exportToExcel(
     data: ExportData[],
     lineId: string,
-    format: 'excel' | 'csv' = 'excel'
+    format: 'excel' | 'csv' = 'excel',
+    filterDateFrom?: string,
+    filterDateTo?: string,
+    exportType: ExportType = 'all'
 ) {
     // Validasi data
     if (!data || data.length === 0) {
@@ -105,14 +110,35 @@ export async function exportToExcel(
 
     let currentRow = 1;
 
+    // Tentukan apakah ini export per hari
+    const isDailyExport = exportType === 'daily';
+
     // ===== TITLE SECTION =====
-    // Format: "RFID TRACKING REPORT DAILY - 2 Desember 2025"
-    const now = new Date();
+    // Format: "RFID TRACKING REPORT DAILY - 2 Desember 2025" atau "RFID TRACKING REPORT DAILY - 2 Desember 2025 - 8 Desember 2025"
     const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
                        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    const tanggalStr = `${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
     
-    worksheet.mergeCells(`A${currentRow}:Q${currentRow}`);
+    let tanggalStr = '';
+    if (filterDateFrom && filterDateTo) {
+        // Jika ada filter dari dan sampai tanggal
+        const fromDate = new Date(filterDateFrom);
+        const toDate = new Date(filterDateTo);
+        const fromStr = `${fromDate.getDate()} ${monthNames[fromDate.getMonth()]} ${fromDate.getFullYear()}`;
+        const toStr = `${toDate.getDate()} ${monthNames[toDate.getMonth()]} ${toDate.getFullYear()}`;
+        tanggalStr = `${fromStr} - ${toStr}`;
+    } else if (filterDateFrom) {
+        // Jika hanya ada filter dari tanggal
+        const fromDate = new Date(filterDateFrom);
+        tanggalStr = `${fromDate.getDate()} ${monthNames[fromDate.getMonth()]} ${fromDate.getFullYear()}`;
+    } else {
+        // Jika tidak ada filter, gunakan tanggal hari ini
+        const now = new Date();
+        tanggalStr = `${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+    }
+    
+    // Adjust merge cells based on export type
+    const titleMergeRange = isDailyExport ? `A${currentRow}:R${currentRow}` : `A${currentRow}:Q${currentRow}`;
+    worksheet.mergeCells(titleMergeRange);
     const titleCell = worksheet.getCell(`A${currentRow}`);
     titleCell.value = `RFID TRACKING REPORT DAILY - ${tanggalStr}`;
     titleCell.font = { bold: true, size: 16, color: { argb: 'FF000000' } };
@@ -121,28 +147,40 @@ export async function exportToExcel(
     currentRow++;
 
     // ===== TABLE HEADER SECTION =====
-    // Header Row 1: Main Headers (LINE, WO, Style, Item, Buyer, Output Sewing, QC Endline, PQC, GOOD SEWING, BALANCE)
+    // Header Row 1: Main Headers
     const headerRow1 = currentRow;
     
-    // Set column widths
-    const colWidths = [15, 12, 12, 30, 30, 15, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12];
+    // Set column widths - tambahkan kolom tanggal jika daily export
+    const baseColWidths = [15, 12, 12, 30, 30, 15, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12];
+    const colWidths = isDailyExport ? [15, ...baseColWidths] : baseColWidths;
     colWidths.forEach((width, idx) => {
         worksheet.getColumn(idx + 1).width = width;
     });
 
-    // Main Headers - LINE, WO, Style, Item, Buyer, Output Sewing, GOOD SEWING, BALANCE merge ke baris 2 dan 3
-    // QC Endline dan PQC hanya merge di baris 1
-    const mainHeaders = [
-        { col: 1, text: 'LINE' }, // Merge A1-A2 dan ke data rows
-        { col: 2, text: 'WO' }, // Merge B1-B2 dan ke data rows
-        { col: 3, text: 'Style' }, // Merge C1-C2 dan ke data rows
-        { col: 4, text: 'Item' }, // Merge D1-D2 dan ke data rows
-        { col: 5, text: 'Buyer' }, // Merge E1-E2 dan ke data rows
-        { col: 6, text: 'Output Sewing' }, // Merge F1-F2 dan ke data rows (hanya 1 kolom)
-        { col: 7, text: 'QC Endline', mergeEnd: 10 }, // Merge G1-J1 (4 kolom: REWORK, WIRA, REJECT, GOOD)
-        { col: 11, text: 'PQC', mergeEnd: 14 }, // Merge K1-N1 (4 kolom: REWORK, WIRA, REJECT, GOOD)
-        { col: 15, text: 'GOOD SEWING' }, // Merge O1-O2 dan ke data rows
-        { col: 16, text: 'BALANCE' } // Merge P1-P2 dan ke data rows
+    // Main Headers - jika daily export, tambahkan kolom Tanggal di awal
+    const mainHeaders = isDailyExport ? [
+        { col: 1, text: 'Tanggal' }, // Kolom tanggal untuk daily export
+        { col: 2, text: 'LINE' },
+        { col: 3, text: 'WO' },
+        { col: 4, text: 'Style' },
+        { col: 5, text: 'Item' },
+        { col: 6, text: 'Buyer' },
+        { col: 7, text: 'Output Sewing' },
+        { col: 8, text: 'QC Endline', mergeEnd: 11 }, // Merge H1-K1
+        { col: 12, text: 'PQC', mergeEnd: 15 }, // Merge L1-O1
+        { col: 16, text: 'GOOD SEWING' },
+        { col: 17, text: 'BALANCE' }
+    ] : [
+        { col: 1, text: 'LINE' },
+        { col: 2, text: 'WO' },
+        { col: 3, text: 'Style' },
+        { col: 4, text: 'Item' },
+        { col: 5, text: 'Buyer' },
+        { col: 6, text: 'Output Sewing' },
+        { col: 7, text: 'QC Endline', mergeEnd: 10 }, // Merge G1-J1
+        { col: 11, text: 'PQC', mergeEnd: 14 }, // Merge K1-N1
+        { col: 15, text: 'GOOD SEWING' },
+        { col: 16, text: 'BALANCE' }
     ];
 
     mainHeaders.forEach(({ col, text, mergeEnd }) => {
@@ -160,10 +198,17 @@ export async function exportToExcel(
     currentRow++;
 
     // Header Row 2: Sub Headers (hanya untuk QC Endline dan PQC)
-    // Untuk kolom lain (LINE, WO, Style, Item, Buyer, Output Sewing, GOOD SEWING, BALANCE), 
-    // kita akan isi dengan data di baris ini juga
     const headerRow2 = currentRow;
-    const subHeaders = [
+    const subHeaders = isDailyExport ? [
+        { col: 8, text: 'REWORK' },  // QC Endline REWORK
+        { col: 9, text: 'WIRA' },   // QC Endline WIRA
+        { col: 10, text: 'REJECT' }, // QC Endline REJECT
+        { col: 11, text: 'GOOD' },  // QC Endline GOOD
+        { col: 12, text: 'REWORK' }, // PQC REWORK
+        { col: 13, text: 'WIRA' },   // PQC WIRA
+        { col: 14, text: 'REJECT' }, // PQC REJECT
+        { col: 15, text: 'GOOD' }    // PQC GOOD
+    ] : [
         { col: 7, text: 'REWORK' },  // QC Endline REWORK
         { col: 8, text: 'WIRA' },   // QC Endline WIRA
         { col: 9, text: 'REJECT' }, // QC Endline REJECT
@@ -189,7 +234,36 @@ export async function exportToExcel(
         const dataRow = currentRow;
         dataRows.push(dataRow);
         
-        const dataValues = [
+        // Format tanggal untuk display
+        let tanggalDisplay = '';
+        if (rowData.tanggal) {
+            const date = new Date(rowData.tanggal);
+            tanggalDisplay = date.toLocaleDateString('id-ID', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
+        }
+        
+        const dataValues = isDailyExport ? [
+            tanggalDisplay || rowData.tanggal || '-', // Col 1 - Tanggal (untuk daily export)
+            rowData.line || '-',           // Col 2 - LINE
+            rowData.wo || '-',             // Col 3 - WO
+            rowData.style || '-',          // Col 4 - Style
+            rowData.item || '-',           // Col 5 - Item
+            rowData.buyer || '-',         // Col 6 - Buyer
+            rowData.outputSewing || 0,     // Col 7 - Output Sewing
+            rowData.qcRework || 0,         // Col 8 - QC Endline REWORK
+            rowData.qcWira || 0,           // Col 9 - QC Endline WIRA
+            rowData.qcReject || 0,        // Col 10 - QC Endline REJECT
+            rowData.qcGood || 0,           // Col 11 - QC Endline GOOD
+            rowData.pqcRework || 0,        // Col 12 - PQC REWORK
+            rowData.pqcWira || 0,         // Col 13 - PQC WIRA
+            rowData.pqcReject || 0,       // Col 14 - PQC REJECT
+            rowData.pqcGood || 0,          // Col 15 - PQC GOOD
+            rowData.goodSewing || 0,       // Col 16 - GOOD SEWING
+            rowData.balance || 0           // Col 17 - BALANCE
+        ] : [
             rowData.line || '-',           // Col 1 - LINE
             rowData.wo || '-',             // Col 2 - WO
             rowData.style || '-',          // Col 3 - Style
@@ -216,8 +290,9 @@ export async function exportToExcel(
             cell.value = value;
             Object.assign(cell, dataCellStyle);
 
-            // Balance column - red if negative
-            if (col === 16 && typeof value === 'number' && value < 0) {
+            // Balance column - red if negative (adjust column number based on export type)
+            const balanceCol = isDailyExport ? 17 : 16;
+            if (col === balanceCol && typeof value === 'number' && value < 0) {
                 cell.font = { color: { argb: 'FFFF0000' }, bold: true, size: 11 };
             }
         });
@@ -226,31 +301,121 @@ export async function exportToExcel(
         currentRow++;
     });
 
+    // Tambahkan baris total untuk export daily
+    if (isDailyExport && dataRows.length > 0) {
+        const totalRow = currentRow;
+        
+        // Hitung total
+        const totalOutputSewing = data.reduce((sum, row) => sum + (row.outputSewing || 0), 0);
+        const totalPqcGood = data.reduce((sum, row) => sum + (row.pqcGood || 0), 0);
+        const balanceFinal = totalOutputSewing - totalPqcGood;
+        
+        // Style untuk baris total
+        const totalRowStyle = {
+            font: { size: 11, bold: true, color: { argb: 'FF000000' } },
+            fill: {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFE8E8E8' } // Light gray background
+            },
+            alignment: { horizontal: 'center', vertical: 'middle' },
+            border: {
+                top: { style: 'medium', color: { argb: 'FF000000' } },
+                bottom: { style: 'medium', color: { argb: 'FF000000' } },
+                left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+                right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+            }
+        };
+        
+        // Col 1-6: Label "TOTAL" (merged)
+        worksheet.getCell(totalRow, 1).value = 'TOTAL';
+        worksheet.getCell(totalRow, 1).font = { size: 11, bold: true, color: { argb: 'FF000000' } };
+        worksheet.getCell(totalRow, 1).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE8E8E8' }
+        };
+        worksheet.getCell(totalRow, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+        worksheet.getCell(totalRow, 1).border = {
+            top: { style: 'medium', color: { argb: 'FF000000' } },
+            bottom: { style: 'medium', color: { argb: 'FF000000' } },
+            left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+            right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+        };
+        
+        // Merge cells untuk label TOTAL (col 1-6)
+        try {
+            worksheet.mergeCells(totalRow, 1, totalRow, 6);
+        } catch (e) {
+            // Ignore jika merge gagal
+        }
+        
+        // Col 7: Total Sewing Output
+        worksheet.getCell(totalRow, 7).value = totalOutputSewing;
+        Object.assign(worksheet.getCell(totalRow, 7), totalRowStyle);
+        
+        // Col 8-14: Kosong (QC Endline dan PQC detail)
+        for (let col = 8; col <= 14; col++) {
+            const cell = worksheet.getCell(totalRow, col);
+            Object.assign(cell, totalRowStyle);
+            cell.value = '';
+        }
+        
+        // Col 15: Total PQC Good
+        worksheet.getCell(totalRow, 15).value = totalPqcGood;
+        Object.assign(worksheet.getCell(totalRow, 15), totalRowStyle);
+        
+        // Col 16: GOOD SEWING (sama dengan Total PQC Good)
+        worksheet.getCell(totalRow, 16).value = totalPqcGood;
+        Object.assign(worksheet.getCell(totalRow, 16), totalRowStyle);
+        
+        // Col 17: Balance Final
+        worksheet.getCell(totalRow, 17).value = balanceFinal;
+        Object.assign(worksheet.getCell(totalRow, 17), totalRowStyle);
+        if (balanceFinal < 0) {
+            worksheet.getCell(totalRow, 17).font = { color: { argb: 'FFFF0000' }, bold: true, size: 11 };
+        }
+        
+        worksheet.getRow(totalRow).height = 30;
+        currentRow++;
+    }
+
     // Merge cells setelah semua data diisi
     if (dataRows.length > 0) {
         try {
-            const mergeHeaderColumns = [1, 2, 3, 4, 5, 6, 15, 16]; // A, B, C, D, E, F, O, P
+            // Adjust merge columns based on export type
+            const mergeHeaderColumns = isDailyExport 
+                ? [1, 2, 3, 4, 5, 6, 7, 16, 17] // Tanggal, LINE, WO, Style, Item, Buyer, Output Sewing, GOOD SEWING, BALANCE
+                : [1, 2, 3, 4, 5, 6, 15, 16]; // LINE, WO, Style, Item, Buyer, Output Sewing, GOOD SEWING, BALANCE
             
-            // Merge QC Endline dan PQC dari headerRow1 ke headerRow2 (horizontal dan vertikal)
-            try {
-                worksheet.mergeCells(headerRow1, 7, headerRow2, 10); // QC Endline G1:J1 -> G2:J2
-            } catch (e) {
-                // Ignore jika sudah di-merge atau error
-            }
-            try {
-                worksheet.mergeCells(headerRow1, 11, headerRow2, 14); // PQC K1:N1 -> K2:N2
-            } catch (e) {
-                // Ignore jika sudah di-merge atau error
+            // Merge QC Endline dan PQC dari headerRow1 ke headerRow2
+            if (isDailyExport) {
+                try {
+                    worksheet.mergeCells(headerRow1, 8, headerRow2, 11); // QC Endline H1:K1 -> H2:K2
+                } catch (e) {
+                    // Ignore jika sudah di-merge atau error
+                }
+                try {
+                    worksheet.mergeCells(headerRow1, 12, headerRow2, 15); // PQC L1:O1 -> L2:O2
+                } catch (e) {
+                    // Ignore jika sudah di-merge atau error
+                }
+            } else {
+                try {
+                    worksheet.mergeCells(headerRow1, 7, headerRow2, 10); // QC Endline G1:J1 -> G2:J2
+                } catch (e) {
+                    // Ignore jika sudah di-merge atau error
+                }
+                try {
+                    worksheet.mergeCells(headerRow1, 11, headerRow2, 14); // PQC K1:N1 -> K2:N2
+                } catch (e) {
+                    // Ignore jika sudah di-merge atau error
+                }
             }
             
-            // Merge cells untuk kolom yang perlu merge vertikal (LINE, WO, Style, Item, Buyer, Output Sewing, GOOD SEWING, BALANCE)
-            // Struktur: 
-            // - headerRow1 ke headerRow2: Header text di-merge (2 baris header)
-            // - Data tetap di data rows (1 baris, tidak di-merge dengan header)
+            // Merge cells untuk kolom yang perlu merge vertikal
             mergeHeaderColumns.forEach(col => {
                 try {
-                    // Merge header dari headerRow1 ke headerRow2 (2 baris header yang di-merge)
-                    // Ini membuat header LINE, WO, Style, dll memiliki 2 baris yang di-merge
                     worksheet.mergeCells(headerRow1, col, headerRow2, col);
                 } catch (e) {
                     // Ignore error jika merge gagal
@@ -266,6 +431,7 @@ export async function exportToExcel(
     worksheet.getRow(headerRow2).height = 22;
 
     // Generate filename
+    const now = new Date();
     const dateStr = now.toLocaleDateString('id-ID', {
         day: '2-digit',
         month: '2-digit',
@@ -286,52 +452,138 @@ export async function exportToExcel(
         const csvData: string[][] = [];
 
         // Add title
-        const now = new Date();
         const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
                            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-        const tanggalStr = `${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+        
+        let tanggalStr = '';
+        if (filterDateFrom && filterDateTo) {
+            // Jika ada filter dari dan sampai tanggal
+            const fromDate = new Date(filterDateFrom);
+            const toDate = new Date(filterDateTo);
+            const fromStr = `${fromDate.getDate()} ${monthNames[fromDate.getMonth()]} ${fromDate.getFullYear()}`;
+            const toStr = `${toDate.getDate()} ${monthNames[toDate.getMonth()]} ${toDate.getFullYear()}`;
+            tanggalStr = `${fromStr} - ${toStr}`;
+        } else if (filterDateFrom) {
+            // Jika hanya ada filter dari tanggal
+            const fromDate = new Date(filterDateFrom);
+            tanggalStr = `${fromDate.getDate()} ${monthNames[fromDate.getMonth()]} ${fromDate.getFullYear()}`;
+        } else {
+            // Jika tidak ada filter, gunakan tanggal hari ini
+            const now = new Date();
+            tanggalStr = `${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+        }
+        
         csvData.push([`RFID TRACKING REPORT DAILY - ${tanggalStr}`]);
         csvData.push([]);
 
         // Add headers - Row 1: Main Headers
-        csvData.push([
-            'LINE', 'WO', 'Style', 'Item', 'Buyer',
-            'Output Sewing',
-            'QC Endline', 'QC Endline', 'QC Endline', 'QC Endline',
-            'PQC', 'PQC', 'PQC', 'PQC',
-            'GOOD SEWING', 'BALANCE'
-        ]);
-
-        // Add headers - Row 2: Sub Headers
-        csvData.push([
-            '', '', '', '', '',
-            '',
-            'REWORK', 'WIRA', 'REJECT', 'GOOD',
-            'REWORK', 'WIRA', 'REJECT', 'GOOD',
-            '', ''
-        ]);
-
-        // Add data
-        data.forEach(row => {
+        if (isDailyExport) {
             csvData.push([
-                row.line || '-',
-                row.wo || '-',
-                row.style || '-',
-                row.item || '-',
-                row.buyer || '-',
-                (row.outputSewing || 0).toString(),
-                (row.qcRework || 0).toString(),
-                (row.qcWira || 0).toString(),
-                (row.qcReject || 0).toString(),
-                (row.qcGood || 0).toString(),
-                (row.pqcRework || 0).toString(),
-                (row.pqcWira || 0).toString(),
-                (row.pqcReject || 0).toString(),
-                (row.pqcGood || 0).toString(),
-                (row.goodSewing || 0).toString(),
-                (row.balance || 0).toString()
+                'Tanggal', 'LINE', 'WO', 'Style', 'Item', 'Buyer',
+                'Output Sewing',
+                'QC Endline', 'QC Endline', 'QC Endline', 'QC Endline',
+                'PQC', 'PQC', 'PQC', 'PQC',
+                'GOOD SEWING', 'BALANCE'
             ]);
-        });
+
+            // Add headers - Row 2: Sub Headers
+            csvData.push([
+                '', '', '', '', '', '',
+                '',
+                'REWORK', 'WIRA', 'REJECT', 'GOOD',
+                'REWORK', 'WIRA', 'REJECT', 'GOOD',
+                '', ''
+            ]);
+
+            // Add data
+            data.forEach(row => {
+                let tanggalDisplay = '';
+                if (row.tanggal) {
+                    const date = new Date(row.tanggal);
+                    tanggalDisplay = date.toLocaleDateString('id-ID', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric'
+                    });
+                }
+                csvData.push([
+                    tanggalDisplay || row.tanggal || '-',
+                    row.line || '-',
+                    row.wo || '-',
+                    row.style || '-',
+                    row.item || '-',
+                    row.buyer || '-',
+                    (row.outputSewing || 0).toString(),
+                    (row.qcRework || 0).toString(),
+                    (row.qcWira || 0).toString(),
+                    (row.qcReject || 0).toString(),
+                    (row.qcGood || 0).toString(),
+                    (row.pqcRework || 0).toString(),
+                    (row.pqcWira || 0).toString(),
+                    (row.pqcReject || 0).toString(),
+                    (row.pqcGood || 0).toString(),
+                    (row.goodSewing || 0).toString(),
+                    (row.balance || 0).toString()
+                ]);
+            });
+            
+            // Tambahkan baris total untuk CSV daily export
+            if (data.length > 0) {
+                const totalOutputSewing = data.reduce((sum, row) => sum + (row.outputSewing || 0), 0);
+                const totalPqcGood = data.reduce((sum, row) => sum + (row.pqcGood || 0), 0);
+                const balanceFinal = totalOutputSewing - totalPqcGood;
+                
+                csvData.push([]); // Baris kosong
+                csvData.push([
+                    'TOTAL', '', '', '', '', '',
+                    totalOutputSewing.toString(),
+                    '', '', '', '',
+                    '', '', '', '',
+                    totalPqcGood.toString(),
+                    totalPqcGood.toString(),
+                    balanceFinal.toString()
+                ]);
+            }
+        } else {
+            csvData.push([
+                'LINE', 'WO', 'Style', 'Item', 'Buyer',
+                'Output Sewing',
+                'QC Endline', 'QC Endline', 'QC Endline', 'QC Endline',
+                'PQC', 'PQC', 'PQC', 'PQC',
+                'GOOD SEWING', 'BALANCE'
+            ]);
+
+            // Add headers - Row 2: Sub Headers
+            csvData.push([
+                '', '', '', '', '',
+                '',
+                'REWORK', 'WIRA', 'REJECT', 'GOOD',
+                'REWORK', 'WIRA', 'REJECT', 'GOOD',
+                '', ''
+            ]);
+
+            // Add data
+            data.forEach(row => {
+                csvData.push([
+                    row.line || '-',
+                    row.wo || '-',
+                    row.style || '-',
+                    row.item || '-',
+                    row.buyer || '-',
+                    (row.outputSewing || 0).toString(),
+                    (row.qcRework || 0).toString(),
+                    (row.qcWira || 0).toString(),
+                    (row.qcReject || 0).toString(),
+                    (row.qcGood || 0).toString(),
+                    (row.pqcRework || 0).toString(),
+                    (row.pqcWira || 0).toString(),
+                    (row.pqcReject || 0).toString(),
+                    (row.pqcGood || 0).toString(),
+                    (row.goodSewing || 0).toString(),
+                    (row.balance || 0).toString()
+                ]);
+            });
+        }
 
         const csv = csvData.map(row => row.join(',')).join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
