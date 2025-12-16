@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -13,7 +13,7 @@ import { formatDateForAPI } from '../utils/dateUtils';
 import OverviewChart from '../components/dashboard/OverviewChart';
 import DataLineCard from '../components/dashboard/DataLineCard';
 import StatusCardsGrid from '../components/dashboard/StatusCardsGrid';
-import { COLORS } from '../components/dashboard/constants';
+import { COLORS, DEFAULT_REWORK_POPUP_ENABLED } from '../components/dashboard/constants';
 import { Filter, XCircle, CheckCircle, RefreshCcw, AlertCircle } from 'lucide-react';
 import backgroundImage from '../assets/background.jpg';
 
@@ -64,6 +64,56 @@ export default function DashboardRFID() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailTitle, setDetailTitle] = useState('');
     const [detailType, setDetailType] = useState<'GOOD' | 'REWORK' | 'REJECT' | 'WIRA' | null>(null);
+
+    // State untuk tracking perubahan rework dan popup notifikasi
+    const previousReworkRef = useRef<number>(0);
+    const previousPqcReworkRef = useRef<number>(0);
+    const [showReworkNotification, setShowReworkNotification] = useState(false);
+    const [reworkNotificationData, setReworkNotificationData] = useState<any>(null);
+    const [reworkNotificationLoading, setReworkNotificationLoading] = useState(false);
+    const [reworkNotificationType, setReworkNotificationType] = useState<'QC' | 'PQC' | null>(null);
+    const [selectedReworkType, setSelectedReworkType] = useState<string>('');
+    const [selectedOperator, setSelectedOperator] = useState<string>('');
+    const [showOperators, setShowOperators] = useState(false);
+    const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+    const [enableReworkPopup, setEnableReworkPopup] = useState<boolean>(DEFAULT_REWORK_POPUP_ENABLED); // Menggunakan variable global
+
+    // Daftar jenis rework
+    const reworkTypes = [
+        'Skipped Stitch',
+        'Broken Stitch',
+        'Open Seam',
+        'Puckering',
+        'Run Off Stitch',
+        'Uneven Stitch Density',
+        'Needle Mark/Hole',
+        'Dirty Stain',
+        'Iron Mark'
+    ];
+
+    // Daftar nama operator (20 nama, dominan wanita Indonesia)
+    const operators = [
+        'Siti Nurhaliza',
+        'Dewi Sartika',
+        'Rina Wati',
+        'Maya Sari',
+        'Indah Permata',
+        'Lina Marlina',
+        'Ratna Dewi',
+        'Sari Indah',
+        'Yuni Astuti',
+        'Diana Putri',
+        'Ayu Lestari',
+        'Fitri Handayani',
+        'Nurul Hikmah',
+        'Sinta Rahayu',
+        'Kartika Sari',
+        'Budi Santoso',
+        'Ahmad Fauzi',
+        'Rina Kartika',
+        'Eka Wijaya',
+        'Putri Maharani'
+    ];
 
     // Fungsi untuk fetch detail data berdasarkan status
     const fetchDetailData = useCallback(async (type: 'GOOD' | 'REWORK' | 'REJECT' | 'WIRA', section: 'QC' | 'PQC') => {
@@ -366,6 +416,166 @@ export default function DashboardRFID() {
             setWiraData(null);
         }
     }, [filterWo, lineId, showWoFilterModal, fetchWiraData]);
+
+    // Fungsi untuk fetch data rework terbaru dari List RFID API
+    const fetchLatestReworkData = useCallback(async (type: 'QC' | 'PQC', maxWaitSeconds: number = 10): Promise<any | null> => {
+        const startTime = Date.now();
+        const maxWaitTime = maxWaitSeconds * 1000; // Convert to milliseconds
+        const pollInterval = 1000; // Poll setiap 1 detik
+
+        return new Promise((resolve) => {
+            const poll = async () => {
+                try {
+                    const url = `${API_BASE_URL}/tracking/rfid_garment?line=${encodeURIComponent(lineId)}`;
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    let allData = data.data || [];
+                    
+                    if (Array.isArray(data)) {
+                        allData = data;
+                    }
+
+                    // Filter data berdasarkan status rework
+                    const reworkData = allData.filter((item: any) => {
+                        if (!item.timestamp) return false;
+                        
+                        const bagian = (item.bagian || '').trim().toUpperCase();
+                        const lastStatus = (item.last_status || '').trim().toUpperCase();
+                        
+                        if (type === 'QC') {
+                            return bagian === 'QC' && lastStatus === 'REWORK';
+                        } else {
+                            return bagian === 'PQC' && lastStatus === 'PQC_REWORK';
+                        }
+                    });
+
+                    // Sort berdasarkan timestamp terbaru
+                    reworkData.sort((a: any, b: any) => {
+                        const dateA = new Date(a.timestamp).getTime();
+                        const dateB = new Date(b.timestamp).getTime();
+                        return dateB - dateA; // Terbaru di atas
+                    });
+
+                    // Ambil data terbaru
+                    if (reworkData.length > 0) {
+                        const latestRework = reworkData[0];
+                        
+                        // Cek apakah timestamp dalam rentang waktu yang wajar (dalam 10 detik terakhir)
+                        const itemTime = new Date(latestRework.timestamp).getTime();
+                        const now = Date.now();
+                        const timeDiff = now - itemTime;
+                        
+                        // Jika data dalam 10 detik terakhir, anggap valid
+                        if (timeDiff <= 10000) {
+                            resolve(latestRework);
+                            return;
+                        }
+                    }
+
+                    // Cek apakah sudah melewati waktu maksimal
+                    const elapsed = Date.now() - startTime;
+                    if (elapsed >= maxWaitTime) {
+                        resolve(null);
+                        return;
+                    }
+
+                    // Lanjutkan polling
+                    setTimeout(poll, pollInterval);
+                } catch (error) {
+                    console.error('Error fetching latest rework data:', error);
+                    
+                    // Cek apakah sudah melewati waktu maksimal
+                    const elapsed = Date.now() - startTime;
+                    if (elapsed >= maxWaitTime) {
+                        resolve(null);
+                        return;
+                    }
+
+                    // Lanjutkan polling meskipun error
+                    setTimeout(poll, pollInterval);
+                }
+            };
+
+            // Mulai polling
+            poll();
+        });
+    }, [lineId]);
+
+    // Initialize previous values saat pertama kali load
+    useEffect(() => {
+        if (previousReworkRef.current === 0 && rework > 0) {
+            previousReworkRef.current = rework;
+        }
+        if (previousPqcReworkRef.current === 0 && pqcRework > 0) {
+            previousPqcReworkRef.current = pqcRework;
+        }
+    }, [rework, pqcRework]);
+
+    // Detect perubahan rework dan tampilkan popup (hanya jika enableReworkPopup aktif)
+    useEffect(() => {
+        // Hanya detect jika popup rework diaktifkan
+        if (!enableReworkPopup) {
+            // Tetap update previous value meskipun popup tidak aktif
+            if (rework !== previousReworkRef.current) {
+                previousReworkRef.current = rework;
+            }
+            if (pqcRework !== previousPqcReworkRef.current) {
+                previousPqcReworkRef.current = pqcRework;
+            }
+            return;
+        }
+
+        // Detect perubahan QC Rework
+        if (rework > previousReworkRef.current && previousReworkRef.current > 0) {
+            const increase = rework - previousReworkRef.current;
+            if (increase === 1) {
+                // Rework bertambah 1, fetch data terbaru
+                setReworkNotificationLoading(true);
+                setReworkNotificationType('QC');
+                setShowReworkNotification(true);
+                
+                fetchLatestReworkData('QC', 10).then((data) => {
+                    setReworkNotificationData(data);
+                    setReworkNotificationLoading(false);
+                });
+            }
+        }
+        // Update previous value hanya jika ada perubahan yang valid
+        if (rework !== previousReworkRef.current) {
+            previousReworkRef.current = rework;
+        }
+
+        // Detect perubahan PQC Rework
+        if (pqcRework > previousPqcReworkRef.current && previousPqcReworkRef.current > 0) {
+            const increase = pqcRework - previousPqcReworkRef.current;
+            if (increase === 1) {
+                // PQC Rework bertambah 1, fetch data terbaru
+                setReworkNotificationLoading(true);
+                setReworkNotificationType('PQC');
+                setShowReworkNotification(true);
+                
+                fetchLatestReworkData('PQC', 10).then((data) => {
+                    setReworkNotificationData(data);
+                    setReworkNotificationLoading(false);
+                });
+            }
+        }
+        // Update previous value hanya jika ada perubahan yang valid
+        if (pqcRework !== previousPqcReworkRef.current) {
+            previousPqcReworkRef.current = pqcRework;
+        }
+    }, [rework, pqcRework, fetchLatestReworkData, enableReworkPopup]);
 
     // Data fetching sudah ditangani oleh custom hook useDashboardRFID
 
@@ -693,6 +903,8 @@ export default function DashboardRFID() {
                                     onDateFilterClick={() => setShowDateFilterModal(true)}
                                     onExportClick={() => setShowExportModal(true)}
                                     onWoFilterClick={() => setShowWoFilterModal(true)}
+                                    enableReworkPopup={enableReworkPopup}
+                                    onEnableReworkPopupChange={setEnableReworkPopup}
                                 />
                             </div>
                         </div>
@@ -711,6 +923,152 @@ export default function DashboardRFID() {
                 onExport={handleExport}
                 lineId={lineId}
             />
+
+            {/* Rework Notification Popup */}
+            {showReworkNotification && (
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl transform transition-all border border-yellow-200 animate-in fade-in zoom-in duration-300">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-4 rounded-t-xl">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                                    <RefreshCcw className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-white">
+                                        Data Rework {reworkNotificationType} Baru
+                                    </h3>
+                                    <p className="text-xs text-yellow-100 mt-0.5">
+                                        RFID baru di-scan ke Rework
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6">
+                            {reworkNotificationLoading ? (
+                                <div className="flex flex-col items-center justify-center py-8">
+                                    <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                                    <p className="text-sm text-gray-600 font-medium">
+                                        Mencari data rework terbaru...
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Memeriksa data dari List RFID
+                                    </p>
+                                </div>
+                            ) : reworkNotificationData ? (
+                                <div className="space-y-4">
+                                    {/* Info Data RFID - Kecil sebagai informasi */}
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                        <div className="grid grid-cols-4 gap-2 text-xs">
+                                            <div>
+                                                <span className="text-gray-500">RFID:</span>
+                                                <span className="ml-1 font-mono font-semibold text-gray-700">{reworkNotificationData.rfid_garment || '-'}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-500">WO:</span>
+                                                <span className="ml-1 font-semibold text-gray-700">{reworkNotificationData.wo || '-'}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-500">Buyer:</span>
+                                                <span className="ml-1 font-semibold text-gray-700 truncate block" title={reworkNotificationData.buyer || '-'}>{reworkNotificationData.buyer || '-'}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-500">Size/Color:</span>
+                                                <span className="ml-1 font-semibold text-gray-700">{reworkNotificationData.size || '-'} / {reworkNotificationData.color || '-'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Card Jenis Rework */}
+                                    {!showOperators && !showSuccessMessage && (
+                                        <div>
+                                            <h4 className="text-sm font-bold text-gray-700 mb-3">Pilih Jenis Rework:</h4>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                {reworkTypes.map((type, index) => (
+                                                    <button
+                                                        key={index}
+                                                        onClick={() => {
+                                                            setSelectedReworkType(type);
+                                                            setShowOperators(true);
+                                                        }}
+                                                        className="bg-gradient-to-br from-yellow-50 to-yellow-100 hover:from-yellow-100 hover:to-yellow-200 border-2 border-yellow-300 hover:border-yellow-400 rounded-lg p-4 text-left transition-all duration-200 hover:shadow-md hover:scale-105"
+                                                    >
+                                                        <div className="text-sm font-bold text-yellow-800">{type}</div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Card Operator */}
+                                    {showOperators && !showSuccessMessage && (
+                                        <div>
+                                            <h4 className="text-sm font-bold text-gray-700 mb-3">Pilih Operator:</h4>
+                                            <div className="grid grid-cols-4 gap-3 max-h-96 overflow-y-auto">
+                                                {operators.map((operator, index) => (
+                                                    <button
+                                                        key={index}
+                                                        onClick={() => {
+                                                            // Simulasi POST (belum benar-benar POST)
+                                                            setSelectedOperator(operator);
+                                                            setShowSuccessMessage(true);
+                                                            
+                                                            // Auto close setelah 3 detik dengan animasi fade
+                                                            setTimeout(() => {
+                                                                setShowReworkNotification(false);
+                                                                setReworkNotificationData(null);
+                                                                setReworkNotificationType(null);
+                                                                setShowOperators(false);
+                                                                setSelectedReworkType('');
+                                                                setSelectedOperator('');
+                                                                setShowSuccessMessage(false);
+                                                            }, 3000);
+                                                        }}
+                                                        className="bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 border-2 border-blue-300 hover:border-blue-400 rounded-lg p-3 text-center transition-all duration-200 hover:shadow-md hover:scale-105"
+                                                    >
+                                                        <div className="text-xs font-semibold text-blue-800">{operator}</div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Success Message - Di dalam kotak kuning yang sama */}
+                                    {showSuccessMessage && selectedReworkType && selectedOperator && (
+                                        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-lg p-6 animate-in fade-in duration-300">
+                                            <div className="flex flex-col items-center text-center space-y-4">
+                                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                                                    <CheckCircle className="w-10 h-10 text-green-600" strokeWidth={2.5} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-bold text-gray-800 mb-3">
+                                                        Data Rework Berhasil Di Input
+                                                    </h3>
+                                                    <p className="text-sm text-gray-700">
+                                                        Rework <span className="font-semibold text-yellow-800">{selectedReworkType}</span> sudah diberitahu kepada <span className="font-semibold text-yellow-800">{selectedOperator}</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-8">
+                                    <AlertCircle className="w-12 h-12 text-yellow-500 mb-4" />
+                                    <p className="text-sm text-gray-600 font-medium text-center">
+                                        Data rework tidak ditemukan
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1 text-center">
+                                        Data mungkin belum tersedia di List RFID
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* WO Filter Modal */}
             {showWoFilterModal && (

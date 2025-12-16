@@ -19,6 +19,7 @@ export default function HomeContent() {
             shadow: 'shadow-blue-200',
             lightBg: 'bg-blue-50'
         },
+       
     ];
 
     const handleModuleClick = (moduleId: number) => {
@@ -30,14 +31,14 @@ export default function HomeContent() {
         // md:pl-80: Memberi jarak aman dari Sidebar kiri (sekitar 320px)
         // pt-32: Memberi jarak aman dari Header atas
         // pr-8: Memberi jarak kanan agar seimbang
-        <div className="w-full h-full transition-all duration-300 relative flex items-center justify-center"
+        <div className=" mt-6 gap-4 w-full h-screen transition-all duration-300 relative flex "
             style={{
                 padding: 'clamp(0.5rem, 2vw, 2rem) clamp(0.5rem, 3vw, 1rem)',
                 overflow: 'hidden',
             }}
         >
             {/* --- GRID CONTAINER --- */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2 xs:gap-2.5 sm:gap-3 md:gap-4 lg:gap-5 xl:gap-6 2xl:gap-8 w-full max-w-7xl mx-auto px-2 xs:px-3 sm:px-4"
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-2 xs:gap-2.5 sm:gap-3 md:gap-4 lg:gap-5 xl:gap-6 2xl:gap-8 w-full max-w-7xl mx-auto px-2 xs:px-3 sm:px-4"
                 >
                 {modules.map((module, index) => {
                     const IconComponent = module.icon;
@@ -50,11 +51,11 @@ export default function HomeContent() {
                             onMouseEnter={() => setHoveredCard(module.id)}
                             onMouseLeave={() => setHoveredCard(null)}
                             className={`
-                                group relative bg-white rounded-xl xs:rounded-2xl sm:rounded-[2rem] md:rounded-[2.5rem] 
+                                group relative bg-white rounded-md xs:rounded-xl sm:rounded-[1rem] md:rounded-[2rem] 
                                 border border-slate-100
                                 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)]
                                 cursor-pointer
-                                flex flex-col items-center justify-between
+                                flex flex-col 
                                 transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
                                 hover:-translate-y-2 xs:hover:-translate-y-3 hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)]
                                 animate-fade-in-up
@@ -63,8 +64,8 @@ export default function HomeContent() {
                             style={{ 
                                 animationDelay: `${index * 150}ms`,
                                 zIndex: 1,
-                                aspectRatio: '3/2',
-                                minHeight: 'clamp(180px, 35vh, 380px)',
+                                aspectRatio: '5/3',
+                                minHeight: 'clamp(100px, 25vh, 280px)',
                                 padding: 'clamp(0.5rem, 1.5vw, 1rem)'
                             }}
                         >
@@ -77,15 +78,13 @@ export default function HomeContent() {
                             {/* --- CONTENT BAGIAN ATAS (ICON & TEXT) --- */}
                             <div className="flex flex-col items-center justify-center w-full flex-1" style={{ 
                                 paddingTop: 'clamp(0.25rem, 1.5vh, 0.75rem)',
-                                paddingLeft: '0.5rem',
-                                paddingRight: '0.5rem',
-                                paddingBottom: '0.25rem'
+                            
                             }}>
                                 {/* ICON (Centered & Big) - Tanpa lingkaran, hanya icon dengan gradasi */}
                                 <div className="relative mb-1 xs:mb-1.5 sm:mb-2 md:mb-2.5 lg:mb-3 flex items-center justify-center transform transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6 flex-shrink-0">
                                     <div className="relative" style={{ 
-                                        width: 'clamp(2.5rem, 7vw, 5rem)',
-                                        height: 'clamp(2.5rem, 7vw, 5rem)'
+                                        width: 'clamp(2rem, 5vw, 4rem)',
+                                        height: 'clamp(2rem, 5vw, 4rem)'
                                     }}>
                                         <svg width="0" height="0" style={{ position: 'absolute' }}>
                                             <defs>
@@ -119,12 +118,12 @@ export default function HomeContent() {
                                 </h3>
                                 <p className="text-slate-400 font-medium tracking-wider text-center flex-shrink-0 w-full"
                                     style={{
-                                        fontSize: 'clamp(0.55rem, 1.3vw, 0.9rem)',
+                                        fontSize: 'clamp(0.4rem, 1vw, 0.6rem)',
                                         lineHeight: '1.4',
                                         wordBreak: 'break-word',
                                         overflowWrap: 'break-word',
                                         fontFamily: 'Poppins, sans-serif',
-                                        fontWeight: 500
+                                        fontWeight: 400
                                     }}
                                 >
                                     {module.subtitle}

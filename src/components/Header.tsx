@@ -98,9 +98,11 @@ export default function Header() {
                 <img src={headerIcon} alt="Header" className="w-6 xs:w-7 sm:w-8 md:w-10 h-6 xs:h-7 sm:h-8 md:h-10" />
 
                 {/* System Title */}
-                <h1 className="font-bold text-xs xs:text-xs sm:text-sm md:text-md lg:text-lg xl:text-xl tracking-wide" style={{ color: '#414345', textTransform: 'capitalize', fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>
-                    <span className="hidden sm:inline">Gistex Monitoring System</span>
-                    <span className="sm:hidden">Gistex</span>
+                <h1 className="text-lg tracking-normal text-zinc-500" style={{ textTransform: 'capitalize', fontFamily: 'Poppins, sans-serif' }}>
+                    <span className="hidden sm:inline">
+                        <span style={{ fontWeight: 600 }}>Gistex Monitoring System</span>
+                    </span>
+                    <span className="sm:hidden" style={{ fontWeight: 600 }}>Gistex</span>
                 </h1>
             </div>
 
@@ -136,10 +138,10 @@ export default function Header() {
 
                 {/* User Info - Hidden di mobile/portrait */}
                 <div className="hidden md:flex flex-col items-center leading-tight">
-                    <span className="font-bold text-[10px] md:text-xs lg:text-sm uppercase" style={{ color: '#42464a' }}>
+                    <span className="text-[10px] md:text-xs lg:text-sm uppercase text-zinc-500" style={{fontWeight: 600 }}>
                         {user ? `HI, ${(user.name || '').toUpperCase()}` : 'HI, GUEST'}
                     </span>
-                    <span className="text-[9px] md:text-[10px] lg:text-xs font-bold text-center" style={{ color: '#54585c' }}>
+                    <span className="text-[9px] md:text-[10px] lg:text-xs text-center text-zinc-500" style={{fontWeight: 500 }}>
                         {user?.bagian || user?.jabatan || 'Guest'}
                     </span>
                 </div>
