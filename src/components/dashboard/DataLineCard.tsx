@@ -48,7 +48,7 @@ const DataLineCard = memo(({ lineTitle, woData, onDateFilterClick, onExportClick
         <ChartCard
             title={
                 <>
-                    <h2 className="text-[8px] xs:text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl font-extrabold text-gray-700 tracking-tight group-hover:text-blue-600 transition-colors" style={{ textTransform: 'capitalize' }}>{`Data ${lineTitle}`}</h2>
+                    <h2 className="text-[8px] xs:text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl font-medium text-gray-700 tracking-tight group-hover:text-blue-600 transition-colors" style={{ textTransform: 'capitalize' }}>{`Data ${lineTitle}`}</h2>
                     <div className="flex items-center gap-0.5 xs:gap-1 sm:gap-1.5 md:gap-2 ml-auto">
                         {/* Checkbox untuk enable/disable popup rework */}
                         <label 
@@ -166,9 +166,9 @@ const DataLineCard = memo(({ lineTitle, woData, onDateFilterClick, onExportClick
                                     {row.map((item, idx) => (
                                         <div key={idx} className="group relative overflow-hidden bg-white rounded-lg border border-blue-500 p-0.5 xs:p-0.5 sm:p-1 md:p-1.5 flex flex-col items-center justify-center gap-0.5 transition-all duration-300 hover:shadow-sm">
                                             <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-500 via-blue-400 to-amber-400"></div>
-                                            <span className="text-[6px] xs:text-[7px] sm:text-[8px] md:text-[9px] font-bold text-blue-600 tracking-widest group-hover:text-blue-800 transition-colors delay-75" style={{ textTransform: 'capitalize' }}>{item.label}</span>
+                                            <span className="text-[6px] xs:text-[7px] sm:text-[8px] md:text-[9px] font-medium text-blue-600 tracking-widest group-hover:text-blue-800 transition-colors delay-75" style={{ textTransform: 'capitalize' }}>{item.label}</span>
                                             <div className="w-full text-center px-0.5">
-                                                <span className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-black text-slate-700 group-hover:text-slate-900 truncate block transition-colors" title={item.value || '-'}>
+                                                <span className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-medium text-slate-700 group-hover:text-slate-900 truncate block transition-colors" title={item.value || '-'}>
                                                     {item.value || '-'}
                                                 </span>
                                             </div>
@@ -184,9 +184,9 @@ const DataLineCard = memo(({ lineTitle, woData, onDateFilterClick, onExportClick
                                     {row.map((item, idx) => (
                                         <div key={idx} className="group relative overflow-hidden bg-white rounded-lg border border-blue-500 p-0.5 xs:p-0.5 sm:p-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-300 hover:shadow-sm">
                                             <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-500 via-blue-400 to-amber-400"></div>
-                                            <span className="text-[6px] xs:text-[7px] sm:text-[8px] font-bold text-blue-600 tracking-widest group-hover:text-blue-800 transition-colors delay-75" style={{ textTransform: 'capitalize' }}>{item.label}</span>
+                                            <span className="text-[6px] xs:text-[7px] sm:text-[8px] font-medium text-blue-600 tracking-widest group-hover:text-blue-800 transition-colors delay-75" style={{ textTransform: 'capitalize' }}>{item.label}</span>
                                             <div className="w-full text-center px-0.5">
-                                                <span className="text-[9px] xs:text-[10px] sm:text-xs font-black text-slate-700 group-hover:text-slate-900 truncate block transition-colors" title={item.value || '-'}>
+                                                <span className="text-[9px] xs:text-[10px] sm:text-xs font-medium text-slate-700 group-hover:text-slate-900 truncate block transition-colors" title={item.value || '-'}>
                                                     {item.value || '-'}
                                                 </span>
                                             </div>
