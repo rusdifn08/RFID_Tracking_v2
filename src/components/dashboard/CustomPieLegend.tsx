@@ -14,7 +14,7 @@ const CustomPieLegend = memo(({ totalCount }: CustomPieLegendProps) => {
                     <span className="text-[8px] xs:text-[9px] sm:text-xs sm:text-sm md:text-sm lg:text-base font-bold text-gray-500 tracking-wider whitespace-nowrap" style={{ textTransform: 'capitalize' }}>Output Sewing</span>
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-lg xs:text-xl sm:text-3xl md:text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl font-black text-gray-800 leading-tight">{totalCount}</span>
+                    <span className="text-lg xs:text-xl sm:text-3xl md:text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl font-bold text-gray-800 leading-tight">{totalCount}</span>
                 </div>
             </div>
         </div>

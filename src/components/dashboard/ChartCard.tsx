@@ -25,7 +25,7 @@ const ChartCard = memo(forwardRef<HTMLDivElement, ChartCardProps>(({ children, t
                     <Icon size={14} className="xs:w-[14px] xs:h-[14px] sm:w-[16px] sm:h-[16px] md:w-[18px] md:h-[18px] lg:w-[20px] lg:h-[20px] xl:w-[22px] xl:h-[22px]" />
                 </div>
                 {typeof title === 'string' ? (
-                    <h2 className="text-[10px] xs:text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl font-extrabold text-gray-700 tracking-tight group-hover:text-blue-600 transition-colors" style={{ textTransform: 'capitalize' }}>{title}</h2>
+                    <h2 className="text-[10px] xs:text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl font-medium text-gray-700 tracking-tight group-hover:text-blue-600 transition-colors" style={{ textTransform: 'capitalize' }}>{title}</h2>
                 ) : (
                     <div className="flex items-center justify-between w-full">{title}</div>
                 )}
