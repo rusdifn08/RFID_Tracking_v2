@@ -7,3 +7,8 @@ export const COLORS = {
     blue: '#2979ff',
 } as const;
 
+// Default state untuk popup rework realtime
+// true = aktif (popup akan muncul saat rework bertambah)
+// false = nonaktif (popup tidak akan muncul)
+export const DEFAULT_REWORK_POPUP_ENABLED = false;
+

@@ -1,14 +1,12 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSidebar } from '../context/SidebarContext';
-import { useAuth } from '../hooks/useAuth';
-import { Home, Rss, Info, LogOut } from 'lucide-react';
+import { Home, Rss, LogOut } from 'lucide-react';
 import logo from '../assets/logo.svg';
 
 export default function Sidebar() {
     const location = useLocation();
     const navigate = useNavigate();
     const { isOpen, closeSidebar } = useSidebar();
-    const { user } = useAuth();
 
     // Deteksi halaman aktif untuk breadcrumb navigation
     const isRFIDPage = location.pathname.startsWith('/monitoring-rfid') ||
@@ -77,7 +75,7 @@ export default function Sidebar() {
 
             {/* Sidebar Container */}
             <aside
-                className={`bg-gradient-to-b from-[#0073EE] to-[#0073EE] h-screen fixed left-0 top-0 flex flex-col shadow-2xl z-50 transition-all duration-300 ease-in-out backdrop-blur-sm ${isOpen ? 'w-[18%] px-4' : 'w-20 px-2'
+                className={`bg-gradient-to-b from-[#0073EE] to-[#0073EE] h-screen fixed left-0 top-0 flex flex-col shadow-2xl z-50 transition-all duration-300 ease-in-out backdrop-blur-sm ${isOpen ? 'w-[18%] ' : 'w-20 px-2'
                     }`}
             >
                 {/* --- LOGO AREA - DI PALING ATAS --- */}
@@ -349,55 +347,6 @@ export default function Sidebar() {
                         )}
                     </div>
 
-                    {/* ABOUT US */}
-                    <Link
-                        to="/about-us"
-                        className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 font-medium text-sm overflow-hidden min-h-[44px] ${location.pathname === '/about-us'
-                            ? 'bg-white/25 shadow-xl shadow-white/20 border-l-4 border-yellow-400'
-                            : 'hover:bg-white/15 hover:shadow-lg hover:shadow-white/10 border-l-4 border-transparent hover:border-yellow-400/50'
-                            }`}
-                        style={{ 
-                            color: location.pathname === '/about-us' ? '#f7f9fa' : '#e6f2ff' 
-                        }}
-                    >
-                        {/* Active indicator dengan glow */}
-                        {location.pathname === '/about-us' && isOpen && (
-                            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-400 rounded-r-full shadow-lg shadow-yellow-400/70 animate-pulse"></div>
-                        )}
-
-                        {/* Hover effect background dengan gradient */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-
-                        {/* Shine effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 transform translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-
-                        {/* Container untuk icon dan text - icon di kiri */}
-                        <div className={`relative z-10 flex items-center ${isOpen ? 'gap-2 flex-1' : 'justify-center'}`}>
-                            {/* Icon dengan glow effect - di kiri */}
-                            <div className={`transform transition-all duration-500 ease-in-out flex-shrink-0 ${!isOpen
-                                ? 'scale-110'
-                                : ''
-                                } ${location.pathname === '/about-us'
-                                    ? 'scale-125'
-                                    : 'group-hover:scale-125 group-hover:rotate-6'
-                                }`}>
-                                <Info
-                                    size={18}
-                                    className={`transition-all duration-500 ease-in-out drop-shadow-lg ${location.pathname === '/about-us'
-                                        ? 'text-yellow-400 drop-shadow-yellow-400/50'
-                                        : 'group-hover:text-yellow-400 group-hover:drop-shadow-yellow-400/50'
-                                        }`}
-                                    style={{ color: location.pathname === '/about-us' ? '#f7f9fa' : '#e6f2ff' }}
-                                    strokeWidth={2.5}
-                                />
-                            </div>
-
-                            {/* Text dengan efek - lebih kecil */}
-                            {isOpen && (
-                                <span className="transition-all duration-300 font-semibold tracking-wide flex-1 text-left text-sm">{'ABOUT US'}</span>
-                            )}
-                        </div>
-                    </Link>
                 </nav>
 
                 {/* Divider Line dengan efek */}
@@ -405,66 +354,24 @@ export default function Sidebar() {
                     <div className="h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent w-full shadow-lg shadow-white/20"></div>
                 </div>
 
-                {/* --- TEAMS SECTION - DI PALING BAWAH --- */}
-                {isOpen && (
-                    <div className="px-2 py-2 flex-shrink-0">
-                        {/* TEAMS Title - Di tengah */}
-                        <div className="text-white/70 font-bold tracking-widest mb-1.5 xs:mb-2 px-2 flex items-center justify-center">
-                            <span className="text-[10px] xs:text-xs sm:text-sm md:text-base text-center" style={{ textTransform: 'capitalize' }}>Teams</span>
-                        </div>
-                        <div className="space-y-1 xs:space-y-1.5">
-                            {/* Bagian dari API */}
-                            <div className="group relative flex items-center justify-center gap-1.5 xs:gap-2 px-2 xs:px-2.5 sm:px-3 py-1.5 xs:py-2 rounded-lg hover:bg-white/10 transition-all duration-300 cursor-pointer border border-transparent hover:border-blue-400/30 hover:shadow-lg hover:shadow-blue-400/20">
-                                <div className="relative">
-                                    <div className="w-1.5 xs:w-2 h-1.5 xs:h-2 rounded-full bg-blue-400 shadow-lg shadow-blue-400/70 flex-shrink-0 group-hover:scale-125 group-hover:shadow-blue-400 transition-all duration-300 animate-pulse"></div>
-                                    <div className="absolute inset-0 w-1.5 xs:w-2 h-1.5 xs:h-2 rounded-full bg-blue-400/30 blur-md group-hover:blur-lg transition-all duration-300"></div>
-                                </div>
-                                <span className="font-bold transition-colors tracking-wide text-center text-[10px] xs:text-xs sm:text-sm md:text-base" style={{ color: '#e6f2ff', textTransform: 'capitalize' }}
-                                    onMouseEnter={(e) => e.currentTarget.style.color = '#f7f9fa'}
-                                    onMouseLeave={(e) => e.currentTarget.style.color = '#e6f2ff'}
-                                >
-                                    {user?.bagian || user?.jabatan || 'Guest'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Divider Line dengan efek */}
-                <div className={`px-2 py-1 flex-shrink-0 transition-all duration-300 ${!isOpen ? 'opacity-0' : 'opacity-100'}`}>
-                    <div className="h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent w-full shadow-lg shadow-white/20"></div>
-                </div>
-
                 {/* --- LOGOUT BUTTON - DI PALING BAWAH --- */}
-                <div className={`flex-shrink-0 ${isOpen ? 'p-2 pb-3' : 'p-2'}`}>
+                <div className={`flex-shrink-0 ${isOpen ? 'px-2 pb-3' : 'px-0'}`}>
                     <button
                         onClick={handleLogout}
-                        className={`group relative w-full flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 font-semibold overflow-hidden min-h-[44px] text-white/90 hover:text-white hover:bg-red-500/25 border-2 border-red-500/40 hover:border-red-500/70 hover:shadow-xl hover:shadow-red-500/30`}
+                        className={`bg-blue-500 mb-2 group relative w-full flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 overflow-hidden min-h-[44px] bg-[#0073EE] hover:bg-[#0066D6] text-white shadow-sm`}
                     >
-                        {/* Hover effect background dengan gradient */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-red-500/0 via-red-500/15 to-red-500/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-
-                        {/* Shine effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-red-400/30 to-transparent -skew-x-12 transform translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-
-                        {/* Glow effect */}
-                        <div className="absolute inset-0 bg-red-500/20 rounded-lg blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10"></div>
-
-                        {/* Icon dengan glow effect */}
-                        <div className={`relative z-10 transform transition-all duration-500 ease-in-out flex-shrink-0 ${!isOpen
-                            ? 'scale-110'
-                            : ''
-                            } group-hover:scale-125 group-hover:rotate-6`}>
+                        {/* Icon */}
+                        <div className={`ml-2 relative z-10 flex-shrink-0 ${!isOpen ? 'scale-110' : ''}`}>
                             <LogOut
                                 size={18}
-                                className="text-white/80 group-hover:text-red-300 transition-all duration-500 ease-in-out drop-shadow-lg group-hover:drop-shadow-red-400/50"
-                                strokeWidth={2.5}
+                                className="text-white"
+                                strokeWidth={4}
                             />
                         </div>
 
-                        {/* Text dengan efek - lebih kecil */}
+                        {/* Text */}
                         {isOpen && (
-                            <span className="relative z-10 flex-1 text-left transition-all duration-300 font-semibold tracking-wider text-sm">{'LOGOUT'}</span>
+                            <span className="ml-2 relative z-10 flex-1 text-left text-md text-white font-normal tracking-normal">{'Logout'}</span>
                         )}
                     </button>
                 </div>

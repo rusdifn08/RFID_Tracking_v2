@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Table as TableIcon, Calendar, Filter } from 'lucide-react';
+import { Table as TableIcon, Calendar, Filter, Bell } from 'lucide-react';
 import ChartCard from './ChartCard';
 import exportExcelIcon from '../../assets/export_excel.svg';
 
@@ -9,9 +9,11 @@ interface DataLineCardProps {
     onDateFilterClick: () => void;
     onExportClick: () => void;
     onWoFilterClick: () => void;
+    enableReworkPopup: boolean;
+    onEnableReworkPopupChange: (enabled: boolean) => void;
 }
 
-const DataLineCard = memo(({ lineTitle, woData, onDateFilterClick, onExportClick, onWoFilterClick }: DataLineCardProps) => {
+const DataLineCard = memo(({ lineTitle, woData, onDateFilterClick, onExportClick, onWoFilterClick, enableReworkPopup, onEnableReworkPopupChange }: DataLineCardProps) => {
     // Data untuk desktop: 3 kolom x 2 baris
     const dataRowsDesktop = [
         [
@@ -48,6 +50,31 @@ const DataLineCard = memo(({ lineTitle, woData, onDateFilterClick, onExportClick
                 <>
                     <h2 className="text-[8px] xs:text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl font-extrabold text-gray-700 tracking-tight group-hover:text-blue-600 transition-colors" style={{ textTransform: 'capitalize' }}>{`Data ${lineTitle}`}</h2>
                     <div className="flex items-center gap-0.5 xs:gap-1 sm:gap-1.5 md:gap-2 ml-auto">
+                        {/* Checkbox untuk enable/disable popup rework */}
+                        <label 
+                            className="flex items-center gap-1 xs:gap-1.5 bg-gradient-to-r from-yellow-50 to-yellow-100 hover:from-yellow-100 hover:to-yellow-200 text-yellow-700 hover:text-yellow-800 rounded-lg border border-yellow-200 hover:border-yellow-300 px-1.5 xs:px-2 py-1 cursor-pointer shadow-sm hover:shadow-md transition-all duration-300 ease-in-out"
+                            title={enableReworkPopup ? "Nonaktifkan Popup Realtime Rework" : "Aktifkan Popup Realtime Rework"}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={enableReworkPopup}
+                                onChange={(e) => onEnableReworkPopupChange(e.target.checked)}
+                                className="w-3 h-3 xs:w-4 xs:h-4 text-yellow-600 bg-gray-100 border-yellow-300 rounded focus:ring-yellow-500 focus:ring-2 cursor-pointer"
+                            />
+                            <Bell 
+                                className={`flex-shrink-0 ${enableReworkPopup ? 'text-yellow-600' : 'text-yellow-400'}`}
+                                style={{ 
+                                    width: 'clamp(1rem, 2.5vw, 1.25rem)', 
+                                    height: 'clamp(1rem, 2.5vw, 1.25rem)',
+                                    minWidth: '1rem',
+                                    minHeight: '1rem'
+                                }} 
+                                strokeWidth={2} 
+                            />
+                            <span className="whitespace-nowrap hidden sm:inline text-[0.6rem] xs:text-[0.65rem] font-medium">
+                                Realtime
+                            </span>
+                        </label>
                         <button
                             onClick={onDateFilterClick}
                             className="bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 hover:text-blue-800 rounded-lg border border-blue-200 hover:border-blue-300 flex items-center gap-1 xs:gap-1.5 sm:gap-2 justify-center shadow-sm hover:shadow-md transition-all duration-300 ease-in-out group relative overflow-hidden"
