@@ -31,14 +31,10 @@ export default function HomeContent() {
         // md:pl-80: Memberi jarak aman dari Sidebar kiri (sekitar 320px)
         // pt-32: Memberi jarak aman dari Header atas
         // pr-8: Memberi jarak kanan agar seimbang
-        <div className=" mt-6 gap-4 w-full h-screen transition-all duration-300 relative flex "
-            style={{
-                padding: 'clamp(0.5rem, 2vw, 2rem) clamp(0.5rem, 3vw, 1rem)',
-                overflow: 'hidden',
-            }}
+        <div className="w-full h-full transition-all duration-300 relative"
         >
             {/* --- GRID CONTAINER --- */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-2 xs:gap-2.5 sm:gap-3 md:gap-4 lg:gap-5 xl:gap-6 2xl:gap-8 w-full max-w-7xl mx-auto px-2 xs:px-3 sm:px-4"
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2 xs:gap-2.5 sm:gap-3 md:gap-4 lg:gap-5 xl:gap-6 2xl:gap-8 w-full max-w-7xl mx-auto px-2 xs:px-3 sm:px-4 pt-2 xs:pt-3 sm:pt-4"
                 >
                 {modules.map((module, index) => {
                     const IconComponent = module.icon;

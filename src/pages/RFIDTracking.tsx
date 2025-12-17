@@ -28,13 +28,10 @@ export default function RFIDTracking() {
             title: 'Finishing',
             subtitle: 'Monitor dan kelola finishing process',
             icon: Package,
-            bgStart: 'from-emerald-400',
-            bgEnd: 'to-emerald-700',
-            shadow: 'shadow-emerald-200',
-            onClick: () => {
-                // TODO: Navigate ke halaman finishing (belum dibuat)
-                console.log('Finishing clicked');
-            }
+            bgStart: 'from-cyan-400',
+            bgEnd: 'to-cyan-600',
+            shadow: 'shadow-cyan-200',
+            onClick: () => navigate('/finishing')
         }
     ];
 
@@ -73,7 +70,8 @@ export default function RFIDTracking() {
                     }}
                 >
                     {/* Grid Container */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2 xs:gap-2.5 sm:gap-3 md:gap-4 lg:gap-5 xl:gap-6 2xl:gap-8 w-full max-w-7xl mx-auto px-2 xs:px-3 sm:px-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2 xs:gap-2.5 sm:gap-3 md:gap-4 lg:gap-5 xl:gap-6 2xl:gap-8 w-full max-w-7xl mx-auto px-2 xs:px-3 sm:px-4"
+                    >
                         {cards.map((card, index) => {
                             const IconComponent = card.icon;
                             const isHovered = hoveredCard === card.id;
@@ -122,8 +120,8 @@ export default function RFIDTracking() {
                                                 <svg width="0" height="0" style={{ position: 'absolute' }}>
                                                     <defs>
                                                         <linearGradient id={`iconGradient-${card.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                                                            <stop offset="0%" stopColor={card.id === 'production-line' ? '#38bdf8' : '#34d399'} />
-                                                            <stop offset="100%" stopColor={card.id === 'production-line' ? '#1e40af' : '#047857'} />
+                                                            <stop offset="0%" stopColor={card.id === 'production-line' ? '#38bdf8' : '#22d3ee'} />
+                                                            <stop offset="100%" stopColor={card.id === 'production-line' ? '#1e40af' : '#0284c7'} />
                                                         </linearGradient>
                                                     </defs>
                                                 </svg>
@@ -141,7 +139,7 @@ export default function RFIDTracking() {
                                         <h3 className="font-bold mb-0.5 xs:mb-0.75 sm:mb-1 md:mb-1.5 text-center transition-colors duration-300 flex-shrink-0 w-full"
                                             style={{
                                                 fontSize: 'clamp(0.875rem, 2.2vw, 1.875rem)',
-                                                color: isHovered ? (card.id === 'production-line' ? '#0073EE' : '#059669') : (card.id === 'production-line' ? '#0073EE' : '#059669'),
+                                                color: isHovered ? (card.id === 'production-line' ? '#0073EE' : '#0284C7') : (card.id === 'production-line' ? '#0073EE' : '#0284C7'),
                                                 lineHeight: '1.3',
                                                 fontFamily: 'Poppins, sans-serif',
                                                 fontWeight: 700

@@ -122,6 +122,28 @@ export default function Breadcrumb() {
                 label: 'About Us',
                 isActive: true,
             });
+        } else if (path.startsWith('/finishing')) {
+            breadcrumbs.push({
+                label: 'RFID Tracking',
+                path: '/rfid-tracking',
+            });
+            breadcrumbs.push({
+                label: 'Finishing',
+                isActive: true,
+            });
+        } else if (path.startsWith('/dashboard-rfid-finishing')) {
+            breadcrumbs.push({
+                label: 'RFID Tracking',
+                path: '/rfid-tracking',
+            });
+            breadcrumbs.push({
+                label: 'Finishing',
+                path: '/finishing',
+            });
+            breadcrumbs.push({
+                label: 'Dashboard RFID Finishing',
+                isActive: true,
+            });
         }
 
         return breadcrumbs;

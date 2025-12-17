@@ -22,7 +22,7 @@ export default function Home() {
 
             {/* Main Content Area */}
             <div
-                className="flex flex-col w-full min-h-screen"
+                className="flex flex-col w-full min-h-screen transition-all duration-300 ease-in-out relative"
                 style={{ marginLeft: isOpen ? '18%' : '5rem', width: isOpen ? 'calc(100% - 18%)' : 'calc(100% - 5rem)' }}
             >
                 {/* Header */}
@@ -30,17 +30,27 @@ export default function Home() {
 
                 {/* Content - dengan margin untuk header fixed (h-16 = 64px) dan padding untuk spacing */}
                 <main
-                    className="flex-1 w-full overflow-y-auto pt-4 xs:pt-6 sm:pt-8 pb-4 xs:pb-6 sm:pb-8 px-2 xs:px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10"
+                    className="flex-1 w-full overflow-y-auto relative"
                     style={{
-                        marginTop: "clamp(0.5rem, 2vh, 1rem)"
+                        padding: 'clamp(0.5rem, 2vw, 2rem) clamp(0.5rem, 3vw, 1rem)',
+                        paddingTop: 'clamp(4rem, 8vh, 6rem)',
+                        paddingBottom: '5rem',
+                        overflow: 'hidden',
                     }}
                 >
                     <HomeContent />
                 </main>
 
                 {/* Footer */}
-                <footer className="w-full py-2 xs:py-3 sm:py-4 border-t border-gray-200 relative" style={{ zIndex: -1 }}>
-                    <div className="text-center text-gray-600 text-[10px] xs:text-xs sm:text-sm px-2" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>
+                <footer
+                    className="absolute bottom-0 left-0 right-0 py-4 border-t border-gray-200/50 pointer-events-none"
+                    style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                        backdropFilter: 'blur(2px)',
+                        zIndex: -1
+                    }}
+                >
+                    <div className="text-center text-gray-600 text-sm pointer-events-auto" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>
                         Gistex Garmen Indonesia Monitoring System (GMS) © 2025 Served by Supernova
                     </div>
                 </footer>

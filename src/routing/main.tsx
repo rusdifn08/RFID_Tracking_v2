@@ -13,6 +13,8 @@ import StatusRFID from '../pages/StatusRFID.tsx';
 import ListRFID from '../pages/ListRFID.tsx';
 import AboutUs from '../pages/AboutUs.tsx';
 import RFIDTracking from '../pages/RFIDTracking.tsx';
+import Finishing from '../pages/Finishing.tsx';
+import DashboardRFIDFinishing from '../pages/DashboardRFIDFinishing.tsx';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 const router = createBrowserRouter([
@@ -129,6 +131,22 @@ const router = createBrowserRouter([
         element: (
             <ProtectedRoute>
                 <AboutUs />
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/finishing',
+        element: (
+            <ProtectedRoute>
+                <Finishing />
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/dashboard-rfid-finishing',
+        element: (
+            <ProtectedRoute>
+                <DashboardRFIDFinishing />
             </ProtectedRoute>
         ),
     },
