@@ -1,0 +1,413 @@
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useSidebar } from '../context/SidebarContext';
+import { Home, Rss, LogOut } from 'lucide-react';
+import logo from '../assets/logo.svg';
+
+export default function Sidebar() {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const { isOpen, closeSidebar } = useSidebar();
+
+    // Deteksi halaman aktif untuk breadcrumb navigation
+    const isRFIDPage = location.pathname.startsWith('/rfid-tracking') ||
+        location.pathname.startsWith('/monitoring-rfid') ||
+        location.pathname.startsWith('/line/') ||
+        location.pathname.startsWith('/dashboard-rfid/') ||
+        location.pathname.startsWith('/daftar-rfid') ||
+        location.pathname.startsWith('/data-rfid') ||
+        location.pathname.startsWith('/list-rfid');
+
+    // Data production lines (sama dengan RFIDLineContent.tsx dan LineDetail.tsx)
+    const productionLines = [
+        { id: 1, title: 'SEWING LINE 1' },
+        { id: 2, title: 'SEWING LINE 2' },
+        { id: 3, title: 'SEWING LINE 3' },
+        { id: 4, title: 'SEWING LINE 4' },
+        { id: 5, title: 'SEWING LINE 5' },
+        { id: 6, title: 'SEWING LINE 6' },
+        { id: 7, title: 'CUTTING GM1' },
+        { id: 8, title: 'SEWING LINE 8' },
+        { id: 9, title: 'SEWING LINE 9' },
+    ];
+
+    // Deteksi line ID dari route
+    const getLineId = (): string | null => {
+        const lineMatch = location.pathname.match(/\/line\/(\d+)/);
+        if (lineMatch) return lineMatch[1];
+
+        const dashboardMatch = location.pathname.match(/\/dashboard-rfid\/(\d+)/);
+        if (dashboardMatch) return dashboardMatch[1];
+
+        // Default ke line 1 untuk daftar-rfid, data-rfid, dan list-rfid
+        if (location.pathname.startsWith('/daftar-rfid') || location.pathname.startsWith('/data-rfid') || location.pathname.startsWith('/list-rfid')) {
+            return '1';
+        }
+
+        return null;
+    };
+
+    const currentLineId = getLineId();
+    const isLinePage = currentLineId !== null;
+    const isRFIDTrackingPage = location.pathname === '/rfid-tracking';
+    const isProductionLinesPage = location.pathname === '/monitoring-rfid';
+
+    // Dapatkan data line berdasarkan ID
+    const currentLineData = currentLineId
+        ? productionLines.find(line => line.id === Number(currentLineId))
+        : null;
+
+    const handleLogout = () => {
+        // Clear semua data login
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('rememberMe');
+        localStorage.removeItem('user');
+        localStorage.removeItem('auth_token');
+        navigate('/login', { replace: true });
+    };
+
+    return (
+        <>
+            {/* Mobile Overlay */}
+            {isOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    onClick={closeSidebar}
+                />
+            )}
+
+            {/* Sidebar Container */}
+            <aside
+                className={`bg-gradient-to-b from-[#0073EE] to-[#0073EE] h-screen fixed left-0 top-0 flex flex-col shadow-2xl z-50 transition-all duration-300 ease-in-out backdrop-blur-sm ${isOpen ? 'w-[18%] ' : 'w-20 px-2'
+                    }`}
+            >
+                {/* --- LOGO AREA - DI PALING ATAS --- */}
+                <div className={`flex flex-col items-center justify-center pt-4 pb-3 relative flex-shrink-0 ${isOpen ? 'px-2' : 'px-0'}`}>
+                    {/* Decorative gradient overlay dengan animasi */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-yellow-400/10 via-yellow-400/5 to-transparent pointer-events-none animate-pulse"></div>
+
+                    {/* Animated background glow */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/5 via-transparent to-blue-400/5 pointer-events-none"></div>
+
+                    {/* Logo SVG - Diperkecil */}
+                    <div className="relative mb-2 group">
+                        {/* Glow effect saat hover */}
+                        <div className="absolute inset-0 bg-yellow-400/30 rounded-2xl blur-2xl group-hover:blur-3xl transition-all duration-500 opacity-0 group-hover:opacity-100 -z-10"></div>
+                        <div className="relative transform transition-all duration-300 group-hover:scale-110 group-hover:rotate-2 group-hover:drop-shadow-2xl">
+                            <img
+                                src={logo}
+                                alt="GISTEX Logo"
+                                className={`${isOpen ? 'w-24 h-18' : 'w-10 h-10'} object-contain drop-shadow-2xl filter brightness-110 transition-all duration-300`}
+                            />
+                        </div>
+                    </div>
+
+                    <div className={`text-center space-y-0.5 transform transition-all duration-300 ${!isOpen ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
+                        
+                    </div>
+                </div>
+
+                {/* Divider Line dengan gradient dan animasi */}
+                <div className="px-2 py-1 flex-shrink-0">
+                    <div className="h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent w-full shadow-lg shadow-white/20"></div>
+                </div>
+
+                {/* --- MENU ITEMS - FLEXIBLE AREA --- */}
+                <nav className={`flex-1 py-2 space-y-1.5 overflow-y-auto custom-scrollbar min-h-0 ${isOpen ? 'px-2' : 'px-0'}`}
+                    
+                >
+                    {/* HOME */}
+                    <Link
+                        to="/home"
+                        className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 font-medium text-sm overflow-hidden min-h-[44px] ${location.pathname === '/home' || location.pathname === '/'
+                            ? 'bg-white/25 shadow-xl shadow-white/20 border-l-4 border-yellow-400'
+                            : 'hover:bg-white/15 hover:shadow-lg hover:shadow-white/10 border-l-4 border-transparent hover:border-yellow-400/50'
+                            }`}
+                        style={{ 
+                            color: (location.pathname === '/home' || location.pathname === '/') ? '#f7f9fa' : '#e6f2ff' 
+                        }}
+                    >
+                        {/* Active indicator dengan glow */}
+                        {(location.pathname === '/home' || location.pathname === '/') && isOpen && (
+                            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-400 rounded-r-full shadow-lg shadow-yellow-400/70 animate-pulse"></div>
+                        )}
+
+                        {/* Hover effect background dengan gradient */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+
+                        {/* Shine effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 transform translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+
+                        {/* Container untuk icon dan text - icon di kiri */}
+                        <div className={`relative z-10 flex items-center ${isOpen ? 'gap-2 flex-1' : 'justify-center'}`}>
+                            {/* Icon dengan glow effect - di kiri */}
+                            <div className={`transform transition-all duration-500 ease-in-out flex-shrink-0 ${!isOpen
+                                ? 'scale-110'
+                                : ''
+                                } ${location.pathname === '/home' || location.pathname === '/'
+                                    ? 'scale-125'
+                                    : 'group-hover:scale-125 group-hover:rotate-6'
+                                }`}>
+                                <Home
+                                    size={18}
+                                    className={`transition-all duration-500 ease-in-out drop-shadow-lg ${location.pathname === '/home' || location.pathname === '/'
+                                        ? 'text-yellow-400 drop-shadow-yellow-400/50'
+                                        : 'group-hover:text-yellow-400 group-hover:drop-shadow-yellow-400/50'
+                                        }`}
+                                    style={{ color: (location.pathname === '/home' || location.pathname === '/') ? '#f7f9fa' : '#e6f2ff' }}
+                                    strokeWidth={2.5}
+                                />
+                            </div>
+
+                            {/* Text dengan efek - lebih kecil */}
+                            {isOpen && (
+                                <span className="transition-all duration-300 font-semibold tracking-wide flex-1 text-sm">{'HOME'}</span>
+                            )}
+                        </div>
+                    </Link>
+
+                    {/* RFID - dengan breadcrumb navigation */}
+                    <div className="space-y-1">
+                        {/* RFID Parent Menu - Link biasa */}
+                        <Link
+                            to="/rfid-tracking"
+                            className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 font-medium text-sm overflow-hidden min-h-[44px] ${isRFIDPage
+                                ? 'bg-white/25 shadow-xl shadow-white/20 border-l-4 border-yellow-400'
+                                : 'hover:bg-white/15 hover:shadow-lg hover:shadow-white/10 border-l-4 border-transparent hover:border-yellow-400/50'
+                                }`}
+                            style={{ 
+                                color: isRFIDPage ? '#f7f9fa' : '#e6f2ff' 
+                            }}
+                        >
+                            {/* Active indicator dengan glow */}
+                            {isRFIDPage && isOpen && (
+                                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-400 rounded-r-full shadow-lg shadow-yellow-400/70 animate-pulse"></div>
+                            )}
+
+                            {/* Hover effect background dengan gradient */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+
+                            {/* Container untuk icon dan text - icon di kiri */}
+                            <div className={`relative z-10 flex items-center ${isOpen ? 'gap-2 flex-1' : 'justify-center'}`}>
+                                {/* Icon dengan glow effect - di kiri */}
+                                <div className={`transform transition-all duration-500 ease-in-out flex-shrink-0 ${!isOpen
+                                    ? 'scale-110'
+                                    : ''
+                                    }`}>
+                                    <Rss
+                                        size={18}
+                                        className={`transition-all duration-500 ease-in-out drop-shadow-lg ${isRFIDPage
+                                            ? 'text-yellow-400 drop-shadow-yellow-400/50'
+                                            : 'group-hover:text-yellow-400 group-hover:drop-shadow-yellow-400/50'
+                                            }`}
+                                        style={{ color: isRFIDPage ? '#f7f9fa' : '#e6f2ff' }}
+                                        strokeWidth={2.5}
+                                    />
+                                </div>
+
+                                {/* Text - lebih kecil */}
+                                {isOpen && (
+                                    <span className="transition-all duration-300 font-semibold tracking-wide flex-1 text-left text-sm">{'RFID'}</span>
+                                )}
+                            </div>
+                        </Link>
+
+                        {/* Breadcrumb Navigation - Muncul berdasarkan halaman aktif */}
+                        {isOpen && isRFIDPage && (
+                            <div className="ml-3 space-y-0.5">
+                                {/* RFID Tracking - Muncul jika di halaman rfid-tracking */}
+                                {isRFIDTrackingPage && (
+                                    <div className="px-3 py-1.5 font-medium text-xs border-l-2 border-white/30"
+                                        style={{ color: '#e6f2ff' }}
+                                    >
+                                        RFID Tracking
+                                    </div>
+                                )}
+
+                                {/* Production Lines - Muncul jika di halaman monitoring-rfid atau lebih dalam */}
+                                {isProductionLinesPage && (
+                                    <div className="ml-3 space-y-0.5">
+                                        <Link
+                                            to="/rfid-tracking"
+                                            className="group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full hover:bg-white/8 border-l-2 border-transparent hover:border-yellow-400/40"
+                                            style={{ color: '#e6f2ff' }}
+                                            onMouseEnter={(e) => e.currentTarget.style.color = '#f7f9fa'}
+                                            onMouseLeave={(e) => e.currentTarget.style.color = '#e6f2ff'}
+                                        >
+                                            <span className="font-medium tracking-wide text-left">RFID Tracking</span>
+                                        </Link>
+                                        <div className="px-3 py-1.5 font-medium text-xs border-l-2 border-white/30"
+                                            style={{ color: '#e6f2ff' }}
+                                        >
+                                            Production Lines
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Line Detail - Muncul jika di halaman line atau lebih dalam (untuk semua line) */}
+                                {isLinePage && currentLineData && (
+                                    <div className="ml-3 space-y-0.5"
+                                        
+                                    >
+                                        {/* Link ke RFID Tracking */}
+                                        <Link
+                                            to="/rfid-tracking"
+                                            className="group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full hover:bg-white/8 border-l-2 border-transparent hover:border-yellow-400/40"
+                                            style={{ color: '#e6f2ff' }}
+                                            onMouseEnter={(e) => e.currentTarget.style.color = '#f7f9fa'}
+                                            onMouseLeave={(e) => e.currentTarget.style.color = '#e6f2ff'}
+                                        >
+                                            <span className="font-medium tracking-wide text-left">RFID Tracking</span>
+                                        </Link>
+                                        {/* Link ke Production Lines jika belum di halaman tersebut */}
+                                        {!isProductionLinesPage && (
+                                            <Link
+                                                to="/monitoring-rfid"
+                                                className="group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full hover:bg-white/8 border-l-2 border-transparent hover:border-yellow-400/40"
+                                                style={{ color: '#e6f2ff' }}
+                                                onMouseEnter={(e) => e.currentTarget.style.color = '#f7f9fa'}
+                                                onMouseLeave={(e) => e.currentTarget.style.color = '#e6f2ff'}
+                                            >
+                                                <span className="font-medium tracking-wide text-left">Production Lines</span>
+                                            </Link>
+                                        )}
+
+                                        {/* Current Line */}
+                                        <Link
+                                            to={`/line/${currentLineId}`}
+                                            className={`group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 text-[10px] overflow-hidden min-h-[32px] w-full ${location.pathname === `/line/${currentLineId}`
+                                                ? 'bg-white/20 shadow-lg shadow-white/10 border-l-2 border-yellow-400/70'
+                                                : 'hover:bg-white/10 border-l-2 border-transparent hover:border-yellow-400/50'
+                                                }`}
+                                            style={{ 
+                                                color: location.pathname === `/line/${currentLineId}` ? '#f7f9fa' : '#e6f2ff',
+                                                fontFamily: 'Poppins, sans-serif',
+                                                fontWeight: 'bold'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (location.pathname !== `/line/${currentLineId}`) {
+                                                    e.currentTarget.style.color = '#f7f9fa';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (location.pathname !== `/line/${currentLineId}`) {
+                                                    e.currentTarget.style.color = '#e6f2ff';
+                                                }
+                                            }}
+                                        >
+                                            <span className="tracking-wide text-left" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>{currentLineData.title}</span>
+                                        </Link>
+
+                                        {/* Submenu - Muncul jika di halaman detail line atau dashboard/daftar/list */}
+                                        {(location.pathname === `/line/${currentLineId}` ||
+                                            location.pathname === `/dashboard-rfid/${currentLineId}` ||
+                                            (location.pathname === '/daftar-rfid' && currentLineId === '1') ||
+                                            (location.pathname === '/data-rfid' && currentLineId === '1') ||
+                                            (location.pathname === '/list-rfid' && currentLineId === '1')) && (
+                                                <div className="ml-3 space-y-0.5">
+                                                    {/* DAFTAR RFID - hanya untuk line 1 */}
+                                                    {currentLineId === '1' && (
+                                                        <Link
+                                                            to="/daftar-rfid"
+                                                            className={`group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full ${location.pathname === '/daftar-rfid'
+                                                                ? 'bg-white/15 shadow-md border-l-2 border-purple-400'
+                                                                : 'hover:bg-white/8 border-l-2 border-transparent hover:border-purple-400/40'
+                                                                }`}
+                                                            style={{ color: location.pathname === '/daftar-rfid' ? '#f7f9fa' : '#e6f2ff' }}
+                                                            onMouseEnter={(e) => {
+                                                                if (location.pathname !== '/daftar-rfid') {
+                                                                    e.currentTarget.style.color = '#f7f9fa';
+                                                                }
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                if (location.pathname !== '/daftar-rfid') {
+                                                                    e.currentTarget.style.color = '#e6f2ff';
+                                                                }
+                                                            }}
+                                                        >
+                                                            <span className="font-medium tracking-wide text-left">DAFTAR RFID</span>
+                                                        </Link>
+                                                    )}
+
+                                                    {/* DASHBOARD RFID - untuk semua line */}
+                                                    <Link
+                                                        to={`/dashboard-rfid/${currentLineId}`}
+                                                        className={`group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full ${location.pathname === `/dashboard-rfid/${currentLineId}`
+                                                            ? 'bg-white/15 shadow-md border-l-2 border-pink-400'
+                                                            : 'hover:bg-white/8 border-l-2 border-transparent hover:border-pink-400/40'
+                                                            }`}
+                                                        style={{ color: location.pathname === `/dashboard-rfid/${currentLineId}` ? '#f7f9fa' : '#e6f2ff' }}
+                                                        onMouseEnter={(e) => {
+                                                            if (location.pathname !== `/dashboard-rfid/${currentLineId}`) {
+                                                                e.currentTarget.style.color = '#f7f9fa';
+                                                            }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            if (location.pathname !== `/dashboard-rfid/${currentLineId}`) {
+                                                                e.currentTarget.style.color = '#e6f2ff';
+                                                            }
+                                                        }}
+                                                    >
+                                                        <span className="font-medium tracking-wide text-left">DASHBOARD RFID</span>
+                                                    </Link>
+
+                                                    {/* LIST RFID - untuk semua line */}
+                                                    <Link
+                                                        to={`/list-rfid/${currentLineId}`}
+                                                        className={`group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full ${location.pathname === `/list-rfid/${currentLineId}` || location.pathname.startsWith('/list-rfid')
+                                                            ? 'bg-white/15 shadow-md border-l-2 border-orange-400'
+                                                            : 'hover:bg-white/8 border-l-2 border-transparent hover:border-orange-400/40'
+                                                            }`}
+                                                        style={{ color: (location.pathname === `/list-rfid/${currentLineId}` || location.pathname.startsWith('/list-rfid')) ? '#f7f9fa' : '#e6f2ff' }}
+                                                        onMouseEnter={(e) => {
+                                                            if (location.pathname !== `/list-rfid/${currentLineId}` && !location.pathname.startsWith('/list-rfid')) {
+                                                                e.currentTarget.style.color = '#f7f9fa';
+                                                            }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            if (location.pathname !== `/list-rfid/${currentLineId}` && !location.pathname.startsWith('/list-rfid')) {
+                                                                e.currentTarget.style.color = '#e6f2ff';
+                                                            }
+                                                        }}
+                                                    >
+                                                        <span className="font-medium tracking-wide text-left">LIST RFID</span>
+                                                    </Link>
+                                                </div>
+                                            )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                </nav>
+
+                {/* Divider Line dengan efek */}
+                <div className={`px-2 py-1 flex-shrink-0 transition-all duration-300 ${!isOpen ? 'opacity-0' : 'opacity-100'}`}>
+                    <div className="h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent w-full shadow-lg shadow-white/20"></div>
+                </div>
+
+                {/* --- LOGOUT BUTTON - DI PALING BAWAH --- */}
+                <div className={`flex-shrink-0 ${isOpen ? 'px-2 pb-3' : 'px-0'}`}>
+                    <button
+                        onClick={handleLogout}
+                        className={`bg-blue-500 mb-2 group relative w-full flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 overflow-hidden min-h-[44px] bg-[#0073EE] hover:bg-[#0066D6] text-white shadow-sm`}
+                    >
+                        {/* Icon */}
+                        <div className={`ml-2 relative z-10 flex-shrink-0 ${!isOpen ? 'scale-110' : ''}`}>
+                            <LogOut
+                                size={18}
+                                className="text-white"
+                                strokeWidth={4}
+                            />
+                        </div>
+
+                        {/* Text */}
+                        {isOpen && (
+                            <span className="ml-2 relative z-10 flex-1 text-left text-md text-white font-normal tracking-normal">{'Logout'}</span>
+                        )}
+                    </button>
+                </div>
+            </aside>
+        </>
+    );
+}

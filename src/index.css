@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+* {
+
+    box-sizing: border-box;
+
+}
+
+html,
+#root {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100vw;
+    height: 100vh;
+    min-height: 100vh;
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+    }
+
+    50% {
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+    }
+}
+
+.animate-fade-in {
+    animation: fade-in 0.5s ease-out forwards;
+    opacity: 0;
+}
+
+.animate-slide-in {
+    animation: slide-in 0.4s ease-out forwards;
+}
+
+/* Smooth transitions for interactive elements */
+button,
+a,
+input,
+select,
+textarea {
+    transition-property: color, background-color, border-color, transform, opacity, box-shadow;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+}
+
+/* Hide scrollbar but keep scrolling functionality */
+/* For Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
+}
+
+/* For Firefox */
+html, body, * {
+    scrollbar-width: none;
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Ensure scrolling still works */
+html, body, * {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Custom scrollbar untuk sidebar - juga disembunyikan */
+.custom-scrollbar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
+}
