@@ -19,7 +19,7 @@ interface UseDaftarRFIDReturn {
     setDateTo: (date: string) => void;
     showDateFilterModal: boolean;
     setShowDateFilterModal: (show: boolean) => void;
-    
+
     // Modal states
     showRegisteredModal: boolean;
     setShowRegisteredModal: (show: boolean) => void;
@@ -27,7 +27,7 @@ interface UseDaftarRFIDReturn {
     setShowScanRejectModal: (show: boolean) => void;
     isModalOpen: boolean;
     setIsModalOpen: (open: boolean) => void;
-    
+
     // Reject scan states
     rejectRfidInput: string;
     setRejectRfidInput: (value: string) => void;
@@ -36,13 +36,13 @@ interface UseDaftarRFIDReturn {
     isProcessingReject: boolean;
     setIsProcessingReject: (value: boolean) => void;
     rejectInputRef: React.RefObject<HTMLInputElement | null>;
-    
+
     // Registered RFID states
     registeredRFIDData: any[];
     setRegisteredRFIDData: React.Dispatch<React.SetStateAction<any[]>>;
     loadingRegistered: boolean;
     setLoadingRegistered: (value: boolean) => void;
-    
+
     // Filter states
     filterStatus: string;
     setFilterStatus: (value: string) => void;
@@ -52,13 +52,13 @@ interface UseDaftarRFIDReturn {
     setFilterColor: (value: string) => void;
     filterSize: string;
     setFilterSize: (value: string) => void;
-    
+
     // Work order data
     workOrderData: Record<string, WorkOrderData>;
     setWorkOrderData: React.Dispatch<React.SetStateAction<Record<string, WorkOrderData>>>;
     loading: boolean;
     setLoading: (value: boolean) => void;
-    
+
     // Form data
     formData: {
         workOrder: string;
@@ -80,7 +80,7 @@ interface UseDaftarRFIDReturn {
     setFocusedInput: (value: string | null) => void;
     hoveredCard: boolean;
     setHoveredCard: (value: boolean) => void;
-    
+
     // Helper functions
     fetchProductionBranchData: () => Promise<void>;
     fetchRegisteredRFID: () => Promise<void>;
@@ -117,7 +117,7 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
         const day = String(today.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     };
-    
+
     const [dateFrom, setDateFrom] = useState<string>(getTodayDate());
     const [dateTo, setDateTo] = useState<string>(getTodayDate());
     const [showDateFilterModal, setShowDateFilterModal] = useState<boolean>(false);
@@ -135,7 +135,7 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
     const [filterSize, setFilterSize] = useState<string>('Semua');
     const [workOrderData, setWorkOrderData] = useState<Record<string, WorkOrderData>>({});
     const [loading, setLoading] = useState<boolean>(false);
-    
+
     const [formData, setFormData] = useState({
         workOrder: '',
         style: '',
@@ -164,7 +164,7 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
     const fetchRegisteredRFID = async () => {
         try {
             setLoadingRegistered(true);
-            
+
             const [progressResponse, doneResponse, waitingResponse] = await Promise.all([
                 fetch(`${API_BASE_URL}/card/progress`, {
                     method: 'GET',
@@ -237,14 +237,14 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
         if (!item) {
             return 'In Progress';
         }
-        
+
         const isDone = item.isDone;
-        
-        if (!isDone || 
-            isDone === '' || 
-            isDone === null || 
-            isDone === undefined || 
-            isDone === 0 || 
+
+        if (!isDone ||
+            isDone === '' ||
+            isDone === null ||
+            isDone === undefined ||
+            isDone === 0 ||
             isDone === false ||
             String(isDone).trim().toLowerCase() === '0' ||
             String(isDone).trim().toLowerCase() === 'false' ||
@@ -252,17 +252,17 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
             String(isDone).trim().toLowerCase() === 'undefined') {
             return 'In Progress';
         }
-        
+
         const isDoneStr = String(isDone).trim().toLowerCase();
-        
+
         if (isDoneStr === '') {
             return 'In Progress';
         }
-        
+
         if (isDoneStr === 'waiting') {
             return 'Waiting';
         }
-        
+
         return 'isDone';
     };
 
@@ -276,11 +276,11 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
             const itemStatus = getItemStatus(item);
             if (itemStatus !== filterStatus) return false;
         }
-        
+
         if (filterColor !== 'Semua' && item.color !== filterColor) return false;
-        
+
         if (filterSize !== 'Semua' && item.size !== filterSize) return false;
-        
+
         if (searchTerm.trim()) {
             const searchLower = searchTerm.toLowerCase();
             return (
@@ -293,7 +293,7 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
                 (item.size?.toLowerCase() || '').includes(searchLower)
             );
         }
-        
+
         return true;
     });
 
@@ -307,7 +307,7 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
         try {
             // API endpoint langsung sesuai spesifikasi
             const API_SCRAP_URL = 'http://10.8.0.104:7000/scrap';
-            
+
             const response = await fetch(API_SCRAP_URL, {
                 method: 'POST',
                 headers: {
@@ -354,16 +354,16 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
     // Handle input change
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        
+
         if (name === 'workOrder') {
             // Get data untuk WO yang dipilih
             const woData = workOrderData[value];
-            
+
             // Auto-fill STYLE, BUYER, dan ITEM jika hanya ada 1 opsi
             const autoStyle = woData?.styles?.length === 1 ? woData.styles[0] : '';
             const autoBuyer = woData?.buyers?.length === 1 ? woData.buyers[0] : '';
             const autoItem = woData?.items?.length === 1 ? woData.items[0] : '';
-            
+
             setFormData({
                 workOrder: value,
                 style: autoStyle,
@@ -394,14 +394,14 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
             alert('Mohon lengkapi semua field sebelum melanjutkan.');
             return false;
         }
-        
+
         // Update formData dengan data yang valid
         setFormData(submitData);
-        
+
         // Buka modal scanning
         modalOpenRef.current = true;
         setIsModalOpen(true);
-        
+
         return true;
     };
 
@@ -414,17 +414,17 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
                 e.nativeEvent.stopImmediatePropagation();
             }
         }
-        
+
         // Validasi formData dari state
         if (!formData.workOrder || !formData.style || !formData.buyer || !formData.item || !formData.color || !formData.size) {
             alert('Mohon lengkapi semua field sebelum melanjutkan.');
             return false;
         }
-        
+
         // Buka modal scanning
         modalOpenRef.current = true;
         setIsModalOpen(true);
-        
+
         return false;
     };
 
@@ -448,7 +448,7 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
     }, [showScanRejectModal]);
 
     // Debounce timer ref untuk mencegah terlalu banyak request
-    const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isFetchingRef = useRef<boolean>(false);
     const lastFetchParamsRef = useRef<string>('');
 
@@ -472,25 +472,23 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
             isFetchingRef.current = true;
             lastFetchParamsRef.current = currentParams;
             setLoading(true);
-            
+
             const formatDateForAPI = (dateStr: string) => {
                 const [year, month, day] = dateStr.split('-');
                 return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
             };
-            
+
             const startDateFrom = dateFrom ? formatDateForAPI(dateFrom) : undefined;
             const startDateTo = dateTo ? formatDateForAPI(dateTo) : undefined;
-            
+
             console.log('🟡 [useDaftarRFID] Calling getWOBreakdown with:', {
                 branch: 'CJL',
-                line: 'L1',
                 startDateFrom,
                 startDateTo
             });
-            
+
             const response = await getWOBreakdown(
                 'CJL',
-                'L1',
                 startDateFrom,
                 startDateTo
             );
@@ -505,12 +503,12 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
 
             const result = response.data;
             const processedData: Record<string, WorkOrderData> = {};
-            
+
             if (result.data && Array.isArray(result.data)) {
                 console.log('🟡 [useDaftarRFID] Processing', result.data.length, 'items');
                 result.data.forEach((item: WOBreakdownData) => {
                     const woNo = item.wo_no;
-                    
+
                     if (!processedData[woNo]) {
                         processedData[woNo] = {
                             workOrder: woNo,
@@ -521,32 +519,32 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
                             sizes: []
                         };
                     }
-                    
+
                     if (item.style && !processedData[woNo].styles.includes(item.style)) {
                         processedData[woNo].styles.push(item.style);
                     }
-                    
+
                     if (item.buyer && !processedData[woNo].buyers.includes(item.buyer)) {
                         processedData[woNo].buyers.push(item.buyer);
                     }
-                    
+
                     if (item.product_name && !processedData[woNo].items.includes(item.product_name)) {
                         processedData[woNo].items.push(item.product_name);
                     }
-                    
+
                     if (item.color && !processedData[woNo].colors.includes(item.color)) {
                         processedData[woNo].colors.push(item.color);
                     }
-                    
+
                     if (item.size && !processedData[woNo].sizes.includes(item.size)) {
                         processedData[woNo].sizes.push(item.size);
                     }
                 });
             }
-            
+
             console.log('✅ [useDaftarRFID] Processed data:', Object.keys(processedData).length, 'work orders');
             setWorkOrderData(processedData);
-            
+
             // Reset form jika workOrder yang dipilih tidak ada lagi di data
             setFormData(prevFormData => {
                 if (prevFormData.workOrder && !processedData[prevFormData.workOrder]) {
@@ -561,7 +559,7 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
                 }
                 return prevFormData;
             });
-            
+
             setLoading(false);
             isFetchingRef.current = false;
             console.log('✅ [useDaftarRFID] fetchProductionBranchData completed successfully');
@@ -611,7 +609,7 @@ export const useDaftarRFID = (): UseDaftarRFIDReturn => {
             }
         };
     }, [dateFrom, dateTo, fetchProductionBranchDataMemo]);
-    
+
     // Sync ref dengan state
     useEffect(() => {
         modalOpenRef.current = isModalOpen;

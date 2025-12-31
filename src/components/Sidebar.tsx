@@ -1,24 +1,16 @@
+import { memo, useMemo, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSidebar } from '../context/SidebarContext';
 import { Home, Rss, LogOut } from 'lucide-react';
 import logo from '../assets/logo.svg';
 
-export default function Sidebar() {
+const Sidebar = memo(() => {
     const location = useLocation();
     const navigate = useNavigate();
     const { isOpen, closeSidebar } = useSidebar();
 
-    // Deteksi halaman aktif untuk breadcrumb navigation
-    const isRFIDPage = location.pathname.startsWith('/rfid-tracking') ||
-        location.pathname.startsWith('/monitoring-rfid') ||
-        location.pathname.startsWith('/line/') ||
-        location.pathname.startsWith('/dashboard-rfid/') ||
-        location.pathname.startsWith('/daftar-rfid') ||
-        location.pathname.startsWith('/data-rfid') ||
-        location.pathname.startsWith('/list-rfid');
-
-    // Data production lines (sama dengan RFIDLineContent.tsx dan LineDetail.tsx)
-    const productionLines = [
+    // Data production lines - dipindahkan ke useMemo untuk optimasi
+    const productionLines = useMemo(() => [
         { id: 1, title: 'SEWING LINE 1' },
         { id: 2, title: 'SEWING LINE 2' },
         { id: 3, title: 'SEWING LINE 3' },
@@ -28,10 +20,10 @@ export default function Sidebar() {
         { id: 7, title: 'CUTTING GM1' },
         { id: 8, title: 'SEWING LINE 8' },
         { id: 9, title: 'SEWING LINE 9' },
-    ];
+    ], []);
 
-    // Deteksi line ID dari route
-    const getLineId = (): string | null => {
+    // Deteksi line ID dari route - dioptimasi dengan useMemo
+    const currentLineId = useMemo(() => {
         const lineMatch = location.pathname.match(/\/line\/(\d+)/);
         if (lineMatch) return lineMatch[1];
 
@@ -44,26 +36,38 @@ export default function Sidebar() {
         }
 
         return null;
-    };
+    }, [location.pathname]);
 
-    const currentLineId = getLineId();
-    const isLinePage = currentLineId !== null;
-    const isRFIDTrackingPage = location.pathname === '/rfid-tracking';
-    const isProductionLinesPage = location.pathname === '/monitoring-rfid';
+    // Deteksi halaman aktif - dioptimasi dengan useMemo
+    const isRFIDPage = useMemo(() => 
+        location.pathname.startsWith('/rfid-tracking') ||
+        location.pathname.startsWith('/monitoring-rfid') ||
+        location.pathname.startsWith('/line/') ||
+        location.pathname.startsWith('/dashboard-rfid/') ||
+        location.pathname.startsWith('/daftar-rfid') ||
+        location.pathname.startsWith('/data-rfid') ||
+        location.pathname.startsWith('/list-rfid'),
+        [location.pathname]
+    );
 
-    // Dapatkan data line berdasarkan ID
-    const currentLineData = currentLineId
-        ? productionLines.find(line => line.id === Number(currentLineId))
-        : null;
+    const isLinePage = useMemo(() => currentLineId !== null, [currentLineId]);
+    const isRFIDTrackingPage = useMemo(() => location.pathname === '/rfid-tracking', [location.pathname]);
+    const isProductionLinesPage = useMemo(() => location.pathname === '/monitoring-rfid', [location.pathname]);
 
-    const handleLogout = () => {
+    // Dapatkan data line berdasarkan ID - dioptimasi dengan useMemo
+    const currentLineData = useMemo(() => 
+        currentLineId ? productionLines.find(line => line.id === Number(currentLineId)) : null,
+        [currentLineId, productionLines]
+    );
+
+    const handleLogout = useCallback(() => {
         // Clear semua data login
         localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('rememberMe');
         localStorage.removeItem('user');
         localStorage.removeItem('auth_token');
         navigate('/login', { replace: true });
-    };
+    }, [navigate]);
 
     return (
         <>
@@ -410,4 +414,8 @@ export default function Sidebar() {
             </aside>
         </>
     );
-}
+});
+
+Sidebar.displayName = 'Sidebar';
+
+export default Sidebar;

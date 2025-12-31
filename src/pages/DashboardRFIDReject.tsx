@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
+import Footer from '../components/Footer';
 import { useSidebar } from '../context/SidebarContext';
 import backgroundImage from '../assets/background.jpg';
 import ChartCard from '../components/dashboard/ChartCard';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { XCircle, Activity, BarChart3, Table, Filter, Download, Calendar } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { Activity, BarChart3, Table, Filter, Download, Calendar, TrendingUp } from 'lucide-react';
 import ExportModal from '../components/ExportModal';
 import { exportToExcel, type ExportType } from '../utils/exportToExcel';
 
@@ -66,6 +67,56 @@ export default function DashboardRFIDReject() {
         return lineRejectData.filter((row) => row.wo === filterWo);
     }, [filterWo]);
 
+    // Data untuk grafik Right first time Month (Jan-Dec)
+    const rightFirstTimeData = useMemo(() => {
+        const months = ['January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'];
+        // Data sesuai gambar: mulai 97.0%, turun ke 90.65% di May, naik lagi
+        const percentages = [97.0, 97.4, 96.98, 90.65, 96.55, 96.69,
+            96.34, 97.19, 96.80, 96.82, 96.89, 96.85];
+        return months.map((month, idx) => ({
+            month: month.substring(0, 3), // Jan, Feb, Mar, etc
+            monthFull: month,
+            percentage: percentages[idx]
+        }));
+    }, []);
+
+    // Data untuk grafik Data reject per jam (8 jam: 08:00 - 15:00) untuk LINE 1, LINE 2, LINE 3
+    const rejectPerHourLineData = useMemo(() => {
+        const hours = Array.from({ length: 8 }, (_, i) => i + 8); // 8 sampai 15 (08:00 - 15:00)
+        const selectedLines = lineRejectData.slice(0, 3); // Hanya LINE 1, LINE 2, LINE 3
+
+        // Fungsi untuk generate nilai konsisten berdasarkan seed
+        const seededRandom = (seed: number) => {
+            const x = Math.sin(seed) * 10000;
+            return x - Math.floor(x);
+        };
+
+        return hours.map((hour) => {
+            const data: { hour: string;[key: string]: string | number } = { hour: `${hour.toString().padStart(2, '0')}:00` };
+            selectedLines.forEach((line, lineIdx) => {
+                // Generate nilai konsisten berdasarkan hour dan lineIdx
+                const seed = hour * 100 + lineIdx;
+                const randomValue = seededRandom(seed);
+                // Generate reject per jam (0-15) dengan pola yang konsisten
+                const rejectCount = Math.floor(randomValue * 16);
+                data[line.line] = rejectCount;
+            });
+            return data;
+        });
+    }, [lineRejectData]);
+
+    // Data untuk tabel Detail Data Reject Garment
+    const detailRejectGarmentData = useMemo(() => {
+        return filteredLineRejectData.map((row, idx) => ({
+            no: idx + 1,
+            line: row.line,
+            wo: row.wo,
+            style: `STYLE-${idx + 1}`,
+            qty: row.checkIn + row.checkOut + row.mati
+        }));
+    }, [filteredLineRejectData]);
+
     const sidebarWidth = isOpen ? '18%' : '5rem';
 
     return (
@@ -107,197 +158,233 @@ export default function DashboardRFIDReject() {
                         minHeight: 0,
                     }}
                 >
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1.5 xs:gap-2 sm:gap-2.5 md:gap-3 h-full">
-                        {/* LEFT COLUMN */}
-                        <div className="lg:col-span-1 flex flex-col gap-1.5 xs:gap-2 sm:gap-2.5 md:gap-3 h-full min-h-0">
-                            {/* TOTAL & OVERVIEW */}
+                    <div className="flex flex-col gap-1.5 xs:gap-2 sm:gap-2.5 md:gap-3 h-full">
+                        {/* ROW 1: Overview Data Reject (2/8) + 2 Grafik (6/8, dibagi 2) */}
+                        <div className="flex gap-1.5 xs:gap-2 sm:gap-2.5 md:gap-3 h-[40%] min-h-0">
+                            {/* OVERVIEW DATA REJECT - 2/8 width */}
                             <ChartCard
                                 title="Overview Data Reject"
                                 icon={BarChart3}
-                                className="flex-[2] min-h-0"
+                                className="w-2/8 min-h-0"
                                 iconColor="#dc2626"
                                 iconBgColor="#fee2e2"
                             >
                                 <div className="grid grid-cols-2 gap-1.5 xs:gap-2 sm:gap-2.5 p-1 xs:p-1.5 sm:p-2 h-full min-h-0">
+                                    {/* Pie Chart */}
+                                    <div className="flex items-center justify-center">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={pieStatusData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius="35%"
+                                                    outerRadius="85%"
+                                                    paddingAngle={2}
+                                                    dataKey="value"
+                                                >
+                                                    {pieStatusData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                                    ))}
+                                                </Pie>
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
                                     {/* Total Reject */}
-                                    <div className="flex flex-col items-center justify-center border-r border-slate-100 pr-1 xs:pr-1.5 sm:pr-2">
+                                    <div className="flex flex-col items-center justify-center">
                                         <span className="text-[10px] xs:text-xs sm:text-sm font-semibold text-slate-600 mb-1">
-                                            Total Reject
+                                            TOTAL REJECT
                                         </span>
-                                        <span className="text-xl xs:text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-red-600">
+                                        <span className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-red-600">
                                             {totalReject.toLocaleString()}
                                         </span>
-                                        <span className="text-[10px] xs:text-[11px] sm:text-xs text-slate-500 mt-0.5">
-                                            Check In + Check Out + Reject Mati
-                                        </span>
-                                    </div>
-
-                                    {/* Ringkasan Status */}
-                                    <div className="grid grid-rows-4 gap-1 xs:gap-1.5">
-                                        <StatusMiniCard
-                                            label="Reject Check In"
-                                            value={rejectCheckIn}
-                                            color="from-sky-500 to-sky-600"
-                                        />
-                                        <StatusMiniCard
-                                            label="Reject Check Out"
-                                            value={rejectCheckOut}
-                                            color="from-emerald-500 to-emerald-600"
-                                        />
-                                        <StatusMiniCard
-                                            label="Reject Mati"
-                                            value={rejectMati}
-                                            color="from-rose-500 to-rose-600"
-                                        />
-                                        <StatusMiniCard
-                                            label="Waiting Reject"
-                                            value={waitingReject}
-                                            color="from-amber-500 to-amber-600"
-                                        />
                                     </div>
                                 </div>
                             </ChartCard>
 
-                            {/* DISTRIBUSI STATUS (PIE) */}
-                            <ChartCard
-                                title="Distribusi Status Reject"
-                                icon={Activity}
-                                className="flex-[1] min-h-0"
-                                iconColor="#0369a1"
-                                iconBgColor="#e0f2fe"
-                            >
-                                <div className="flex items-center justify-center h-full min-h-0 p-1 xs:p-1.5 sm:p-2">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={pieStatusData}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius="35%"
-                                                outerRadius="85%"
-                                                paddingAngle={2}
-                                                dataKey="value"
-                                            >
-                                                {pieStatusData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                                ))}
-                                            </Pie>
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </ChartCard>
+                            {/* CONTAINER 2 GRAFIK - 6/8 width, dibagi 2 */}
+                            <div className="w-6/8 flex gap-1.5 xs:gap-2 sm:gap-2.5 md:gap-3 h-full min-h-0">
+                                {/* RIGHT FIRST TIME MONTH - 1/2 dari 6/8 */}
+                                <ChartCard
+                                    title="Right first time Month"
+                                    icon={TrendingUp}
+                                    className="w-1/2 min-h-0"
+                                    iconColor="#22c55e"
+                                    iconBgColor="#dcfce7"
+                                >
+                                    <div className="h-full min-h-0 p-1 xs:p-1.5 sm:p-2">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={rightFirstTimeData}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                                <XAxis
+                                                    dataKey="month"
+                                                    tick={{ fontSize: 10 }}
+                                                    interval={0}
+                                                />
+                                                <YAxis
+                                                    domain={[90, 98]}
+                                                    tick={{ fontSize: 10 }}
+                                                    label={{ value: 'Right first time (%)', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }}
+                                                />
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                                        border: '1px solid #e5e7eb',
+                                                        borderRadius: '8px',
+                                                        fontSize: '12px'
+                                                    }}
+                                                    formatter={(value: number) => [`${value.toFixed(2)}%`, 'Right first time']}
+                                                    labelFormatter={(label) => {
+                                                        const monthData = rightFirstTimeData.find(d => d.month === label);
+                                                        return monthData?.monthFull || label;
+                                                    }}
+                                                />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="percentage"
+                                                    stroke="#22c55e"
+                                                    strokeWidth={2}
+                                                    dot={{ r: 4, fill: '#22c55e' }}
+                                                    name="Right first time"
+                                                />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </ChartCard>
+
+                                {/* DATA REJECT PER JAM - 1/2 dari 6/8 */}
+                                <ChartCard
+                                    title="Data Reject per Jam"
+                                    icon={TrendingUp}
+                                    className="w-1/2 min-h-0"
+                                    iconColor="#8b5cf6"
+                                    iconBgColor="#f3e8ff"
+                                >
+                                    <div className="h-full min-h-0 p-1 xs:p-1.5 sm:p-2">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={rejectPerHourLineData}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                                <XAxis
+                                                    dataKey="hour"
+                                                    tick={{ fontSize: 10 }}
+                                                    interval={0}
+                                                />
+                                                <YAxis
+                                                    tick={{ fontSize: 10 }}
+                                                    label={{ value: 'Jumlah Reject', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }}
+                                                />
+                                                <Tooltip
+                                                    contentStyle={{
+                                                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                                        border: '1px solid #e5e7eb',
+                                                        borderRadius: '8px',
+                                                        fontSize: '12px'
+                                                    }}
+                                                />
+                                                <Legend
+                                                    wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }}
+                                                    iconType="line"
+                                                />
+                                                {lineRejectData.slice(0, 3).map((line, idx) => {
+                                                    const colors = ['#0ea5e9', '#22c55e', '#ef4444']; // Blue, Green, Red untuk LINE 1, 2, 3
+                                                    return (
+                                                        <Line
+                                                            key={line.line}
+                                                            type="monotone"
+                                                            dataKey={line.line}
+                                                            stroke={colors[idx]}
+                                                            strokeWidth={2}
+                                                            dot={{ r: 3 }}
+                                                            name={line.line}
+                                                        />
+                                                    );
+                                                })}
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </ChartCard>
+                            </div>
                         </div>
 
-                        {/* RIGHT COLUMN */}
-                        <div className="lg:col-span-2 flex flex-col gap-1.5 xs:gap-2 sm:gap-2.5 md:gap-3 h-full min-h-0">
-                            {/* TABEL DATA REJECT PER LINE */}
-                            <ChartCard
-                                title="Data Reject per Line"
-                                icon={Table}
-                                className="flex-[2] min-h-0"
-                                iconColor="#0ea5e9"
-                                iconBgColor="#e0f2fe"
-                                headerAction={(
-                                    <div className="flex items-center gap-1.5 xs:gap-2">
-                                        <button
-                                            onClick={() => setShowFilterModal(true)}
-                                            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 xs:px-3 py-1.5 rounded-lg text-[10px] xs:text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                                        >
-                                            <Filter className="w-3.5 h-3.5 text-slate-500" />
-                                            <span>Filter Data</span>
-                                        </button>
-                                        <button
-                                            onClick={() => setShowWoFilterModal(true)}
-                                            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 xs:px-3 py-1.5 rounded-lg text-[10px] xs:text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                                        >
-                                            <Filter className="w-3.5 h-3.5 text-slate-500" />
-                                            <span>Filter WO</span>
-                                        </button>
-                                        <button
-                                            onClick={() => setShowExportModal(true)}
-                                            className="inline-flex items-center gap-1.5 px-2.5 xs:px-3 py-1.5 rounded-lg text-[10px] xs:text-xs font-semibold text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-sm hover:shadow-md transition-colors"
-                                        >
-                                            <Download className="w-3.5 h-3.5" />
-                                            <span>Export</span>
-                                        </button>
+                        {/* ROW 2: Left Column (Distribusi Status) + Right Column (Detail Data Reject Garment Table) */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5 xs:gap-2 sm:gap-2.5 md:gap-3 flex-1 min-h-0">
+                            {/* LEFT COLUMN - Hanya Distribusi Status Reject */}
+                            <div className="flex flex-col gap-1.5 xs:gap-2 sm:gap-2.5 md:gap-3 h-full min-h-0">
+                                {/* DISTRIBUSI STATUS REJECT */}
+                                <ChartCard
+                                    title="Distribusi Status Reject"
+                                    icon={Activity}
+                                    className="flex-1 min-h-0"
+                                    iconColor="#0369a1"
+                                    iconBgColor="#e0f2fe"
+                                >
+                                    <div className="grid grid-cols-2 gap-1 xs:gap-1.5 sm:gap-2 p-1 xs:p-1.5 sm:p-2 h-full min-h-0">
+                                        <StatusBox label="Waiting" value={waitingReject} color="#f97316" />
+                                        <StatusBox label="Check In" value={rejectCheckIn} color="#0ea5e9" />
+                                        <StatusBox label="Check Out" value={rejectCheckOut} color="#22c55e" />
+                                        <StatusBox label="Reject Mati" value={rejectMati} color="#ef4444" />
                                     </div>
-                                )}
-                            >
-                                <div className="p-1.5 xs:p-2 sm:p-2.5 overflow-auto h-full min-h-0">
-                                    <table className="w-full border-collapse text-[10px] xs:text-[11px] sm:text-xs md:text-sm">
-                                        <thead>
-                                            <tr>
-                                                <HeaderCell>Line</HeaderCell>
-                                                <HeaderCell>Reject Check In</HeaderCell>
-                                                <HeaderCell>Reject Check Out</HeaderCell>
-                                                <HeaderCell>Reject Mati</HeaderCell>
-                                                <HeaderCell>Waiting Reject</HeaderCell>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredLineRejectData.map((row: LineRejectData, idx: number) => (
-                                                <tr
-                                                    key={row.line}
-                                                    className={`transition-colors duration-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'
-                                                        } hover:bg-sky-50/70`}
-                                                >
-                                                    <BodyCell className="font-semibold text-slate-700">
-                                                        {row.line}
-                                                    </BodyCell>
-                                                    <BodyCell className="text-sky-700 font-semibold">
-                                                        {row.checkIn.toLocaleString()}
-                                                    </BodyCell>
-                                                    <BodyCell className="text-emerald-700 font-semibold">
-                                                        {row.checkOut.toLocaleString()}
-                                                    </BodyCell>
-                                                    <BodyCell className="text-rose-700 font-semibold">
-                                                        {row.mati.toLocaleString()}
-                                                    </BodyCell>
-                                                    <BodyCell className="text-amber-700 font-semibold">
-                                                        {row.waiting.toLocaleString()}
-                                                    </BodyCell>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </ChartCard>
+                                </ChartCard>
+                            </div>
 
-                            {/* CARD INFO RINGKAS */}
-                            <ChartCard
-                                title="Highlight KPI Reject"
-                                icon={XCircle}
-                                className="flex-[1] min-h-0"
-                                iconColor="#b91c1c"
-                                iconBgColor="#fee2e2"
-                            >
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 xs:gap-2 sm:gap-2.5 p-1 xs:p-1.5 sm:p-2">
-                                    <KpiCard
-                                        label="Persentase Reject Mati"
-                                        value={`${((rejectMati / rejectCheckIn) * 100).toFixed(1)}%`}
-                                        description="Dari total Reject Check In"
-                                        color="#b91c1c"
-                                    />
-                                    <KpiCard
-                                        label="Close Rate Reject"
-                                        value={`${((rejectCheckOut / rejectCheckIn) * 100).toFixed(1)}%`}
-                                        description="Reject yang sudah di proses keluar"
-                                        color="#16a34a"
-                                    />
-                                    <KpiCard
-                                        label="Waiting Ratio"
-                                        value={`${((waitingReject / rejectCheckIn) * 100).toFixed(1)}%`}
-                                        description="Masih menunggu tindakan"
-                                        color="#f97316"
-                                    />
-                                    <KpiCard
-                                        label="Average Reject / Line"
-                                        value={(rejectCheckIn / lineRejectData.length).toFixed(1)}
-                                        description="Rata-rata Check In per line"
-                                        color="#0ea5e9"
-                                    />
-                                </div>
-                            </ChartCard>
+                            {/* RIGHT COLUMN - Detail Data Reject Garment Table */}
+                            <div className="flex flex-col gap-1.5 xs:gap-2 sm:gap-2.5 md:gap-3 h-full min-h-0">
+                                {/* DETAIL DATA REJECT GARMENT */}
+                                <ChartCard
+                                    title="Detail Data Reject Garment"
+                                    icon={Table}
+                                    className="flex-1 min-h-0"
+                                    iconColor="#0ea5e9"
+                                    iconBgColor="#e0f2fe"
+                                    headerAction={(
+                                        <div className="flex items-center gap-1.5 xs:gap-2">
+                                            <button
+                                                onClick={() => setShowFilterModal(true)}
+                                                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 xs:px-3 py-1.5 rounded-lg text-[10px] xs:text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                                            >
+                                                <Filter className="w-3.5 h-3.5 text-slate-500" />
+                                                <span>Filter</span>
+                                            </button>
+                                            <button
+                                                onClick={() => setShowExportModal(true)}
+                                                className="inline-flex items-center gap-1.5 px-2.5 xs:px-3 py-1.5 rounded-lg text-[10px] xs:text-xs font-semibold text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-sm hover:shadow-md transition-colors"
+                                            >
+                                                <Download className="w-3.5 h-3.5" />
+                                                <span>Export</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                >
+                                    <div className="p-1.5 xs:p-2 sm:p-2.5 overflow-auto h-full min-h-0">
+                                        <table className="w-full border-collapse text-[10px] xs:text-[11px] sm:text-xs">
+                                            <thead>
+                                                <tr>
+                                                    <HeaderCell>NO</HeaderCell>
+                                                    <HeaderCell>Line</HeaderCell>
+                                                    <HeaderCell>WO</HeaderCell>
+                                                    <HeaderCell>STYLE</HeaderCell>
+                                                    <HeaderCell>QTY</HeaderCell>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {detailRejectGarmentData.map((row, idx: number) => (
+                                                    <tr
+                                                        key={idx}
+                                                        className={`transition-colors duration-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'
+                                                            } hover:bg-sky-50/70`}
+                                                    >
+                                                        <BodyCell className="text-center">{row.no}</BodyCell>
+                                                        <BodyCell className="font-semibold text-slate-700">{row.line}</BodyCell>
+                                                        <BodyCell>{row.wo}</BodyCell>
+                                                        <BodyCell>{row.style}</BodyCell>
+                                                        <BodyCell className="font-semibold text-red-600">{row.qty.toLocaleString()}</BodyCell>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </ChartCard>
+                            </div>
                         </div>
                     </div>
                 </main>
@@ -471,22 +558,7 @@ export default function DashboardRFIDReject() {
                     lineId="REJECT"
                 />
 
-                {/* Footer */}
-                <footer
-                    className="absolute bottom-0 left-0 right-0 py-4 border-t border-gray-200/50 pointer-events-none"
-                    style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                        backdropFilter: 'blur(2px)',
-                        zIndex: -1,
-                    }}
-                >
-                    <div
-                        className="text-center text-gray-600 text-sm pointer-events-auto"
-                        style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}
-                    >
-                        Gistex Garmen Indonesia Monitoring System (GMS) © 2025 Served by Supernova
-                    </div>
-                </footer>
+                <Footer />
             </div>
 
             <style>{`
@@ -546,51 +618,31 @@ function BodyCell({ children, className }: CellProps) {
     );
 }
 
-interface StatusMiniCardProps {
+
+interface StatusBoxProps {
     label: string;
     value: number;
-    color: string; // Tailwind gradient classes
-}
-
-function StatusMiniCard({ label, value, color }: StatusMiniCardProps) {
-    return (
-        <div
-            className={`rounded-lg xs:rounded-xl sm:rounded-2xl p-[2px] bg-gradient-to-r ${color} shadow-sm hover:shadow-md transition-all hover:scale-[1.02]`}
-        >
-            <div className="bg-white rounded-[0.5rem] xs:rounded-lg sm:rounded-xl h-full w-full flex items-center justify-between px-2 xs:px-2.5 sm:px-3 py-1">
-                <div className="flex flex-col">
-                    <span className="text-[9px] xs:text-[10px] sm:text-xs font-semibold text-slate-600">
-                        {label}
-                    </span>
-                </div>
-                <span className="text-xs xs:text-sm sm:text-base md:text-lg font-extrabold text-slate-800">
-                    {value.toLocaleString()}
-                </span>
-            </div>
-        </div>
-    );
-}
-
-interface KpiCardProps {
-    label: string;
-    value: string;
-    description: string;
     color: string;
 }
 
-function KpiCard({ label, value, description, color }: KpiCardProps) {
+function StatusBox({ label, value, color }: StatusBoxProps) {
     return (
-        <div className="rounded-xl border border-slate-100 bg-white/90 shadow-sm hover:shadow-md transition-all p-2 xs:p-2.5 sm:p-3 flex flex-col justify-between">
-            <span className="text-[9px] xs:text-[10px] sm:text-xs font-semibold text-slate-500 mb-1">
+        <div
+            className="flex flex-col items-center justify-center rounded-lg border-2 p-1 xs:p-1.5 sm:p-2 h-full min-h-0 bg-white/90 shadow-sm hover:shadow-md transition-all"
+            style={{ borderColor: color }}
+        >
+            <span
+                className="text-xs xs:text-sm sm:text-base md:text-lg font-bold mb-1"
+                style={{ color }}
+            >
                 {label}
             </span>
             <span
-                className="text-sm xs:text-base sm:text-lg md:text-xl font-black tracking-tight mb-0.5"
+                className="text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black"
                 style={{ color }}
             >
-                {value}
+                {value.toLocaleString()}
             </span>
-            <span className="text-[9px] xs:text-[10px] sm:text-xs text-slate-500">{description}</span>
         </div>
     );
 }

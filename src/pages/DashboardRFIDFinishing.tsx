@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
+import Footer from '../components/Footer';
 import { useSidebar } from '../context/SidebarContext';
 import backgroundImage from '../assets/background.jpg';
 import ChartCard from '../components/dashboard/ChartCard';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { BarChart3, Droplet, Layers, Table, XCircle, Filter, Download, Calendar } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { BarChart3, Droplet, Layers, Table, Filter, Download, Calendar, TrendingUp } from 'lucide-react';
 import ExportModal from '../components/ExportModal';
 import { exportToExcel, type ExportType } from '../utils/exportToExcel';
 
@@ -21,7 +22,7 @@ export default function DashboardRFIDFinishing() {
     const [showWoFilterModal, setShowWoFilterModal] = useState(false);
 
     const [showExportModal, setShowExportModal] = useState(false);
-    
+
     // Mock Data dengan aturan:
     // 1. Data sekitar 1000an
     // 2. Check In >= Check Out untuk semua area
@@ -35,33 +36,45 @@ export default function DashboardRFIDFinishing() {
     const dryroomCheckOut = 1150;
     // Waiting Dryroom: sisa PQC Good yang belum masuk ke proses Dryroom
     const dryroomWaiting = 100; // Contoh: total PQC Good ≈ 1300 => 1200 (Check In) + 100 (Waiting)
-    
+
     // Folding: Check In >= Check Out
     // Waiting Folding: barang dari Dryroom (Check Out) yang belum masuk ke Folding
     const foldingCheckIn = 1100;
     const foldingWaiting = dryroomCheckOut - foldingCheckIn; // 50 => Dryroom Check Out (1150) = 1100 + 50
     const foldingCheckOut = 1040; // Data yang sudah siap dikirim
-    
-    // Reject Room: Check In >= Check Out >= Reject Mati, lebih sedikit dari area lain
-    const rejectCheckIn = 85;
-    const rejectCheckOut = 75; // rejectCheckOut <= rejectCheckIn
-    const rejectMati = 45; // rejectMati <= rejectCheckOut
-    const rejectWaiting = 30; // Reject yang masih di area produksi
 
     // Total per area (menghitung juga waiting)
     const totalDryroom = dryroomCheckIn + dryroomCheckOut + dryroomWaiting;
     const totalFolding = foldingCheckIn + foldingCheckOut + foldingWaiting;
-    const totalReject = rejectCheckIn + rejectCheckOut + rejectMati + rejectWaiting;
 
-    // Total Finishing (ringkasan seluruh area)
-    const totalFinishing = totalDryroom + totalFolding + totalReject;
+    // Total Finishing (ringkasan seluruh area, tanpa reject room)
+    const totalFinishing = totalDryroom + totalFolding;
 
-    // Data untuk pie chart - pembagian Dryroom, Folding, Reject Room
+    // Data untuk pie chart - pembagian Dryroom, Folding
     const pieData = [
         { name: 'Dryroom', value: totalDryroom, color: '#06b6d4' },
-        { name: 'Folding', value: totalFolding, color: '#14b8a6' },
-        { name: 'Reject Room', value: totalReject, color: '#f59e0b' }
+        { name: 'Folding', value: totalFolding, color: '#14b8a6' }
     ];
+
+    // Data untuk grafik finishing per jam (8 jam: 08:00 - 15:00)
+    const hours = Array.from({ length: 8 }, (_, i) => i + 8); // 8 sampai 15 (08:00 - 15:00)
+    const finishingPerHourData = useMemo(() => {
+        const seededRandom = (seed: number) => {
+            const x = Math.sin(seed) * 10000;
+            return x - Math.floor(x);
+        };
+
+        return hours.map((hour) => {
+            const seed = hour * 100;
+            const randomValue = seededRandom(seed);
+            // Generate finishing per jam (100-200)
+            const finishingCount = Math.floor(100 + randomValue * 100);
+            return {
+                hour: `${hour.toString().padStart(2, '0')}:00`,
+                finishing: finishingCount
+            };
+        });
+    }, []);
 
     // Mock Data untuk tabel - 9 baris dengan line 1-9, qty berbeda, total = totalFinishing (4805)
     const finishingData = [
@@ -75,9 +88,6 @@ export default function DashboardRFIDFinishing() {
         { wo: 'WO-008', line: '8', style: 'STYLE-B', qty: 535 },
         { wo: 'WO-009', line: '9', style: 'STYLE-C', qty: 515 }
     ];
-
-    // Total qty dari tabel (hanya sebagai referensi)
-    const totalQty = finishingData.reduce((sum, item) => sum + item.qty, 0);
 
     // Data yang sudah difilter berdasarkan WO (dummy filter sederhana)
     const filteredFinishingData = useMemo(() => {
@@ -157,12 +167,20 @@ export default function DashboardRFIDFinishing() {
                                     </div>
                                     {/* Grid 2: Total Finishing */}
                                     <div className="flex flex-col items-center justify-center min-h-0">
-                                        <span className="text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-medium text-gray-600 mb-0.5 xs:mb-1">
+                                        <span
+                                            className="font-semibold text-gray-600 mb-1 xs:mb-1.5"
+                                            style={{
+                                                fontSize: 'clamp(0.625rem, 1.2vw, 0.875rem)'
+                                            }}
+                                        >
                                             Total Finishing
                                         </span>
-                                        <span 
-                                            className="text-lg xs:text-xl sm:text-2xl md:text-3xl font-bold leading-none"
-                                            style={{ color: '#0284C7' }}
+                                        <span
+                                            className="font-black leading-none tracking-tight"
+                                            style={{
+                                                color: '#0284C7',
+                                                fontSize: 'clamp(1.5rem, 4vw, 4rem)'
+                                            }}
                                         >
                                             {totalFinishing.toLocaleString()}
                                         </span>
@@ -175,61 +193,13 @@ export default function DashboardRFIDFinishing() {
                                 title="Dryroom"
                                 icon={Droplet}
                                 className="flex-[1] min-h-0"
-                                iconColor="#16a34a"
-                                iconBgColor="#dcfce7"
+                                iconColor="#06b6d4"
+                                iconBgColor="#cffafe"
                             >
-                                <div className="grid grid-cols-3 gap-1.5 xs:gap-2 sm:gap-2.5 p-1 xs:p-1.5 sm:p-2 h-full min-h-0 overflow-hidden">
-                                    {/* Waiting */}
-                                    <div 
-                                        className="rounded-lg xs:rounded-xl sm:rounded-2xl p-[2px] transition-all duration-300 hover:scale-105 group relative h-full min-h-0 flex"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 50%, #fbbf24 100%)',
-                                            boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                                        }}
-                                    >
-                                        <div className="rounded-lg xs:rounded-xl sm:rounded-2xl bg-white w-full h-full flex flex-col items-center justify-center p-0.5 xs:p-1 sm:p-1.5 min-h-0">
-                                            <span className="text-[10px] xs:text-xs sm:text-sm md:text-base font-semibold mb-0.5 xs:mb-1 text-gray-700">
-                                                Waiting
-                                            </span>
-                                            <span className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold leading-none text-gray-800">
-                                                {dryroomWaiting.toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {/* Check In */}
-                                    <div 
-                                        className="rounded-lg xs:rounded-xl sm:rounded-2xl p-[2px] transition-all duration-300 hover:scale-105 group relative h-full min-h-0 flex"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 50%, #fbbf24 100%)',
-                                            boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                                        }}
-                                    >
-                                        <div className="rounded-lg xs:rounded-xl sm:rounded-2xl bg-white w-full h-full flex flex-col items-center justify-center p-0.5 xs:p-1 sm:p-1.5 min-h-0">
-                                            <span className="text-[10px] xs:text-xs sm:text-sm md:text-base font-semibold mb-0.5 xs:mb-1 text-gray-700">
-                                                Check In
-                                            </span>
-                                            <span className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold leading-none text-gray-800">
-                                                {dryroomCheckIn.toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {/* Check Out */}
-                                    <div 
-                                        className="rounded-lg xs:rounded-xl sm:rounded-2xl p-[2px] transition-all duration-300 hover:scale-105 group relative h-full min-h-0 flex"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 50%, #fbbf24 100%)',
-                                            boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                                        }}
-                                    >
-                                        <div className="rounded-lg xs:rounded-xl sm:rounded-2xl bg-white w-full h-full flex flex-col items-center justify-center p-0.5 xs:p-1 sm:p-1.5 min-h-0">
-                                            <span className="text-[10px] xs:text-xs sm:text-sm md:text-base font-semibold mb-0.5 xs:mb-1 text-gray-700">
-                                                Check Out
-                                            </span>
-                                            <span className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold leading-none text-gray-800">
-                                                {dryroomCheckOut.toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
+                                <div className="grid grid-cols-3 gap-1 xs:gap-1.5 sm:gap-2 p-1 xs:p-1.5 sm:p-2 h-full min-h-0">
+                                    <StatusMiniCard label="Waiting" value={dryroomWaiting} iconColor="#f97316" />
+                                    <StatusMiniCard label="Check In" value={dryroomCheckIn} iconColor="#0ea5e9" />
+                                    <StatusMiniCard label="Check Out" value={dryroomCheckOut} iconColor="#22c55e" />
                                 </div>
                             </ChartCard>
 
@@ -238,61 +208,13 @@ export default function DashboardRFIDFinishing() {
                                 title="Folding"
                                 icon={Layers}
                                 className="flex-[1] min-h-0"
-                                iconColor="#92400e"
-                                iconBgColor="#fef3c7"
+                                iconColor="#14b8a6"
+                                iconBgColor="#ccfbf1"
                             >
-                                <div className="grid grid-cols-3 gap-1.5 xs:gap-2 sm:gap-2.5 p-1 xs:p-1.5 sm:p-2 h-full min-h-0 overflow-hidden">
-                                    {/* Waiting */}
-                                    <div 
-                                        className="rounded-lg xs:rounded-xl sm:rounded-2xl p-[2px] transition-all duration-300 hover:scale-105 group relative h-full min-h-0 flex"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 50%, #fbbf24 100%)',
-                                            boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                                        }}
-                                    >
-                                        <div className="rounded-lg xs:rounded-xl sm:rounded-2xl bg-white w-full h-full flex flex-col items-center justifycenter p-0.5 xs:p-1 sm:p-1.5 min-h-0">
-                                            <span className="text-[10px] xs:text-xs sm:text-sm md:text-base font-semibold mb-0.5 xs:mb-1 text-gray-700">
-                                                Waiting
-                                            </span>
-                                            <span className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold leading-none text-gray-800">
-                                                {foldingWaiting.toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {/* Check In */}
-                                    <div 
-                                        className="rounded-lg xs:rounded-xl sm:rounded-2xl p-[2px] transition-all duration-300 hover:scale-105 group relative h-full min-h-0 flex"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 50%, #fbbf24 100%)',
-                                            boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                                        }}
-                                    >
-                                        <div className="rounded-lg xs:rounded-xl sm:rounded-2xl bg-white w-full h-full flex flex-col items-center justifycenter p-0.5 xs:p-1 sm:p-1.5 min-h-0">
-                                            <span className="text-[10px] xs:text-xs sm:text-sm md:text-base font-semibold mb-0.5 xs:mb-1 text-gray-700">
-                                                Check In
-                                            </span>
-                                            <span className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold leading-none text-gray-800">
-                                                {foldingCheckIn.toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {/* Shipment (Check Out) */}
-                                    <div 
-                                        className="rounded-lg xs:rounded-xl sm:rounded-2xl p-[2px] transition-all duration-300 hover:scale-105 group relative h-full min-h-0 flex"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 50%, #fbbf24 100%)',
-                                            boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                                        }}
-                                    >
-                                        <div className="rounded-lg xs:rounded-xl sm:rounded-2xl bg-white w-full h-full flex flex-col items-center justifycenter p-0.5 xs:p-1 sm:p-1.5 min-h-0">
-                                            <span className="text-[10px] xs:text-xs sm:text-sm md:text-base font-semibold mb-0.5 xs:mb-1 text-gray-700">
-                                                Shipment
-                                            </span>
-                                            <span className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold leading-none text-gray-800">
-                                                {foldingCheckOut.toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
+                                <div className="grid grid-cols-3 gap-1 xs:gap-1.5 sm:gap-2 p-1 xs:p-1.5 sm:p-2 h-full min-h-0">
+                                    <StatusMiniCard label="Waiting" value={foldingWaiting} iconColor="#f97316" />
+                                    <StatusMiniCard label="Check In" value={foldingCheckIn} iconColor="#0ea5e9" />
+                                    <StatusMiniCard label="Shipment" value={foldingCheckOut} iconColor="#22c55e" />
                                 </div>
                             </ChartCard>
                         </div>
@@ -334,44 +256,44 @@ export default function DashboardRFIDFinishing() {
                                     <table className="w-full border-collapse">
                                         <thead>
                                             <tr>
-                                                <th 
+                                                <th
                                                     className="border px-1.5 xs:px-2 sm:px-2.5 py-1 xs:py-1.5 sm:py-2 text-left text-[9px] xs:text-[10px] sm:text-xs font-bold"
-                                                    style={{ 
+                                                    style={{
                                                         background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-                                                        color: '#0284C7', 
+                                                        color: '#0284C7',
                                                         borderColor: '#0284C7',
                                                         borderWidth: '1px'
                                                     }}
                                                 >
                                                     WO
                                                 </th>
-                                                <th 
+                                                <th
                                                     className="border px-1.5 xs:px-2 sm:px-2.5 py-1 xs:py-1.5 sm:py-2 text-left text-[9px] xs:text-[10px] sm:text-xs font-bold"
-                                                    style={{ 
+                                                    style={{
                                                         background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-                                                        color: '#0284C7', 
+                                                        color: '#0284C7',
                                                         borderColor: '#0284C7',
                                                         borderWidth: '1px'
                                                     }}
                                                 >
                                                     Line
                                                 </th>
-                                                <th 
+                                                <th
                                                     className="border px-1.5 xs:px-2 sm:px-2.5 py-1 xs:py-1.5 sm:py-2 text-left text-[9px] xs:text-[10px] sm:text-xs font-bold"
-                                                    style={{ 
+                                                    style={{
                                                         background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-                                                        color: '#0284C7', 
+                                                        color: '#0284C7',
                                                         borderColor: '#0284C7',
                                                         borderWidth: '1px'
                                                     }}
                                                 >
                                                     Style
                                                 </th>
-                                                <th 
+                                                <th
                                                     className="border px-1.5 xs:px-2 sm:px-2.5 py-1 xs:py-1.5 sm:py-2 text-left text-[9px] xs:text-[10px] sm:text-xs font-bold"
-                                                    style={{ 
+                                                    style={{
                                                         background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-                                                        color: '#0284C7', 
+                                                        color: '#0284C7',
                                                         borderColor: '#0284C7',
                                                         borderWidth: '1px'
                                                     }}
@@ -383,7 +305,7 @@ export default function DashboardRFIDFinishing() {
                                         <tbody>
                                             {filteredFinishingData.length > 0 ? (
                                                 filteredFinishingData.map((item, index) => (
-                                                    <tr 
+                                                    <tr
                                                         key={index}
                                                         className="transition-colors duration-200 hover:bg-cyan-50/50"
                                                     >
@@ -413,83 +335,45 @@ export default function DashboardRFIDFinishing() {
                                 </div>
                             </ChartCard>
 
-                            {/* REJECT ROOM */}
+                            {/* GRAFIK FINISHING PER JAM */}
                             <ChartCard
-                                title="Reject Room"
-                                icon={XCircle}
+                                title="Data Finishing per Jam"
+                                icon={TrendingUp}
                                 className="flex-[1] min-h-0"
-                                iconColor="#dc2626"
-                                iconBgColor="#fee2e2"
+                                iconColor="#8b5cf6"
+                                iconBgColor="#f3e8ff"
                             >
-                                <div className="grid grid-cols-4 gap-1.5 xs:gap-2 sm:gap-2.5 p-1 xs:p-1.5 sm:p-2 h-full min-h-0 overflow-hidden">
-                                    {/* Waiting */}
-                                    <div 
-                                        className="rounded-lg xs:rounded-xl sm:rounded-2xl p-[2px] transition-all duration-300 hover:scale-105 group relative h-full min-h-0 flex"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 50%, #fbbf24 100%)',
-                                            boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                                        }}
-                                    >
-                                        <div className="rounded-lg xs:rounded-xl sm:rounded-2xl bg-white w-full h-full flex flex-col items-center justify-center p-0.5 xs:p-1 sm:p-1.5 min-h-0">
-                                            <span className="text-[10px] xs:text-xs sm:text-sm md:text-base font-semibold mb-0.5 xs:mb-1 text-center text-gray-700">
-                                                Waiting
-                                            </span>
-                                            <span className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold leading-none text-gray-800">
-                                                {rejectWaiting.toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {/* Check In */}
-                                    <div 
-                                        className="rounded-lg xs:rounded-xl sm:rounded-2xl p-[2px] transition-all duration-300 hover:scale-105 group relative h-full min-h-0 flex"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 50%, #fbbf24 100%)',
-                                            boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                                        }}
-                                    >
-                                        <div className="rounded-lg xs:rounded-xl sm:rounded-2xl bg-white w-full h-full flex flex-col items-center justify-center p-0.5 xs:p-1 sm:p-1.5 min-h-0">
-                                            <span className="text-[10px] xs:text-xs sm:text-sm md:text-base font-semibold mb-0.5 xs:mb-1 text-center text-gray-700">
-                                                Check In
-                                            </span>
-                                            <span className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold leading-none text-gray-800">
-                                                {rejectCheckIn.toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {/* Check Out */}
-                                    <div 
-                                        className="rounded-lg xs:rounded-xl sm:rounded-2xl p-[2px] transition-all duration-300 hover:scale-105 group relative h-full min-h-0 flex"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 50%, #fbbf24 100%)',
-                                            boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                                        }}
-                                    >
-                                        <div className="rounded-lg xs:rounded-xl sm:rounded-2xl bg-white w-full h-full flex flex-col items-center justify-center p-0.5 xs:p-1 sm:p-1.5 min-h-0">
-                                            <span className="text-[10px] xs:text-xs sm:text-sm md:text-base font-semibold mb-0.5 xs:mb-1 text-center text-gray-700">
-                                                Check Out
-                                            </span>
-                                            <span className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold leading-none text-gray-800">
-                                                {rejectCheckOut.toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {/* Reject Mati */}
-                                    <div 
-                                        className="rounded-lg xs:rounded-xl sm:rounded-2xl p-[2px] transition-all duration-300 hover:scale-105 group relative h-full min-h-0 flex"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #7dd3fc 0%, #0284c7 50%, #fbbf24 100%)',
-                                            boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
-                                        }}
-                                    >
-                                        <div className="rounded-lg xs:rounded-xl sm:rounded-2xl bg-white w-full h-full flex flex-col items-center justify-center p-0.5 xs:p-1 sm:p-1.5 min-h-0">
-                                            <span className="text-[10px] xs:text-xs sm:text-sm md:text-base font-semibold mb-0.5 xs:mb-1 text-center text-gray-700">
-                                                Reject Mati
-                                            </span>
-                                            <span className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold leading-none text-gray-800">
-                                                {rejectMati.toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
+                                <div className="h-full min-h-0 p-1 xs:p-1.5 sm:p-2">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={finishingPerHourData}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                            <XAxis
+                                                dataKey="hour"
+                                                tick={{ fontSize: 10 }}
+                                                interval={0}
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 10 }}
+                                                label={{ value: 'Jumlah Finishing', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                                    border: '1px solid #e5e7eb',
+                                                    borderRadius: '8px',
+                                                    fontSize: '12px'
+                                                }}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="finishing"
+                                                stroke="#8b5cf6"
+                                                strokeWidth={2}
+                                                dot={{ r: 4 }}
+                                                name="Finishing"
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
                                 </div>
                             </ChartCard>
                         </div>
@@ -666,19 +550,7 @@ export default function DashboardRFIDFinishing() {
                     lineId="FIN"
                 />
 
-                {/* Footer */}
-                <footer 
-                    className="absolute bottom-0 left-0 right-0 py-4 border-t border-gray-200/50 pointer-events-none"
-                    style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                        backdropFilter: 'blur(2px)',
-                        zIndex: -1
-                    }}
-                >
-                    <div className="text-center text-gray-600 text-sm pointer-events-auto" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>
-                        Gistex Garmen Indonesia Monitoring System (GMS) © 2025 Served by Supernova
-                    </div>
-                </footer>
+                <Footer />
             </div>
 
             <style>{`
@@ -699,6 +571,48 @@ export default function DashboardRFIDFinishing() {
                     background: #94a3b8;
                 }
             `}</style>
+        </div>
+    );
+}
+
+interface StatusMiniCardProps {
+    label: string;
+    value: number;
+    iconColor: string;
+}
+
+function StatusMiniCard({ label, value, iconColor }: StatusMiniCardProps) {
+    return (
+        <div
+            className="relative flex flex-col items-center justify-between p-1 xs:p-1.5 sm:p-2 h-full w-full bg-white rounded-lg xs:rounded-xl sm:rounded-xl md:rounded-2xl transition-all duration-300 ease-out transform hover:-translate-y-1 shadow-sm border border-blue-500 hover:shadow-md hover:border-blue-600 group cursor-pointer"
+        >
+            <div className="flex-shrink-0 flex items-center justify-center mb-1">
+                <div
+                    className="w-2 h-2 xs:w-2.5 xs:h-2.5 sm:w-3 sm:h-3 rounded-full"
+                    style={{ backgroundColor: iconColor }}
+                />
+            </div>
+            <div className="flex flex-col items-center justify-center flex-1 w-full min-h-0">
+                <h3
+                    className="font-extrabold tracking-widest transition-colors mb-0.5 xs:mb-1"
+                    style={{
+                        color: '#2979ff',
+                        textTransform: 'uppercase',
+                        fontSize: 'clamp(0.5rem, 0.8vw, 0.75rem)'
+                    }}
+                >
+                    {label}
+                </h3>
+                <span
+                    className="font-bold leading-none tracking-tighter transition-all duration-500 ease-in-out transform scale-100 hover:scale-105"
+                    style={{
+                        color: '#003975',
+                        fontSize: 'clamp(1rem, 2.5vw, 2.5rem)'
+                    }}
+                >
+                    {value.toLocaleString()}
+                </span>
+            </div>
         </div>
     );
 }

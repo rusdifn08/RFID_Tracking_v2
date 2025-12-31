@@ -23,9 +23,9 @@ const ChartCard = memo(forwardRef<HTMLDivElement, ChartCardProps>(({ children, t
             }}
         >
             <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 md:gap-2.5 lg:gap-3 xl:gap-4 flex-1">
-                <div 
+                <div
                     className="p-1 xs:p-1.5 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 rounded-lg sm:rounded-xl transition-all duration-300 shadow-sm group-hover:shadow-md"
-                    style={{ 
+                    style={{
                         backgroundColor: iconBgColor,
                         color: iconColor
                     }}

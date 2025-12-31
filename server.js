@@ -64,17 +64,17 @@ async function proxyRequest(endpoint, req, res, options = {}) {
                 queryParams.append(key, req.query[key]);
             }
         });
-        
+
         const queryString = queryParams.toString();
         const url = `${BACKEND_API_URL}${endpoint}${queryString ? `?${queryString}` : ''}`;
-        
+
         console.log(`\n🔍 [PROXY] ${req.method} ${endpoint}`);
         console.log(`🔍 [PROXY] URL: ${url}`);
-        
+
         const startTime = Date.now();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 detik timeout
-        
+
         const response = await fetch(url, {
             method: options.method || req.method || 'GET',
             headers: {
@@ -89,12 +89,12 @@ async function proxyRequest(endpoint, req, res, options = {}) {
             console.error(`❌ [PROXY] Fetch error:`, fetchError);
             throw fetchError;
         });
-        
+
         clearTimeout(timeoutId);
         const duration = Date.now() - startTime;
         console.log(`⏱️  [PROXY] Request duration: ${duration}ms`);
         console.log(`📥 [PROXY] Response status: ${response.status} ${response.statusText}`);
-        
+
         let data;
         try {
             const textData = await response.text();
@@ -105,14 +105,14 @@ async function proxyRequest(endpoint, req, res, options = {}) {
             console.error(`❌ [PROXY] JSON parse error:`, parseError);
             throw new Error('Invalid JSON response from backend API');
         }
-        
+
         // Forward response dengan status code yang sama
         res.status(response.status).json(data);
     } catch (error) {
         console.error(`\n❌ [PROXY] Error:`, error);
         let errorMessage = 'Error connecting to backend API';
         let statusCode = 500;
-        
+
         if (error.name === 'AbortError' || error.message.includes('timeout')) {
             errorMessage = 'Request timeout - Backend API tidak merespon dalam 30 detik';
             statusCode = 504;
@@ -123,7 +123,7 @@ async function proxyRequest(endpoint, req, res, options = {}) {
             errorMessage = 'Backend API mengembalikan response yang tidak valid';
             statusCode = 502;
         }
-        
+
         return res.status(statusCode).json({
             success: false,
             message: errorMessage,
@@ -223,7 +223,7 @@ async function checkDatabaseConnection() {
 async function checkMySQLConnection() {
     const startTime = Date.now();
     let connection = null;
-    
+
     try {
         // Buat koneksi MySQL
         connection = await mysql.createConnection({
@@ -265,7 +265,7 @@ async function checkMySQLConnection() {
         };
     } catch (error) {
         const responseTime = Date.now() - startTime;
-        
+
         // Pastikan koneksi ditutup jika ada error
         if (connection) {
             try {
@@ -353,8 +353,8 @@ app.get('/api/health/check', async (req, res) => {
         checkApiConnection()
     ]);
 
-    const databaseResult = databaseStatus.status === 'fulfilled' 
-        ? databaseStatus.value 
+    const databaseResult = databaseStatus.status === 'fulfilled'
+        ? databaseStatus.value
         : {
             status: 'error',
             connected: false,
@@ -451,7 +451,7 @@ app.get('/api/health/check', async (req, res) => {
 // Individual Database Health Check
 app.get('/api/health/database', async (req, res) => {
     const result = await checkDatabaseConnection();
-    
+
     console.log('\n' + '='.repeat(60));
     console.log('🔍 DATABASE HEALTH CHECK');
     console.log('='.repeat(60));
@@ -473,7 +473,7 @@ app.get('/api/health/database', async (req, res) => {
 // Individual MySQL Health Check
 app.get('/api/health/mysql', async (req, res) => {
     const result = await checkMySQLConnection();
-    
+
     console.log('\n' + '='.repeat(60));
     console.log('🔍 MYSQL HEALTH CHECK');
     console.log('='.repeat(60));
@@ -505,7 +505,7 @@ app.get('/api/health/mysql', async (req, res) => {
 // Individual API Health Check
 app.get('/api/health/api', async (req, res) => {
     const result = await checkApiConnection();
-    
+
     console.log('\n' + '='.repeat(60));
     console.log('🔍 API HEALTH CHECK');
     console.log('='.repeat(60));
@@ -612,7 +612,7 @@ app.post('/api/auth/login', async (req, res) => {
  */
 app.get('/user', async (req, res) => {
     const { nik, rfid_user } = req.query;
-    
+
     console.log(`\n📥 [SERVER] ==========================================`);
     console.log(`📥 [SERVER] Received request: GET /user`);
     console.log(`📥 [SERVER] Query params:`, req.query);
@@ -625,7 +625,7 @@ app.get('/user', async (req, res) => {
     if (rfid_user) {
         return await proxyRequest('/user', req, res);
     }
-    
+
     if (!nik) {
         console.log(`❌ [SERVER] NIK atau rfid_user parameter is required`);
         return res.status(400).json({
@@ -643,13 +643,13 @@ app.get('/user', async (req, res) => {
         console.log(`🔍 [USER API] URL: ${backendUrl}`);
         console.log(`🔍 [USER API] NIK: ${nik}`);
         console.log(`🔍 [USER API] Timestamp: ${new Date().toISOString()}`);
-        
+
         const startTime = Date.now();
-        
+
         // Create AbortController for timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 detik timeout
-        
+
         const response = await fetch(backendUrl, {
             method: 'GET',
             headers: {
@@ -661,9 +661,9 @@ app.get('/user', async (req, res) => {
             console.error(`❌ [USER API] Fetch error:`, fetchError);
             throw fetchError;
         });
-        
+
         clearTimeout(timeoutId);
-        
+
         const endTime = Date.now();
         const duration = endTime - startTime;
         console.log(`⏱️  [USER API] Request duration: ${duration}ms`);
@@ -678,7 +678,7 @@ app.get('/user', async (req, res) => {
             console.error(`❌ [USER API] Response text:`, textData);
             throw new Error('Invalid JSON response from backend API');
         }
-        
+
         console.log(`📥 [USER API] Response success: ${data.success}`);
         console.log(`📥 [USER API] Response has user: ${!!data.user}`);
         if (data.user) {
@@ -690,7 +690,7 @@ app.get('/user', async (req, res) => {
         // Forward response dari backend API langsung ke frontend
         // Backend API mengembalikan struktur: { success, debug, password_hash, user }
         console.log(`📥 [USER API] Response data:`, JSON.stringify(data, null, 2));
-        
+
         // Jika response OK, forward langsung ke frontend
         if (response.ok) {
             console.log(`✅ [USER API] Forwarding response to client`);
@@ -718,11 +718,11 @@ app.get('/user', async (req, res) => {
         console.error(`❌ [USER API] Error stack:`, error.stack);
         console.error(`❌ [USER API] Timestamp: ${new Date().toISOString()}`);
         console.error(`❌ [USER API] ==========================================\n`);
-        
+
         // Handle specific error types
         let errorMessage = 'Error connecting to backend API';
         let statusCode = 500;
-        
+
         if (error.name === 'AbortError' || error.message.includes('timeout')) {
             errorMessage = 'Request timeout - Backend API tidak merespon dalam 10 detik';
             statusCode = 504;
@@ -733,7 +733,7 @@ app.get('/user', async (req, res) => {
             errorMessage = 'Backend API mengembalikan response yang tidak valid';
             statusCode = 502;
         }
-        
+
         return res.status(statusCode).json({
             success: false,
             message: errorMessage,
@@ -886,7 +886,7 @@ app.post('/garment', async (req, res) => {
 
         // Cek duplikasi RFID sebelum insert - CEK SEMUA DATA rfid_garment di database
         console.log(`\n🔍 [DUPLICATE CHECK] Checking RFID: "${normalizedRfid}"`);
-        
+
         // Debug: Tampilkan semua rfid_garment yang ada di database (untuk verifikasi)
         try {
             const [allRfids] = await connection.execute(
@@ -898,11 +898,11 @@ app.post('/garment', async (req, res) => {
         } catch (err) {
             console.log(`   ⚠️  Could not fetch existing RFIDs:`, err.message);
         }
-        
+
         // Query untuk cek duplikasi - gunakan beberapa metode untuk memastikan
         let duplicateFound = false;
         let existingData = null;
-        
+
         // Method 1: Direct comparison (paling umum)
         try {
             const [rows1] = await connection.execute(
@@ -912,7 +912,7 @@ app.post('/garment', async (req, res) => {
                  LIMIT 1`,
                 [normalizedRfid]
             );
-            
+
             if (rows1 && rows1.length > 0) {
                 duplicateFound = true;
                 existingData = rows1[0];
@@ -922,7 +922,7 @@ app.post('/garment', async (req, res) => {
         } catch (err) {
             console.log(`   ⚠️  Method 1 error:`, err.message);
         }
-        
+
         // Method 2: String comparison (untuk handle INT/VARCHAR conversion)
         if (!duplicateFound) {
             try {
@@ -933,7 +933,7 @@ app.post('/garment', async (req, res) => {
                      LIMIT 1`,
                     [normalizedRfid]
                 );
-                
+
                 if (rows2 && rows2.length > 0) {
                     duplicateFound = true;
                     existingData = rows2[0];
@@ -944,7 +944,7 @@ app.post('/garment', async (req, res) => {
                 console.log(`   ⚠️  Method 2 error:`, err.message);
             }
         }
-        
+
         // Method 3: Trim comparison (untuk handle whitespace)
         if (!duplicateFound) {
             try {
@@ -955,7 +955,7 @@ app.post('/garment', async (req, res) => {
                      LIMIT 1`,
                     [normalizedRfid]
                 );
-                
+
                 if (rows3 && rows3.length > 0) {
                     duplicateFound = true;
                     existingData = rows3[0];
@@ -966,14 +966,14 @@ app.post('/garment', async (req, res) => {
                 console.log(`   ⚠️  Method 3 error:`, err.message);
             }
         }
-        
+
         // Jika ditemukan duplikasi, BLOCK INSERT
         if (duplicateFound && existingData) {
             await connection.rollback();
             await connection.end();
             console.log(`\n   ❌❌❌ BLOCKING INSERT - RFID "${normalizedRfid}" ALREADY EXISTS ❌❌❌`);
             console.log(`   Existing record ID: ${existingData.id_garment}\n`);
-            
+
             return res.status(409).json({
                 success: false,
                 message: 'RFID sudah ada di database (Duplikasi)',
@@ -987,7 +987,7 @@ app.post('/garment', async (req, res) => {
                 timestamp: new Date().toISOString()
             });
         }
-        
+
         console.log(`   ✅✅✅ No duplicate found - OK to insert ✅✅✅\n`);
 
         // Insert data langsung ke MySQL database
@@ -1036,7 +1036,7 @@ app.post('/garment', async (req, res) => {
         });
     } catch (error) {
         console.error('MySQL Error [garment POST]:', error);
-        
+
         // Rollback transaction jika masih ada
         try {
             if (connection && !connection._fatalError) {
@@ -1046,7 +1046,7 @@ app.post('/garment', async (req, res) => {
         } catch (rollbackError) {
             console.error('Error during rollback:', rollbackError);
         }
-        
+
         // Handle duplicate entry error (fallback jika pengecekan sebelumnya gagal)
         if (error.code === 'ER_DUP_ENTRY' || error.code === 1062) {
             return res.status(409).json({
@@ -1215,30 +1215,30 @@ app.get('/wo/branch', async (req, res) => {
 
 /**
  * Proxy untuk Production Schedule API - get-wo-breakdown
- * GET /api/prod-sch/get-wo-breakdown?branch=CJL&line=L1&start_date_from=2025-12-01
+ * GET /api/prod-sch/get-wo-breakdown?branch=CJL&start_date_from=2025-12-01
  * Proxy ke 10.8.18.60:7186 dengan header GCC-API-KEY
+ * Note: Parameter Line dihilangkan agar mendapatkan semua WO dari setiap line
  */
 app.get('/api/prod-sch/get-wo-breakdown', async (req, res) => {
     try {
-        const { branch, line, start_date_from, start_date_to } = req.query;
-        
-        // Build query string
+        const { branch, start_date_from, start_date_to } = req.query;
+
+        // Build query string (tanpa parameter line)
         const queryParams = new URLSearchParams();
         if (branch) queryParams.append('branch', branch);
-        if (line) queryParams.append('line', line);
         if (start_date_from) queryParams.append('start_date_from', start_date_from);
         if (start_date_to) queryParams.append('start_date_to', start_date_to);
-        
+
         const queryString = queryParams.toString();
         const url = `http://10.8.18.60:7186/api/prod-sch/get-wo-breakdown${queryString ? `?${queryString}` : ''}`;
-        
+
         console.log(`\n🔵 [PROD-SCH PROXY] GET /api/prod-sch/get-wo-breakdown`);
         console.log(`🔵 [PROD-SCH PROXY] URL: ${url}`);
-        
+
         const startTime = Date.now();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 detik timeout
-        
+
         const response = await fetch(url, {
             method: 'GET',
             headers: {
@@ -1252,12 +1252,12 @@ app.get('/api/prod-sch/get-wo-breakdown', async (req, res) => {
             console.error(`❌ [PROD-SCH PROXY] Fetch error:`, fetchError);
             throw fetchError;
         });
-        
+
         clearTimeout(timeoutId);
         const duration = Date.now() - startTime;
         console.log(`⏱️  [PROD-SCH PROXY] Request duration: ${duration}ms`);
         console.log(`📥 [PROD-SCH PROXY] Response status: ${response.status} ${response.statusText}`);
-        
+
         let data;
         try {
             const textData = await response.text();
@@ -1268,14 +1268,14 @@ app.get('/api/prod-sch/get-wo-breakdown', async (req, res) => {
             console.error(`❌ [PROD-SCH PROXY] JSON parse error:`, parseError);
             throw new Error('Invalid JSON response from Production Schedule API');
         }
-        
+
         // Forward response dengan status code yang sama
         res.status(response.status).json(data);
     } catch (error) {
         console.error(`\n❌ [PROD-SCH PROXY] Error:`, error);
         let errorMessage = 'Error connecting to Production Schedule API';
         let statusCode = 500;
-        
+
         if (error.name === 'AbortError' || error.message.includes('timeout')) {
             errorMessage = 'Request timeout - Production Schedule API tidak merespon dalam 30 detik';
             statusCode = 504;
@@ -1286,7 +1286,7 @@ app.get('/api/prod-sch/get-wo-breakdown', async (req, res) => {
             errorMessage = 'Production Schedule API mengembalikan response yang tidak valid';
             statusCode = 502;
         }
-        
+
         return res.status(statusCode).json({
             success: false,
             message: errorMessage,

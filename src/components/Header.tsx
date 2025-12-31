@@ -1,17 +1,33 @@
-import { useState, useEffect } from 'react';
+import { memo, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSidebar } from '../context/SidebarContext';
 import { useAuth } from '../hooks/useAuth';
 import { Menu, Bell, Radio, X, Activity, CheckCircle2, Maximize2, Minimize2 } from 'lucide-react';
 import headerIcon from '../assets/header.svg';
 import handIcon from '../assets/hand.svg';
+import NotificationModal from './notification/NotificationModal';
+import NotificationDetailModal from './notification/NotificationDetailModal';
+import { useNotifications } from '../hooks/useNotifications';
 
-export default function Header() {
+const Header = memo(() => {
     const { isOpen, toggleSidebar } = useSidebar();
     const { user } = useAuth();
     const navigate = useNavigate();
     const [showCheckRfidModal, setShowCheckRfidModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+
+    // Notification hooks
+    const {
+        notifications,
+        unreadCount,
+        showModal: showNotificationModal,
+        showDetailModal,
+        selectedNotification,
+        setShowModal: setShowNotificationModal,
+        handleNotificationClick,
+        handleMarkAllAsRead,
+        handleCloseDetailModal,
+    } = useNotifications();
 
     // Check fullscreen state on mount and when it changes
     useEffect(() => {
@@ -42,8 +58,8 @@ export default function Header() {
         };
     }, []);
 
-    // Toggle fullscreen function
-    const toggleFullscreen = async () => {
+    // Toggle fullscreen function - dioptimasi dengan useCallback
+    const toggleFullscreen = useCallback(async () => {
         try {
             if (!isFullscreen) {
                 // Enter fullscreen
@@ -72,7 +88,7 @@ export default function Header() {
         } catch (error) {
             console.error('Error toggling fullscreen:', error);
         }
-    };
+    }, [isFullscreen]);
 
     return (
         <header
@@ -138,19 +154,25 @@ export default function Header() {
 
                 {/* User Info - Hidden di mobile/portrait */}
                 <div className="hidden md:flex flex-col items-center leading-tight">
-                    <span className="text-[10px] md:text-xs lg:text-sm uppercase text-zinc-500" style={{fontWeight: 600 }}>
+                    <span className="text-[10px] md:text-xs lg:text-sm uppercase text-zinc-500" style={{ fontWeight: 600 }}>
                         {user ? `HI, ${(user.name || '').toUpperCase()}` : 'HI, GUEST'}
                     </span>
-                    <span className="text-[9px] md:text-[10px] lg:text-xs text-center text-zinc-500" style={{fontWeight: 500 }}>
+                    <span className="text-[9px] md:text-[10px] lg:text-xs text-center text-zinc-500" style={{ fontWeight: 500 }}>
                         {user?.bagian || user?.jabatan || 'Guest'}
                     </span>
                 </div>
 
                 {/* Notification Bell */}
-                <button className="relative p-0.5 xs:p-1 hover:bg-gray-100 rounded transition-colors">
+                <button
+                    onClick={() => setShowNotificationModal(true)}
+                    className="relative p-0.5 xs:p-1 hover:bg-gray-100 rounded transition-colors"
+                    aria-label="Notifications"
+                >
                     <Bell className="w-4 xs:w-5 sm:w-6 h-4 xs:h-5 sm:h-6 text-gray-700" />
-                    {/* Red Dot */}
-                    <span className="absolute top-0.5 xs:top-1 right-0.5 xs:right-1 w-2 xs:w-2.5 h-2 xs:h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
+                    {/* Red Dot - Only show if there are unread notifications */}
+                    {unreadCount > 0 && (
+                        <span className="absolute top-0.5 xs:top-1 right-0.5 xs:right-1 w-2 xs:w-2.5 h-2 xs:h-2.5 bg-red-500 border-2 border-white rounded-full animate-pulse"></span>
+                    )}
                 </button>
             </div>
 
@@ -232,6 +254,26 @@ export default function Header() {
                     </div>
                 </div>
             )}
+
+            {/* Notification Modal */}
+            <NotificationModal
+                isOpen={showNotificationModal}
+                notifications={notifications}
+                onClose={() => setShowNotificationModal(false)}
+                onNotificationClick={handleNotificationClick}
+                onMarkAllAsRead={handleMarkAllAsRead}
+            />
+
+            {/* Notification Detail Modal */}
+            <NotificationDetailModal
+                isOpen={showDetailModal}
+                notification={selectedNotification}
+                onClose={handleCloseDetailModal}
+            />
         </header>
     );
-}
+});
+
+Header.displayName = 'Header';
+
+export default Header;

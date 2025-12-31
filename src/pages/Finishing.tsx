@@ -1,24 +1,22 @@
-import { useNavigate } from 'react-router-dom';
+import { memo, useMemo } from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import Breadcrumb from '../components/Breadcrumb';
-import { useState } from 'react';
+import Footer from '../components/Footer';
 import { useSidebar } from '../context/SidebarContext';
 import backgroundImage from '../assets/background.jpg';
+import LineDetailCardsGrid from '../components/line/LineDetailCardsGrid';
 
 // Material-UI Imports
-import { Paper } from '@mui/material';
 import {
     Dashboard as DashboardIcon,
     EventNote as ListRfidIcon,
 } from '@mui/icons-material';
 
-export default function Finishing() {
-    const navigate = useNavigate();
+const Finishing = memo(() => {
     const { isOpen } = useSidebar();
-    const [hoveredCard, setHoveredCard] = useState<number | null>(null);
 
-    const cards = [
+    const cards = useMemo(() => [
         {
             id: 1,
             title: 'Dashboard RFID Finishing',
@@ -33,7 +31,7 @@ export default function Finishing() {
             icon: ListRfidIcon,
             path: '/list-rfid-finishing',
         },
-    ];
+    ], []);
 
     return (
         <div className="flex min-h-screen w-full h-screen font-sans text-slate-800 overflow-hidden fixed inset-0 m-0 p-0"
@@ -79,82 +77,13 @@ export default function Finishing() {
                     }}
                 >
                     {/* --- CARDS GRID --- */}
-                    <div 
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 xs:gap-4 sm:gap-5 md:gap-6 max-w-6xl mx-auto mt-3"
-                        onMouseLeave={() => setHoveredCard(null)}
-                    >
-                        {cards.map((card, index) => {
-                            const isHovered = hoveredCard === card.id;
-                            const isDimmed = hoveredCard !== null && hoveredCard !== card.id;
-
-                            return (
-                                <div
-                                    key={card.id}
-                                    onClick={() => navigate(card.path)}
-                                    onMouseEnter={() => setHoveredCard(card.id)}
-                                    className="relative group cursor-pointer transition-all duration-300"
-                                    style={{
-                                        animation: `fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards ${index * 150}ms`,
-                                        opacity: 0,
-                                        zIndex: isHovered ? 10 : 1
-                                    }}
-                                >
-                                    <Paper
-                                        elevation={0}
-                                        className="relative flex flex-col p-4 xs:p-5 sm:p-6 bg-white transition-all duration-300"
-                                        style={{
-                                            borderRadius: '16px',
-                                            boxShadow: isHovered 
-                                                ? '0 10px 40px -10px rgba(2, 132, 199, 0.2)'
-                                                : '0 4px 20px -5px rgba(0,0,0,0.1)',
-                                            transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
-                                            filter: isDimmed ? 'grayscale(100%)' : 'none',
-                                            opacity: isDimmed ? 0.5 : 1
-                                        }}
-                                    >
-                                        {/* Icon - Biru untuk finishing (beda dari production line) */}
-                                        <div className="mb-3 xs:mb-4 flex items-center justify-start">
-                                            <div className="flex items-center justify-center">
-                                                <card.icon 
-                                                    sx={{ 
-                                                        fontSize: 'clamp(32px, 4vw, 48px)',
-                                                        color: isDimmed ? '#9CA3AF' : (isHovered ? '#0284C7' : '#0284C7'),
-                                                        transition: 'color 0.3s ease'
-                                                    }} 
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Text Content */}
-                                        <div className="flex-1">
-                                            <h3
-                                                className="text-base xs:text-lg sm:text-xl md:text-2xl font-bold leading-tight mb-1 xs:mb-1.5 sm:mb-2 transition-colors duration-300"
-                                                style={{ 
-                                                    color: isDimmed ? '#9CA3AF' : (isHovered ? '#0284C7' : '#0284C7'),
-                                                    textTransform: 'capitalize'
-                                                }}
-                                            >
-                                                {card.title}
-                                            </h3>
-                                            <p 
-                                                className="text-xs xs:text-sm sm:text-base font-medium leading-relaxed transition-colors duration-300"
-                                                style={{ 
-                                                    color: isHovered ? '#0284C7' : (isDimmed ? '#9CA3AF' : '#6B7280'),
-                                                    textTransform: 'capitalize' 
-                                                }}
-                                            >
-                                                {card.subtitle}
-                                            </p>
-                                        </div>
-                                    </Paper>
-                                </div>
-                            );
-                        })}
+                    <div className="max-w-6xl mx-auto mt-3">
+                        <LineDetailCardsGrid cards={cards} />
                     </div>
                 </main>
 
                 {/* Footer - Transparan di belakang konten */}
-                <footer 
+                <footer
                     className="absolute bottom-0 left-0 right-0 py-4 border-t border-gray-200/50 pointer-events-none"
                     style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.3)',
@@ -192,5 +121,9 @@ export default function Finishing() {
             `}</style>
         </div>
     );
-}
+});
+
+Finishing.displayName = 'Finishing';
+
+export default Finishing;
 

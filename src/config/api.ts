@@ -698,21 +698,20 @@ export interface WOBreakdownResponse {
 /**
  * Get WO Breakdown dari Production Schedule API
  * @param branch - Branch code (contoh: 'CJL')
- * @param line - Line code (contoh: 'L1')
  * @param startDateFrom - Start date from (format: YYYY-MM-DD)
  * @param startDateTo - Start date to (format: YYYY-MM-DD, optional)
- * @returns WO Breakdown data
+ * @returns WO Breakdown data (semua WO dari semua line)
  */
 export const getWOBreakdown = async (
     branch: string = 'CJL',
-    line: string = 'L1',
     startDateFrom?: string,
     startDateTo?: string
 ): Promise<ApiResponse<WOBreakdownResponse>> => {
     try {
         // Gunakan proxy endpoint dari server.js untuk menghindari CORS dan rate limiting
         // Proxy akan memanggil ke 10.8.18.60:7186 dengan header GCC-API-KEY
-        let apiUrl = `${API_BASE_URL}/api/prod-sch/get-wo-breakdown?branch=${encodeURIComponent(branch)}&line=${encodeURIComponent(line)}`;
+        // Parameter Line dihilangkan agar mendapatkan semua WO dari setiap line
+        let apiUrl = `${API_BASE_URL}/api/prod-sch/get-wo-breakdown?branch=${encodeURIComponent(branch)}`;
         
         // Tambahkan start_date_from jika ada
         if (startDateFrom) {
