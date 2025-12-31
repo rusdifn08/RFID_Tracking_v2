@@ -1,5 +1,6 @@
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
+import Footer from '../components/Footer';
 import { useSidebar } from '../context/SidebarContext';
 
 export default function DataRFID() {
@@ -28,12 +29,7 @@ export default function DataRFID() {
                     </div>
                 </main>
 
-                {/* Footer */}
-                <footer className="bg-white border-t border-gray-200 py-4 px-6 text-center w-full">
-                    <p className="text-sm text-black">
-                        Gistex Garmen Indonesia Command Center (GCC) © 2021 Served by Sirius
-                    </p>
-                </footer>
+                <Footer variant="solid" />
             </div>
         </div>
     );

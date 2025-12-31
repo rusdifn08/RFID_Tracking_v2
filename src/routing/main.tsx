@@ -1,24 +1,44 @@
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
-import Login from '../pages/Login.tsx';
-import Register from '../pages/Register.tsx';
-import Home from '../pages/Home.tsx';
-import Dashboard from '../pages/Dashboard.tsx';
-import DaftarRFID from '../pages/DaftarRFID.tsx';
-import MonitoringRFID from '../pages/MonitoringRFID.tsx';
-import DataRFID from '../pages/DataRFID.tsx';
-import LineDetail from '../pages/LineDetail.tsx';
-import DashboardRFID from '../pages/DashboardRFID.tsx';
-import CheckingRFID from '../pages/CheckingRFID.tsx';
-import StatusRFID from '../pages/StatusRFID.tsx';
-import ListRFID from '../pages/ListRFID.tsx';
-import AboutUs from '../pages/AboutUs.tsx';
-import RFIDTracking from '../pages/RFIDTracking.tsx';
-import Finishing from '../pages/Finishing.tsx';
-import DashboardRFIDFinishing from '../pages/DashboardRFIDFinishing.tsx';
-import RejectRoom from '../pages/RejectRoom.tsx';
-import DashboardRFIDReject from '../pages/DashboardRFIDReject.tsx';
-import ListRFIDReject from '../pages/ListRFIDReject.tsx';
+import { lazy, Suspense } from 'react';
 import ProtectedRoute from '../components/ProtectedRoute';
+
+// Lazy load semua pages untuk code splitting
+const Login = lazy(() => import('../pages/Login.tsx'));
+const Register = lazy(() => import('../pages/Register.tsx'));
+const Home = lazy(() => import('../pages/Home.tsx'));
+const Dashboard = lazy(() => import('../pages/Dashboard.tsx'));
+const DaftarRFID = lazy(() => import('../pages/DaftarRFID.tsx'));
+const MonitoringRFID = lazy(() => import('../pages/MonitoringRFID.tsx'));
+const DataRFID = lazy(() => import('../pages/DataRFID.tsx'));
+const LineDetail = lazy(() => import('../pages/LineDetail.tsx'));
+const DashboardRFID = lazy(() => import('../pages/DashboardRFID.tsx'));
+const CheckingRFID = lazy(() => import('../pages/CheckingRFID.tsx'));
+const StatusRFID = lazy(() => import('../pages/StatusRFID.tsx'));
+const ListRFID = lazy(() => import('../pages/ListRFID.tsx'));
+const AboutUs = lazy(() => import('../pages/AboutUs.tsx'));
+const RFIDTracking = lazy(() => import('../pages/RFIDTracking.tsx'));
+const Finishing = lazy(() => import('../pages/Finishing.tsx'));
+const DashboardRFIDFinishing = lazy(() => import('../pages/DashboardRFIDFinishing.tsx'));
+const RejectRoom = lazy(() => import('../pages/RejectRoom.tsx'));
+const DashboardRFIDReject = lazy(() => import('../pages/DashboardRFIDReject.tsx'));
+const ListRFIDReject = lazy(() => import('../pages/ListRFIDReject.tsx'));
+
+// Loading component untuk Suspense
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="text-center">
+      <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+      <p className="text-gray-600 font-medium">Memuat halaman...</p>
+    </div>
+  </div>
+);
+
+// Wrapper untuk lazy loaded components dengan Suspense
+const LazyWrapper = ({ children }: { children: React.ReactNode }) => (
+  <Suspense fallback={<PageLoader />}>
+    {children}
+  </Suspense>
+);
 
 const router = createBrowserRouter([
     {
@@ -27,17 +47,27 @@ const router = createBrowserRouter([
     },
     {
         path: '/login',
-        element: <Login />,
+        element: (
+            <LazyWrapper>
+                <Login />
+            </LazyWrapper>
+        ),
     },
     {
         path: '/register',
-        element: <Register />,
+        element: (
+            <LazyWrapper>
+                <Register />
+            </LazyWrapper>
+        ),
     },
     {
         path: '/home',
         element: (
             <ProtectedRoute>
-                <Home />
+                <LazyWrapper>
+                    <Home />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -45,7 +75,9 @@ const router = createBrowserRouter([
         path: '/dashboard',
         element: (
             <ProtectedRoute>
-                <Dashboard />
+                <LazyWrapper>
+                    <Dashboard />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -53,7 +85,9 @@ const router = createBrowserRouter([
         path: '/daftar-rfid',
         element: (
             <ProtectedRoute>
-                <DaftarRFID />
+                <LazyWrapper>
+                    <DaftarRFID />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -61,7 +95,9 @@ const router = createBrowserRouter([
         path: '/rfid-tracking',
         element: (
             <ProtectedRoute>
-                <RFIDTracking />
+                <LazyWrapper>
+                    <RFIDTracking />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -69,7 +105,9 @@ const router = createBrowserRouter([
         path: '/monitoring-rfid',
         element: (
             <ProtectedRoute>
-                <MonitoringRFID />
+                <LazyWrapper>
+                    <MonitoringRFID />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -77,7 +115,9 @@ const router = createBrowserRouter([
         path: '/data-rfid',
         element: (
             <ProtectedRoute>
-                <DataRFID />
+                <LazyWrapper>
+                    <DataRFID />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -85,7 +125,9 @@ const router = createBrowserRouter([
         path: '/line/:id',
         element: (
             <ProtectedRoute>
-                <LineDetail />
+                <LazyWrapper>
+                    <LineDetail />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -93,7 +135,9 @@ const router = createBrowserRouter([
         path: '/dashboard-rfid/:id',
         element: (
             <ProtectedRoute>
-                <DashboardRFID />
+                <LazyWrapper>
+                    <DashboardRFID />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -101,7 +145,9 @@ const router = createBrowserRouter([
         path: '/checking-rfid',
         element: (
             <ProtectedRoute>
-                <CheckingRFID />
+                <LazyWrapper>
+                    <CheckingRFID />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -109,7 +155,9 @@ const router = createBrowserRouter([
         path: '/status-rfid',
         element: (
             <ProtectedRoute>
-                <StatusRFID />
+                <LazyWrapper>
+                    <StatusRFID />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -117,7 +165,9 @@ const router = createBrowserRouter([
         path: '/list-rfid',
         element: (
             <ProtectedRoute>
-                <ListRFID />
+                <LazyWrapper>
+                    <ListRFID />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -125,7 +175,9 @@ const router = createBrowserRouter([
         path: '/list-rfid/:id',
         element: (
             <ProtectedRoute>
-                <ListRFID />
+                <LazyWrapper>
+                    <ListRFID />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -133,7 +185,9 @@ const router = createBrowserRouter([
         path: '/about-us',
         element: (
             <ProtectedRoute>
-                <AboutUs />
+                <LazyWrapper>
+                    <AboutUs />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -141,7 +195,9 @@ const router = createBrowserRouter([
         path: '/finishing',
         element: (
             <ProtectedRoute>
-                <Finishing />
+                <LazyWrapper>
+                    <Finishing />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -149,7 +205,9 @@ const router = createBrowserRouter([
         path: '/dashboard-rfid-finishing',
         element: (
             <ProtectedRoute>
-                <DashboardRFIDFinishing />
+                <LazyWrapper>
+                    <DashboardRFIDFinishing />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -157,7 +215,9 @@ const router = createBrowserRouter([
         path: '/reject-room',
         element: (
             <ProtectedRoute>
-                <RejectRoom />
+                <LazyWrapper>
+                    <RejectRoom />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -165,7 +225,9 @@ const router = createBrowserRouter([
         path: '/dashboard-rfid-reject',
         element: (
             <ProtectedRoute>
-                <DashboardRFIDReject />
+                <LazyWrapper>
+                    <DashboardRFIDReject />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },
@@ -173,7 +235,9 @@ const router = createBrowserRouter([
         path: '/list-rfid-reject',
         element: (
             <ProtectedRoute>
-                <ListRFIDReject />
+                <LazyWrapper>
+                    <ListRFIDReject />
+                </LazyWrapper>
             </ProtectedRoute>
         ),
     },

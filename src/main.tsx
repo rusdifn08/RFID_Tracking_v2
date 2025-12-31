@@ -5,19 +5,27 @@ import './index.css'
 import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary'
 
-// Setup React Query Client dengan error handling yang lebih baik
+// Setup React Query Client dengan optimasi performa yang lebih agresif
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
+      refetchOnMount: false, // Tidak refetch saat component mount jika data sudah ada
+      refetchOnReconnect: false, // Tidak refetch saat reconnect
       retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 menit
-      throwOnError: false, // Jangan throw error, biarkan component handle
-      // Disable refetch interval untuk menghindari masalah
+      staleTime: 10 * 60 * 1000, // 10 menit - data dianggap fresh lebih lama
+      gcTime: 30 * 60 * 1000, // 30 menit - cache dihapus setelah 30 menit (lebih lama)
+      throwOnError: false,
       refetchInterval: false,
+      // Optimasi untuk mengurangi re-render
+      structuralSharing: true,
+      // Network mode untuk optimasi
+      networkMode: 'online',
     },
     mutations: {
       throwOnError: false,
+      retry: 1,
+      networkMode: 'online',
     },
   },
 })

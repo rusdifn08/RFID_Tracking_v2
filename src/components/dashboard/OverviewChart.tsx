@@ -28,7 +28,7 @@ const OverviewChart = memo(({ pieData, outputLine }: OverviewChartProps) => {
 
         checkWidth();
         window.addEventListener('resize', checkWidth);
-        
+
         // Use ResizeObserver untuk detect perubahan width card
         const resizeObserver = new ResizeObserver(checkWidth);
         if (cardRef.current) {
@@ -42,10 +42,10 @@ const OverviewChart = memo(({ pieData, outputLine }: OverviewChartProps) => {
     }, []);
 
     return (
-        <ChartCard 
+        <ChartCard
             ref={cardRef}
-            title="Overview Data RFID" 
-            icon={PieIcon} 
+            title="Overview Data RFID"
+            icon={PieIcon}
             className="h-full w-full"
         >
             <div className="-ml-10 flex flex-col md:flex-row items-center h-full" style={{ padding: '0.5%' }}>
@@ -54,14 +54,14 @@ const OverviewChart = memo(({ pieData, outputLine }: OverviewChartProps) => {
                     <div className="w-full md:w-[55%] h-full relative" style={{ minHeight: '100px' }}>
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                                <Pie 
-                                    data={pieData} 
-                                    cx="70%" 
-                                    cy="50%" 
-                                    innerRadius={0} 
-                                    outerRadius="90%" 
-                                    dataKey="value" 
-                                    stroke="white" 
+                                <Pie
+                                    data={pieData}
+                                    cx="60%"
+                                    cy="50%"
+                                    innerRadius={0}
+                                    outerRadius="90%"
+                                    dataKey="value"
+                                    stroke="white"
                                     strokeWidth={2}
                                     className="xs:stroke-[2px] sm:stroke-[2.5px] md:stroke-[3px]"
                                 >

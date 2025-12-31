@@ -1,5 +1,6 @@
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
+import Footer from '../components/Footer';
 import HomeContent from '../components/HomeContent';
 import { useSidebar } from '../context/SidebarContext';
 import backgroundImage from '../assets/background.jpg';
@@ -41,19 +42,7 @@ export default function Home() {
                     <HomeContent />
                 </main>
 
-                {/* Footer */}
-                <footer
-                    className="absolute bottom-0 left-0 right-0 py-4 border-t border-gray-200/50 pointer-events-none"
-                    style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                        backdropFilter: 'blur(2px)',
-                        zIndex: -1
-                    }}
-                >
-                    <div className="text-center text-gray-600 text-sm pointer-events-auto" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>
-                        Gistex Garmen Indonesia Monitoring System (GMS) © 2025 Served by Supernova
-                    </div>
-                </footer>
+                <Footer />
             </div>
         </div>
     );

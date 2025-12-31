@@ -12,7 +12,7 @@ export interface RFIDItem {
     item?: string;
     color?: string;
     size?: string;
-    status: string;
+    status?: string; // Changed to optional to match component usage
     lokasi?: string;
     line?: string;
     lineNumber?: string;
