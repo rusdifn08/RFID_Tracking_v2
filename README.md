@@ -1,194 +1,97 @@
-# RFID_Tracking
-RFID Tracking For Gistex Garment Indonesia
+# RFID Tracking
+
+RFID Tracking untuk Gistex Garment Indonesia.
 
 ## Tech Stack
 
-- React + TypeScript + Vite
-- Python Flask
-- Material UI
-- TanStack Query
-- Tailwind CSS 4
-- MQTT
+- **Frontend:** React 19 + TypeScript + Vite (Rolldown)
+- **UI:** Material UI (MUI) 7, Tailwind CSS 4, Lucide React
+- **State & Data:** TanStack Query, Zustand, React Hook Form + Zod
+- **Charts:** Recharts
+- **Proxy & Backend:** Node.js (Express), WebSocket, MySQL2
+- **Export:** ExcelJS, xlsx
 
-## Getting Started
+## Menjalankan Aplikasi
 
-### Menjalankan Aplikasi
-
-#### 1. Install Dependencies
-
-Pertama, install semua module yang diperlukan:
+### 1. Install dependensi
 
 ```bash
 npm install
 ```
 
-#### 2. Menjalankan Aplikasi
+### 2. Menjalankan frontend dan server
 
-Aplikasi ini memerlukan **2 terminal** untuk berjalan dengan baik:
+Aplikasi membutuhkan **proxy server** (Express) dan **frontend** (Vite) berjalan bersamaan.
 
-#### Terminal 1 - Frontend (React + Vite)
+**Opsi A – Satu perintah (disarankan):**
+
 ```bash
-npm run dev
-```
-Frontend akan berjalan di `http://localhost:5173` (atau port yang tersedia)
+# Default (CLN – backend 10.8.0.104)
+npm run dev:all
 
-#### Terminal 2 - Server Frontend (Express Proxy Server)
-```bash
-npm run server
+# Atau per environment:
+npm run dev:all:cln   # CLN
+npm run dev:all:mjl    # MJL (backend 10.5.0.106)
+npm run dev:all:mjl2   # MJL2 (backend 10.5.0.99, port 8001 & 5174)
 ```
-Server akan berjalan di `http://10.8.10.104:8000` dan berfungsi sebagai proxy ke backend API.
 
-**Catatan:** Pastikan kedua terminal berjalan bersamaan agar aplikasi dapat berfungsi dengan baik.
+**Opsi B – Dua terminal:**
+
+| Terminal 1 – Frontend | Terminal 2 – Proxy server |
+|------------------------|---------------------------|
+| `npm run dev`          | `npm run server` (default CLN) |
+| `npm run dev:mjl2`     | `npm run server:mjl2` (MJL2)   |
+
+- **Frontend:** `http://localhost:5173` (atau `http://localhost:5174` untuk MJL2)
+- **Proxy server:** Mengikuti IP mesin yang menjalankan frontend, port **8000** (CLN/MJL) atau **8001** (MJL2).  
+  Contoh: `http://localhost:8000` atau `http://10.8.10.104:8000` jika akses dari jaringan.
+
+**Catatan:** Konfigurasi frontend (`src/config/api.ts`) otomatis memakai host yang sama dengan yang dipakai buka aplikasi, sehingga proxy cukup dijalankan di mesin yang sama dengan frontend.
 
 ---
 
-### Konfigurasi MySQL
+## Environment & Backend
 
-Aplikasi menggunakan MySQL database dengan konfigurasi berikut:
+| Environment | Backend IP     | Proxy port | Frontend port (opsional) |
+|-------------|-----------------|------------|---------------------------|
+| CLN (default) | 10.8.0.104    | 8000       | 5173                      |
+| MJL        | 10.5.0.106      | 8000       | 5173                      |
+| MJL2       | 10.5.0.99       | 8001       | 5174                      |
 
-```javascript
-Host: 10.8.0.104
-User: robot
-Password: robot123
-Database: db_garmenttracking
-Table: garment
-```
-
-**Lokasi konfigurasi:** `server.js` (baris 158-167)
+- **Lokasi konfigurasi backend:** `server.js` (variabel `BACKEND_IP`, `PORT`).
+- **Lokasi konfigurasi frontend:** `src/config/api.ts` (base URL proxy dan WebSocket).
 
 ---
 
-### IP Backend yang Digunakan
+## Konfigurasi MySQL
 
-#### Frontend Server (Proxy Server)
-- **IP:** `10.8.10.104`
-- **Port:** `8000`
-- **URL:** `http://10.8.10.104:8000`
-- **Fungsi:** Server proxy yang menghubungkan frontend dengan backend API
+Digunakan oleh proxy server untuk koneksi ke database (jika dipakai):
 
-#### Backend API Server
-- **IP:** `10.8.10.120`
-- **Port:** `8000`
-- **URL:** `http://10.8.10.120:8000`
-- **Fungsi:** Backend API utama yang menyediakan data dan logika bisnis
-
-**Lokasi konfigurasi:**
-- Frontend API URL: `src/config/api.ts` (baris 16-18)
-- Backend API URL: `server.js` (baris 15, 155, 815, 1331, 1455)
+- **Host:** 10.8.0.104 (atau sesuai environment)
+- **User / Password / Database:** Dikonfigurasi di `server.js` (bagian koneksi MySQL).
 
 ---
 
-### API Endpoints yang Digunakan
+## API (ringkasan)
 
-#### Authentication
-- `GET /user?nik={nik}` - Mendapatkan data user berdasarkan NIK
-- `GET /login?nik={nik}&password={password}` - Login dengan NIK dan password
-- `GET /login?rfid_user={rfid_user}` - Login dengan RFID user
+- **Auth:** `GET /user?nik=...`, `GET /login?nik=...&password=...`
+- **Garment:** `GET /garment?rfid_garment=...`, `POST /garment`
+- **Tracking:** `GET /tracking/line?line=...`, `GET /tracking?rfid_garment=...`
+- **WO:** `GET /wo/production_branch?production_branch=...&line=...`
+- **Health:** `GET /health`, `GET /api/health/check`, `/api/health/mysql`, `/api/health/database`, `/api/health/api`
 
-#### Garment Data
-- `GET /garment?rfid_garment={rfid_garment}` - Mendapatkan data garment berdasarkan RFID
-- `POST /garment` - Insert data garment baru ke database
-  ```json
-  {
-    "rfid_garment": "string",
-    "item": "string",
-    "buyer": "string",
-    "style": "string",
-    "wo": "string",
-    "color": "string",
-    "size": "string"
-  }
-  ```
-
-#### Tracking Data
-- `GET /tracking/line?line={line_number}` - Mendapatkan data tracking berdasarkan line
-  - Response: `{ success, line, data: { good, rework, reject, pqc_good, pqc_rework, pqc_reject, output_line } }`
-- `GET /tracking?rfid_garment={rfid_garment}` - Mendapatkan data tracking berdasarkan RFID garment
-
-#### Work Order (WO) Data
-- `GET /wo/production_branch?production_branch={branch}&line={line}` - Mendapatkan data WO berdasarkan production branch dan line
-  - Contoh: `GET /wo/production_branch?production_branch=MJ1&line=L1`
-  - Response: `{ success, data: [{ wo_no, product_name, style, buyer, colors, breakdown_sizes, total_qty_order }] }`
-
-#### Health Check
-- `GET /health` - Health check server
-- `GET /api/health/check` - Check semua koneksi (database, MySQL, API)
-- `GET /api/health/mysql` - Check koneksi MySQL
-- `GET /api/health/database` - Check koneksi database
-- `GET /api/health/api` - Check koneksi backend API
-
-**Lokasi dokumentasi API:** `server.js` (routes mulai dari baris 136)
+Dokumentasi rinci route ada di `server.js`.
 
 ---
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Script npm
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+| Script | Keterangan |
+|--------|------------|
+| `npm run dev` | Jalankan frontend (Vite) |
+| `npm run build` | Build production |
+| `npm run server` | Jalankan proxy server (CLN) |
+| `npm run server:cln` / `server:mjl` / `server:mjl2` | Proxy per environment |
+| `npm run dev:all` | Frontend + server bersamaan (CLN) |
+| `npm run dev:all:cln` / `dev:all:mjl` / `dev:all:mjl2` | Frontend + server per environment |
+| `npm run preview` | Preview build production |
