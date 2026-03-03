@@ -5,6 +5,9 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    include: ['mqtt'],
+  },
   server: {
     host: '0.0.0.0', // Akses dari semua interface (localhost dan jaringan lokal)
     port: 5173,

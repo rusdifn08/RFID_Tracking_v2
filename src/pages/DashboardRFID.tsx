@@ -1,11 +1,11 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Suspense, lazy, useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } from 'recharts';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { useSidebar } from '../context/SidebarContext';
-import { API_BASE_URL, getDefaultHeaders } from '../config/api';
+import { API_BASE_URL, getDefaultHeaders, getBackendEnvironment } from '../config/api';
 import ExportModal from '../components/ExportModal';
 import type { ExportType } from '../components/ExportModal';
 import { exportToExcel } from '../utils/exportToExcel';
@@ -23,6 +23,7 @@ import StatusCard from '../components/dashboard/StatusCard';
 import { COLORS, DEFAULT_REWORK_POPUP_ENABLED } from '../components/dashboard/constants';
 import { XCircle, CheckCircle, Wrench, Clock, Search, Crosshair, AlertCircle } from 'lucide-react';
 import backgroundImage from '../assets/background.jpg';
+import targetIcon from '../assets/target.webp';
 
 // --- HALAMAN UTAMA ---
 
@@ -33,8 +34,14 @@ const ChartSkeleton = () => (
     </div>
 );
 
+// Line IDs yang punya halaman Dashboard RFID (sesuai Sidebar production lines)
+const DASHBOARD_RFID_LINE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+const MIN_LINE = Math.min(...DASHBOARD_RFID_LINE_IDS);
+const MAX_LINE = Math.max(...DASHBOARD_RFID_LINE_IDS);
+
 export default function DashboardRFID() {
     const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
     const { isOpen } = useSidebar();
 
     // Normalisasi lineId - ekstrak angka dari format "LINE 3" atau "LINE%203"
@@ -58,6 +65,17 @@ export default function DashboardRFID() {
     // Gunakan normalizedLineId untuk fetch data (selalu angka)
     const lineId = normalizedLineId;
     const lineTitle = `LINE ${lineId}`;
+
+    // Navigasi prev/next untuk pindah ke Dashboard RFID line lain
+    const currentLineNum = useMemo(() => parseInt(lineId, 10) || 1, [lineId]);
+    const hasPrevLine = currentLineNum > MIN_LINE;
+    const hasNextLine = currentLineNum < MAX_LINE;
+    const handlePrevLine = useCallback(() => {
+        if (hasPrevLine) navigate(`/dashboard-rfid/${currentLineNum - 1}`);
+    }, [hasPrevLine, currentLineNum, navigate]);
+    const handleNextLine = useCallback(() => {
+        if (hasNextLine) navigate(`/dashboard-rfid/${currentLineNum + 1}`);
+    }, [hasNextLine, currentLineNum, navigate]);
 
     // State untuk WO filter
     const [availableWOList, setAvailableWOList] = useState<string[]>([]);
@@ -85,17 +103,24 @@ export default function DashboardRFID() {
     const setFilterDateFromStore = useDashboardStore((state) => state.setFilterDateFrom);
     const setFilterDateToStore = useDashboardStore((state) => state.setFilterDateTo);
     const setDashboardFilterWo = useDashboardStore((state) => state.setFilterWo);
-    const setIsDateFilterActive = useDashboardStore((state) => state.setIsDateFilterActive);
+    const resetFiltersToDefault = useDashboardStore((state) => state.resetFiltersToDefault);
+    const applyDateFilter = useDashboardStore((state) => state.applyDateFilter);
+    const appliedFilterDateFrom = useDashboardStore((state) => state.appliedFilterDateFrom);
+    const appliedFilterDateTo = useDashboardStore((state) => state.appliedFilterDateTo);
+    const isDateFilterActive = useDashboardStore((state) => state.isDateFilterActive);
 
-    // Reset filter aktif saat tanggal diubah (user harus klik search lagi)
+    // Saat masuk (atau masuk kembali) ke halaman dashboard, reset filter ke default (hari ini, tanpa WO)
+    useEffect(() => {
+        resetFiltersToDefault();
+    }, [resetFiltersToDefault]);
+
+    // Ubah nilai input saja; data tidak berubah sampai user klik Search
     const handleDateFromChange = (date: string) => {
         setFilterDateFromStore(date);
-        setIsDateFilterActive(false); // Reset filter aktif saat tanggal diubah
     };
 
     const handleDateToChange = (date: string) => {
         setFilterDateToStore(date);
-        setIsDateFilterActive(false); // Reset filter aktif saat tanggal diubah
     };
 
     // State untuk detail modal
@@ -104,6 +129,10 @@ export default function DashboardRFID() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailTitle, setDetailTitle] = useState('');
     const [detailType, setDetailType] = useState<'GOOD' | 'REWORK' | 'REJECT' | 'WIRA' | 'OUTPUT' | null>(null);
+    // Output Sewing: summary per jam & filter info dari API baru
+    const [detailSummaryPerJam, setDetailSummaryPerJam] = useState<any[]>([]);
+    const [detailFilterApplied, setDetailFilterApplied] = useState<Record<string, string> | null>(null);
+    const [outputChartType, setOutputChartType] = useState<'bar' | 'area' | 'line'>('area');
     const [searchQuery, setSearchQuery] = useState('');
 
     // State untuk tracking perubahan rework dan popup notifikasi
@@ -179,8 +208,13 @@ export default function DashboardRFID() {
         }
     }, [showDetailModal, detailQueryParams.type, detailQueryParams.section, currentWo, appliedFilterWo, woData]);
 
+    // Untuk detail modal & API: pakai applied dates bila filter aktif (setelah Search), else hari ini
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const detailDateFrom = isDateFilterActive ? (appliedFilterDateFrom || todayStr) : todayStr;
+    const detailDateTo = isDateFilterActive ? (appliedFilterDateTo || todayStr) : todayStr;
+
     const detailDataQuery = useQuery({
-        queryKey: ['detail-data', lineId, detailQueryParams.type, detailQueryParams.section],
+        queryKey: ['detail-data', lineId, detailQueryParams.type, detailQueryParams.section, detailDateFrom, detailDateTo],
         queryFn: async () => {
             if (!detailQueryParams.type || !detailQueryParams.section) {
                 return [];
@@ -191,80 +225,65 @@ export default function DashboardRFID() {
             // Mapping type dan section ke status parameter (API: /wira/detail?status=xxx&line=xx)
             let status: string;
             if (type === 'OUTPUT') {
-                // Output Sewing: API wira/detail?status=output_sewing&line=1
                 status = 'output_sewing';
             } else if (section === 'QC') {
-                // QC: GOOD, REWORK, REJECT, WIRA
-                status = type; // GOOD, REWORK, REJECT, atau WIRA
+                status = type;
             } else {
-                // PQC: PQC_GOOD, PQC_REWORK, PQC_REJECT, PQC_WIRA
-                status = `PQC_${type}`; // PQC_GOOD, PQC_REWORK, PQC_REJECT, atau PQC_WIRA
+                status = `PQC_${type}`;
             }
 
-            // API baru menggunakan format: wira/detail?status=xxx&line=xx
-            const url = `${API_BASE_URL}/wira/detail?status=${encodeURIComponent(status)}&line=${encodeURIComponent(lineId)}`;
-
-            console.log('🔵 [Detail Modal] Fetching data dari API baru:', url);
-            console.log('🔵 [Detail Modal] Parameters:', { status, line: lineId, type, section });
+            // URL: semua detail (QC/PQC/OUTPUT) pakai filter tanggal dari dashboard
+            const url = `${API_BASE_URL}/wira/detail?status=${encodeURIComponent(status)}&line=${encodeURIComponent(lineId)}&tanggal_from=${encodeURIComponent(detailDateFrom)}&tanggal_to=${encodeURIComponent(detailDateTo)}`;
 
             try {
                 const response = await fetch(url, {
                     method: 'GET',
-                    headers: {
-                        ...getDefaultHeaders(),
-                    },
+                    headers: { ...getDefaultHeaders() },
                 });
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error('❌ [Detail Modal] API Error:', response.status, response.statusText, errorText);
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
                 }
 
                 const result = await response.json();
-                console.log('🔵 [Detail Modal] API Response:', result);
-                console.log('🔵 [Detail Modal] API Response keys:', Object.keys(result));
-                console.log('🔵 [Detail Modal] result.status:', result.status);
-                console.log('🔵 [Detail Modal] result.data:', result.data);
-                console.log('🔵 [Detail Modal] result.data isArray:', Array.isArray(result.data));
-                console.log('🔵 [Detail Modal] result.data length:', result.data?.length);
 
-                // Handle response format baru (status: "success", data: [...])
+                // Format baru Output Sewing: data = { summary_per_jam: [...], raw_data: [...] }
+                if (result.status === 'success' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
+                    const raw = result.data.raw_data || [];
+                    const summary = result.data.summary_per_jam || [];
+                    const sortedRaw = [...raw].sort((a: any, b: any) => {
+                        const tA = new Date(a.timestamp || 0).getTime();
+                        const tB = new Date(b.timestamp || 0).getTime();
+                        return tB - tA;
+                    });
+                    return {
+                        rawData: sortedRaw,
+                        summaryPerJam: summary,
+                        count: result.count ?? sortedRaw.length,
+                        filter_applied: result.filter_applied || null,
+                    };
+                }
+
+                // Format array (GOOD, REWORK, REJECT, WIRA, atau fallback)
                 if (result.status === 'success' && result.data && Array.isArray(result.data)) {
-                    // Sort berdasarkan timestamp terbaru
                     const sortedData = [...result.data].sort((a: any, b: any) => {
                         const dateA = new Date(a.timestamp || 0).getTime();
                         const dateB = new Date(b.timestamp || 0).getTime();
-                        return dateB - dateA; // Terbaru di atas
+                        return dateB - dateA;
                     });
-
-                    console.log(`✅ [Detail Modal] Data dari API baru: ${sortedData.length} items`);
-                    console.log('✅ [Detail Modal] First item sample:', sortedData[0]);
                     return sortedData;
                 }
 
-                // Fallback untuk format lama (success: true, data: [...])
                 if (result.success && result.data && Array.isArray(result.data)) {
                     const sortedData = [...result.data].sort((a: any, b: any) => {
                         const dateA = new Date(a.timestamp || 0).getTime();
                         const dateB = new Date(b.timestamp || 0).getTime();
                         return dateB - dateA;
                     });
-                    console.log(`✅ [Detail Modal] Data dari API (format lama): ${sortedData.length} items`);
                     return sortedData;
                 }
 
-                console.warn('⚠️ [Detail Modal] API response tidak valid atau data kosong:', result);
-                console.warn('⚠️ [Detail Modal] Response structure:', {
-                    hasStatus: 'status' in result,
-                    statusValue: result.status,
-                    hasSuccess: 'success' in result,
-                    successValue: result.success,
-                    hasData: 'data' in result,
-                    dataType: typeof result.data,
-                    isArray: Array.isArray(result.data),
-                    dataValue: result.data
-                });
                 return [];
             } catch (error) {
                 console.error('❌ [Detail Modal] Error fetching data:', error);
@@ -272,40 +291,71 @@ export default function DashboardRFID() {
             }
         },
         enabled: showDetailModal && !!detailQueryParams.type && !!detailQueryParams.section,
-        staleTime: 30000, // 30 detik
+        staleTime: 30000,
         retry: 1,
     });
 
     // Update detail data dan state saat query berhasil
     useEffect(() => {
-        console.log('🔵 [Detail Modal] Query state update:', {
-            hasData: !!detailDataQuery.data,
-            dataLength: detailDataQuery.data?.length || 0,
-            isError: detailDataQuery.isError,
-            isLoading: detailDataQuery.isLoading,
-            type: detailQueryParams.type,
-            section: detailQueryParams.section,
-            currentWo,
-            enabled: showDetailModal && !!detailQueryParams.type && !!detailQueryParams.section
-        });
-
-        if (detailDataQuery.data) {
-            console.log('✅ [Detail Modal] Setting detail data:', detailDataQuery.data.length, 'items');
-            setDetailData(detailDataQuery.data);
+        const data = detailDataQuery.data;
+        if (data && typeof data === 'object' && !Array.isArray(data) && 'rawData' in data) {
+            // Output Sewing: format { rawData, summaryPerJam, count, filter_applied }
+            setDetailData((data as { rawData: any[] }).rawData || []);
+            setDetailSummaryPerJam((data as { summaryPerJam: any[] }).summaryPerJam || []);
+            setDetailFilterApplied((data as { filter_applied: Record<string, string> | null }).filter_applied || null);
+        } else if (Array.isArray(data)) {
+            setDetailData(data);
+            setDetailSummaryPerJam([]);
+            setDetailFilterApplied(null);
         } else if (detailDataQuery.isError) {
-            console.error('❌ [Detail Modal] Query error:', detailDataQuery.error);
             setDetailData([]);
-            // Error handling untuk detail data
-        } else if (!detailDataQuery.isLoading && !detailDataQuery.data && showDetailModal) {
-            // Jika query tidak loading dan tidak ada data, reset detail data
-            console.log('⚠️ [Detail Modal] No data and not loading, resetting detail data');
+            setDetailSummaryPerJam([]);
+            setDetailFilterApplied(null);
+        } else if (!detailDataQuery.isLoading && !data && showDetailModal) {
             setDetailData([]);
+            setDetailSummaryPerJam([]);
+            setDetailFilterApplied(null);
         }
-    }, [detailDataQuery.data, detailDataQuery.isError, detailDataQuery.isLoading, detailDataQuery.error, detailQueryParams.type, detailQueryParams.section, currentWo, showDetailModal]);
+    }, [detailDataQuery.data, detailDataQuery.isError, detailDataQuery.isLoading, showDetailModal]);
 
     useEffect(() => {
         setDetailLoading(detailDataQuery.isLoading);
     }, [detailDataQuery.isLoading]);
+
+    // Target output: dari production line sesuai line & environment (card production line)
+    const environment = (typeof window !== 'undefined' && (localStorage.getItem('backend_environment') as 'CLN' | 'MJL' | 'MJL2')) || getBackendEnvironment() || 'CLN';
+    const targetDataQuery = useQuery({
+        queryKey: ['target-data', environment],
+        queryFn: async () => {
+            const res = await fetch(`${API_BASE_URL}/api/target-data?environment=${encodeURIComponent(environment)}`, { headers: getDefaultHeaders() });
+            if (!res.ok) throw new Error('Failed to fetch target data');
+            const json = await res.json();
+            return json?.data?.targets ?? {};
+        },
+        staleTime: 60000,
+        enabled: !!environment,
+    });
+    const targetOutputBase = useMemo(() => {
+        const targets = targetDataQuery.data;
+        if (!targets || typeof targets !== 'object') return undefined;
+        const v = targets[lineId];
+        return typeof v === 'number' && v >= 0 ? v : undefined;
+    }, [targetDataQuery.data, lineId]);
+
+    // Jumlah hari untuk target: pakai applied dates bila filter aktif (sesuai data yang ditampilkan)
+    const filterDays = useMemo(() => {
+        const from = isDateFilterActive ? (appliedFilterDateFrom || todayStr) : (filterDateFrom || todayStr);
+        const to = isDateFilterActive ? (appliedFilterDateTo || todayStr) : (filterDateTo || todayStr);
+        const fromDate = new Date(from + 'T00:00:00');
+        const toDate = new Date(to + 'T00:00:00');
+        const diffMs = toDate.getTime() - fromDate.getTime();
+        const days = Math.max(1, Math.round(diffMs / 86400000) + 1);
+        return days;
+    }, [isDateFilterActive, appliedFilterDateFrom, appliedFilterDateTo, filterDateFrom, filterDateTo, todayStr]);
+    const targetOutput = useMemo(() => {
+        if (targetOutputBase === undefined || targetOutputBase <= 0) return undefined;
+        return targetOutputBase * filterDays;
+    }, [targetOutputBase, filterDays]);
 
     // Update title dan type saat query params berubah
     useEffect(() => {
@@ -606,108 +656,62 @@ export default function DashboardRFID() {
         return matchedData || null;
     }, [wiraWebSocketData?.data, lineId]);
 
-    // Hitung pieData menggunakan data dari WebSocket wira-dashboard (hanya QC)
-    // Wira (Orange), Reject (Merah), Good (Hijau), Sisa Output = Output - (Wira + Reject + Good)
+    // Hitung pieData menggunakan data PQC (bukan QC) - dari WebSocket atau hook
+    // Di development: tampilkan perbandingan Good PQC vs Target saja
     const pieData = useMemo(() => {
-        // Jika ada data dari WebSocket, gunakan data tersebut (hanya QC)
+        const isDev = import.meta.env.DEV;
+        if (isDev) {
+            const target = targetOutput ?? 0;
+            const sisa = Math.max(0, target - pqcGood);
+            const segments: Array<{ name: string; value: number; display: string; color: string }> = [
+                { name: 'Good PQC', value: pqcGood, display: `Good PQC ( ${pqcGood} )`, color: COLORS.greenSoft },
+            ];
+            // Sisa Target hanya ditampilkan ketika target belum terpenuhi
+            if (sisa > 0 && target > 0) {
+                segments.push({ name: 'Sisa Target', value: sisa, display: `Sisa Target — Target: ${target}, Sisa: ${sisa}`, color: COLORS.blueSoft });
+            }
+            return segments;
+        }
+
+        // Jika ada data dari WebSocket, gunakan data PQC dari item tersebut
         if (wiraDashboardData) {
-            // Coba berbagai format property name (menggunakan any untuk fleksibilitas)
             const data = wiraDashboardData as any;
             const outputSewingValue = data['Output Sewing'] || data['OutputSewing'] || data.Output || outputLine || 0;
-            const goodQcValue = data.Good || data.good || 0;
-            const rejectQcValue = data.Reject || data.reject || 0;
-            const wiraQcValue = data.WIRA || data.Wira || data.wira || 0;
+            const goodPqcValue = data['PQC Good'] || data.pqc_good || data.pqcGood || 0;
+            const rejectPqcValue = data['PQC Reject'] || data.pqc_reject || data.pqcReject || 0;
+            const wiraPqcValue = data['PQC WIRA'] || data.pqc_wira || data.pqcWira || 0;
 
-            const outputSewingStr = String(outputSewingValue);
-            const goodQcStr = String(goodQcValue);
-            const rejectQcStr = String(rejectQcValue);
-            const wiraQcStr = String(wiraQcValue);
+            const outputSewing = parseInt(String(outputSewingValue), 10);
+            const goodPqc = parseInt(String(goodPqcValue), 10);
+            const rejectPqc = parseInt(String(rejectPqcValue), 10);
+            const wiraPqcVal = parseInt(String(wiraPqcValue), 10);
 
-            const outputSewing = parseInt(outputSewingStr, 10);
-            const goodQc = parseInt(goodQcStr, 10);
-            const rejectQc = parseInt(rejectQcStr, 10);
-            const wiraQc = parseInt(wiraQcStr, 10);
-
-
-            // Hitung Sisa Output
-            const sisaOutput = Math.max(0, outputSewing - (wiraQc + rejectQc + goodQc));
+            const sisaOutput = Math.max(0, outputSewing - (wiraPqcVal + rejectPqc + goodPqc));
 
             const pieDataRaw: Array<{ name: string; value: number; display: string; color: string }> = [
-                {
-                    name: 'Good',
-                    value: goodQc,
-                    display: `Good ( ${goodQc} )`,
-                    color: COLORS.greenSoft
-                },
-                {
-                    name: 'WIRA',
-                    value: wiraQc,
-                    display: `WIRA ( ${wiraQc} )`,
-                    color: COLORS.orangeSoft
-                },
-                {
-                    name: 'Reject',
-                    value: rejectQc,
-                    display: `Reject ( ${rejectQc} )`,
-                    color: COLORS.redSoft
-                },
+                { name: 'Good', value: goodPqc, display: `Good ( ${goodPqc} )`, color: COLORS.greenSoft },
+                { name: 'WIRA', value: wiraPqcVal, display: `WIRA ( ${wiraPqcVal} )`, color: COLORS.orangeSoft },
+                { name: 'Reject', value: rejectPqc, display: `Reject ( ${rejectPqc} )`, color: COLORS.redSoft },
             ];
-
-            // Tambahkan Sisa Output jika ada
             if (sisaOutput > 0) {
-                pieDataRaw.push({
-                    name: 'Sisa Output',
-                    value: sisaOutput,
-                    display: `Sisa Output ( ${sisaOutput} )`,
-                    color: COLORS.blueGray // Abu ke biruan untuk Sisa Output
-                });
+                pieDataRaw.push({ name: 'Sisa Output', value: sisaOutput, display: `Sisa Output ( ${sisaOutput} )`, color: COLORS.blueGray });
             }
-
-            const result = pieDataRaw.filter(item => item.value > 0).length > 0
-                ? pieDataRaw.filter(item => item.value > 0)
-                : pieDataRaw;
-
+            const result = pieDataRaw.filter(item => item.value > 0).length > 0 ? pieDataRaw.filter(item => item.value > 0) : pieDataRaw;
             return result;
         }
 
-        // Fallback: gunakan data dari hook (hanya QC, bukan PQC)
+        // Fallback: gunakan data PQC dari hook
         const pieDataRaw: Array<{ name: string; value: number; display: string; color: string }> = [
-            {
-                name: 'Good',
-                value: good,
-                display: `Good ( ${good} )`,
-                color: COLORS.greenSoft
-            },
-            {
-                name: 'WIRA',
-                value: wiraQc,
-                display: `WIRA ( ${wiraQc} )`,
-                color: COLORS.orangeSoft
-            },
-            {
-                name: 'Reject',
-                value: reject,
-                display: `Reject ( ${reject} )`,
-                color: COLORS.redSoft
-            },
+            { name: 'Good', value: pqcGood, display: `Good ( ${pqcGood} )`, color: COLORS.greenSoft },
+            { name: 'WIRA', value: wiraPqc, display: `WIRA ( ${wiraPqc} )`, color: COLORS.orangeSoft },
+            { name: 'Reject', value: pqcReject, display: `Reject ( ${pqcReject} )`, color: COLORS.redSoft },
         ];
-
-        // Hitung Sisa Output dari outputLine
-        const sisaOutput = Math.max(0, (outputLine || 0) - (wiraQc + reject + good));
+        const sisaOutput = Math.max(0, (outputLine || 0) - (wiraPqc + pqcReject + pqcGood));
         if (sisaOutput > 0) {
-            pieDataRaw.push({
-                name: 'Sisa Output',
-                value: sisaOutput,
-                display: `Sisa Output ( ${sisaOutput} )`,
-                color: COLORS.blueGray // Abu ke biruan untuk Sisa Output
-            });
+            pieDataRaw.push({ name: 'Sisa Output', value: sisaOutput, display: `Sisa Output ( ${sisaOutput} )`, color: COLORS.blueGray });
         }
-
-        // Filter hanya item yang value > 0, tapi jika semua 0, tetap tampilkan semua
-        return pieDataRaw.filter(item => item.value > 0).length > 0
-            ? pieDataRaw.filter(item => item.value > 0)
-            : pieDataRaw;
-    }, [wiraDashboardData, good, wiraQc, reject, outputLine]);
+        return pieDataRaw.filter(item => item.value > 0).length > 0 ? pieDataRaw.filter(item => item.value > 0) : pieDataRaw;
+    }, [wiraDashboardData, outputLine, pqcGood, wiraPqc, pqcReject, targetOutput]);
 
     // Data untuk status cards
     const qcData = useMemo(() => ({
@@ -737,14 +741,68 @@ export default function DashboardRFID() {
         { name: 'Reject', value: pqcReject, color: COLORS.red },
     ].filter(d => d.value > 0), [pqcGood, wiraPqc, pqcReject]);
 
-    // Filter data berdasarkan search query
+    // Jendela jam untuk Output Sewing: hanya tampilkan 10 jam dari jam pertama yang ada data
+    const OUTPUT_HOUR_WINDOW = 10;
+
+    // Data chart per jam untuk Output Sewing (dari summary_per_jam), hanya 10 jam dari jam pertama ada data
+    const outputPerJamChartData = useMemo(() => {
+        if (!detailSummaryPerJam.length) return [];
+        const row = detailSummaryPerJam[0];
+        const jamKeys = ['jam_06', 'jam_07', 'jam_08', 'jam_09', 'jam_10', 'jam_11', 'jam_12', 'jam_13', 'jam_14', 'jam_15', 'jam_16', 'jam_17', 'jam_18', 'jam_19', 'jam_20', 'jam_21', 'jam_22'];
+        const fullData = jamKeys.map((key) => {
+            const jam = key.replace('jam_', '');
+            return {
+                jam: `${jam}:00`,
+                label: jam,
+                jumlah: typeof row[key] === 'number' ? row[key] : 0,
+            };
+        });
+        const firstIndex = fullData.findIndex((d) => d.jumlah > 0);
+        if (firstIndex < 0) return fullData.slice(0, OUTPUT_HOUR_WINDOW);
+        return fullData.slice(firstIndex, firstIndex + OUTPUT_HOUR_WINDOW);
+    }, [detailSummaryPerJam]);
+
+    // Max Y untuk chart Output Sewing: ikuti data tertinggi, default 40 jika semua nol
+    const outputChartYMax = useMemo(() => {
+        if (!outputPerJamChartData.length) return 40;
+        const max = Math.max(...outputPerJamChartData.map((d) => d.jumlah));
+        return max > 0 ? Math.ceil(max * 1.05) || 40 : 40;
+    }, [outputPerJamChartData]);
+
+    // Untuk OUTPUT: range jam (start, end) dari chart agar bisa filter raw_data
+    const outputHourRange = useMemo(() => {
+        if (detailType !== 'OUTPUT' || !outputPerJamChartData.length) return null;
+        const first = outputPerJamChartData[0];
+        const last = outputPerJamChartData[outputPerJamChartData.length - 1];
+        const startHour = parseInt(first?.label ?? '6', 10);
+        const endHour = parseInt(last?.label ?? '22', 10);
+        return { startHour, endHour };
+    }, [detailType, outputPerJamChartData]);
+
+    // Raw data untuk OUTPUT: hanya yang timestamp-nya dalam jendela 10 jam
+    const detailDataForDisplay = useMemo(() => {
+        if (detailType !== 'OUTPUT' || !outputHourRange) return detailData;
+        const { startHour, endHour } = outputHourRange;
+        return detailData.filter((item) => {
+            const ts = item.timestamp;
+            if (!ts) return false;
+            const match = String(ts).match(/T(\d{2}):/);
+            const hour = match ? parseInt(match[1], 10) : -1;
+            return hour >= startHour && hour <= endHour;
+        });
+    }, [detailType, detailData, outputHourRange]);
+
+    // Sumber data tabel: pakai detailDataForDisplay untuk OUTPUT (sudah difilter jam), selain itu detailData
+    const detailDataForTable = detailType === 'OUTPUT' && outputHourRange ? detailDataForDisplay : detailData;
+
+    // Filter data berdasarkan search query (sumber: detailDataForTable = sudah filter jam untuk OUTPUT)
     const filteredDetailData = useMemo(() => {
         if (!searchQuery.trim()) {
-            return detailData;
+            return detailDataForTable;
         }
 
         const query = searchQuery.toLowerCase().trim();
-        return detailData.filter((item) => {
+        return detailDataForTable.filter((item) => {
             const rfid = (item.rfid_garment || '').toLowerCase();
             const wo = (item.wo || '').toLowerCase();
             const style = (item.style || '').toLowerCase();
@@ -763,7 +821,7 @@ export default function DashboardRFID() {
                 size.includes(query) ||
                 line.includes(query);
         });
-    }, [detailData, searchQuery]);
+    }, [detailDataForTable, searchQuery]);
 
     // Fungsi untuk fetch data per hari
     const fetchDailyData = async (): Promise<any[]> => {
@@ -974,17 +1032,26 @@ export default function DashboardRFID() {
     // State untuk detect mobile device (termasuk tablet portrait)
     const [isMobile, setIsMobile] = useState(false);
 
-    // Effect untuk detect mobile device dan tablet portrait
+    // Effect untuk detect mobile vs desktop layout (landscape = selalu tampilan desktop)
     useEffect(() => {
         const checkMobile = () => {
-            // Gunakan breakpoint lg (1024px) sebagai batas mobile/tablet portrait vs desktop
-            // Di bawah 1024px = mobile/tablet portrait (layout seperti mobile), di atas = desktop
-            setIsMobile(window.innerWidth < 1024);
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            const isLandscape = w > h;
+            // Desktop layout: lebar >= 1024px ATAU (landscape dan lebar >= 480px)
+            // Tablet/smartphone landscape selalu dapat tampilan full seperti desktop
+            const useDesktopLayout = w >= 1024 || (isLandscape && w >= 480);
+            setIsMobile(!useDesktopLayout);
         };
+        const handleOrientationChange = () => setTimeout(checkMobile, 150);
 
         checkMobile();
         window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
+        window.addEventListener('orientationchange', handleOrientationChange);
+        return () => {
+            window.removeEventListener('resize', checkMobile);
+            window.removeEventListener('orientationchange', handleOrientationChange);
+        };
     }, []);
 
     return (
@@ -1059,13 +1126,13 @@ export default function DashboardRFID() {
                                     {/* Grid 1: Overview Data RFID - Chart distribusi data saja */}
                                     <div className="w-full min-h-[200px] sm:min-h-[250px]">
                                         <Suspense fallback={<ChartSkeleton />}>
-                                            <OverviewChart pieData={pieData} outputLine={outputLine} />
+                                            <OverviewChart pieData={pieData} outputLine={outputLine} targetForPercentage={targetOutput} />
                                         </Suspense>
                                     </div>
                                     {/* Grid 2: Data Output Sewing - Output sewing saja */}
                                     <div className="w-full min-h-[200px] sm:min-h-[250px]">
                                         <Suspense fallback={<ChartSkeleton />}>
-                                            <OutputSewingCard outputLine={outputLine} onClick={fetchOutputDetail} />
+                                            <OutputSewingCard outputLine={outputLine} targetOutput={targetOutput} onClick={fetchOutputDetail} />
                                         </Suspense>
                                     </div>
                                 </div>
@@ -1084,8 +1151,12 @@ export default function DashboardRFID() {
                                             onDateFromChange={handleDateFromChange}
                                             onDateToChange={handleDateToChange}
                                             onWoChange={setDashboardFilterWo}
-                                            onSearchClick={() => setIsDateFilterActive(true)}
+                                            onSearchClick={applyDateFilter}
                                             onExportClick={() => setShowExportModal(true)}
+                                            onPrevLine={handlePrevLine}
+                                            onNextLine={handleNextLine}
+                                            hasPrev={hasPrevLine}
+                                            hasNext={hasNextLine}
                                         />
                                     </Suspense>
                                 </div>
@@ -1153,13 +1224,13 @@ export default function DashboardRFID() {
                                     {/* Grid 1: Overview Data RFID - Chart distribusi data saja */}
                                     <div className="flex-[1] min-w-0 overflow-hidden" style={{ flex: '1 1 50%', maxWidth: '50%' }}>
                                         <Suspense fallback={<ChartSkeleton />}>
-                                            <OverviewChart pieData={pieData} outputLine={outputLine} />
+                                            <OverviewChart pieData={pieData} outputLine={outputLine} targetForPercentage={targetOutput} />
                                         </Suspense>
                                     </div>
                                     {/* Grid 2: Data Output Sewing - Output sewing saja */}
                                     <div className="flex-[1] min-w-0 overflow-hidden" style={{ flex: '1 1 50%', maxWidth: '50%' }}>
                                         <Suspense fallback={<ChartSkeleton />}>
-                                            <OutputSewingCard outputLine={outputLine} onClick={fetchOutputDetail} />
+                                            <OutputSewingCard outputLine={outputLine} targetOutput={targetOutput} onClick={fetchOutputDetail} />
                                         </Suspense>
                                     </div>
                                 </div>
@@ -1176,8 +1247,12 @@ export default function DashboardRFID() {
                                             onDateFromChange={handleDateFromChange}
                                             onDateToChange={handleDateToChange}
                                             onWoChange={setDashboardFilterWo}
-                                            onSearchClick={() => setIsDateFilterActive(true)}
+                                            onSearchClick={applyDateFilter}
                                             onExportClick={() => setShowExportModal(true)}
+                                            onPrevLine={handlePrevLine}
+                                            onNextLine={handleNextLine}
+                                            hasPrev={hasPrevLine}
+                                            hasNext={hasNextLine}
                                         />
                                     </Suspense>
                                 </div>
@@ -1425,10 +1500,10 @@ export default function DashboardRFID() {
                     setShowDetailModal(false);
                     setSearchQuery('');
                 }}>
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] sm:h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        {/* Header */}
-                        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-600 p-4 sm:p-6 flex-shrink-0">
-                            <div className="flex items-center justify-between mb-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-[92vw] sm:w-[90vw] max-w-[1600px] max-h-[95vh] h-[88vh] sm:h-[92vh] overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Header - compact agar sama di 720p/1080p */}
+                        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-600 p-3 sm:p-4 flex-shrink-0">
+                            <div className="flex items-center justify-between mb-2 sm:mb-3">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
                                         {detailType === 'GOOD' && <CheckCircle className="text-white" size={24} strokeWidth={2.5} />}
@@ -1469,26 +1544,47 @@ export default function DashboardRFID() {
                                 {/* Total Data dan Tanggal - Sebelah Kanan */}
                                 <div className="flex items-center gap-4">
                                     <div className="text-sm text-white/90 hidden sm:block" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                                        Data hari ini ({new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })})
+                                        {(() => {
+                                            const from = detailDateFrom || new Date().toISOString().slice(0, 10);
+                                            const to = detailDateTo || new Date().toISOString().slice(0, 10);
+                                            const fromFormatted = new Date(from + 'T00:00:00').toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+                                            const toFormatted = new Date(to + 'T00:00:00').toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+                                            return from === to ? `Data ${fromFormatted}` : `Data Dari ${fromFormatted} s/d ${toFormatted}`;
+                                        })()}
                                     </div>
                                     <div className="bg-white/20 backdrop-blur-sm border-2 border-white/30 rounded-xl px-4 py-2.5 shadow-lg">
                                         <div className="text-xs font-semibold text-white/90 mb-0.5">Total Data</div>
                                         <div className="text-2xl font-bold text-white">
-                                            {searchQuery.trim() ? filteredDetailData.length : detailData.length}
+                                            {searchQuery.trim()
+                                                ? filteredDetailData.length
+                                                : (detailType === 'OUTPUT' ? detailDataForTable.length : detailData.length)}
                                         </div>
                                     </div>
+                                    {detailType === 'OUTPUT' && targetOutput !== undefined && targetOutput > 0 && (() => {
+                                        const totalCount = searchQuery.trim() ? filteredDetailData.length : detailDataForTable.length;
+                                        const targetMet = totalCount >= targetOutput;
+                                        return (
+                                            <div className={`backdrop-blur-sm border-2 rounded-xl px-4 py-2.5 shadow-lg ${targetMet ? 'bg-green-500/30 border-green-400' : 'bg-white/20 border-white/30'}`}>
+                                                <div className={`flex items-center gap-1.5 text-xs font-semibold mb-0.5 ${targetMet ? 'text-green-100' : 'text-white/90'}`}>
+                                                    <img src={targetIcon} alt="" className="w-3.5 h-3.5 flex-shrink-0 object-contain" aria-hidden />
+                                                    Target Output
+                                                </div>
+                                                <div className={`text-2xl font-bold ${targetMet ? 'text-white' : 'text-white'}`}>{targetOutput}</div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Table Content */}
-                        <div className="flex-1 overflow-hidden p-4 sm:p-6 bg-gradient-to-br from-slate-50 to-blue-50/30 min-h-0 flex flex-col">
+                        {/* Table Content - gap kecil agar konsisten di semua resolusi */}
+                        <div className="flex-1 overflow-hidden p-2 sm:p-3 bg-gradient-to-br from-slate-50 to-blue-50/30 min-h-0 flex flex-col">
                             {detailLoading ? (
                                 <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
                                     <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                                     <p className="text-slate-600 font-medium" style={{ fontFamily: 'Poppins, sans-serif' }}>Memuat data...</p>
                                 </div>
-                            ) : detailData.length === 0 ? (
+                            ) : detailData.length === 0 && (detailType !== 'OUTPUT' || detailSummaryPerJam.length === 0) ? (
                                 <div className="flex flex-col items-center justify-center text-slate-400 h-full min-h-[400px]">
                                     <div className="p-4 bg-blue-100 rounded-full mb-4">
                                         <XCircle size={48} className="text-blue-500 opacity-50" />
@@ -1496,7 +1592,7 @@ export default function DashboardRFID() {
                                     <p className="text-lg font-bold text-slate-600 mb-1" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Tidak ada data</p>
                                     <p className="text-sm" style={{ fontFamily: 'Poppins, sans-serif' }}>Tidak ada data {detailTitle}</p>
                                 </div>
-                            ) : filteredDetailData.length === 0 ? (
+                            ) : filteredDetailData.length === 0 && searchQuery.trim() ? (
                                 <div className="flex flex-col items-center justify-center text-slate-400 h-full min-h-[400px]">
                                     <div className="p-4 bg-blue-100 rounded-full mb-4">
                                         <Search size={48} className="text-blue-500 opacity-50" />
@@ -1505,96 +1601,165 @@ export default function DashboardRFID() {
                                     <p className="text-sm" style={{ fontFamily: 'Poppins, sans-serif' }}>Tidak ada data yang cocok dengan "{searchQuery}"</p>
                                 </div>
                             ) : (
-                                <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden h-full flex flex-col">
-                                    <div className="overflow-y-auto flex-1 min-h-0">
-                                        <table className="w-full">
-                                            <thead className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-600 border-b-2 border-blue-500 sticky top-0 z-10">
-                                                <tr>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>No</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>RFID ID</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>WO</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Style</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Buyer</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Item</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Color</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Size</th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>
-                                                        {(detailQueryParams.type === 'REWORK' || detailQueryParams.type === 'WIRA') ? 'Count' : 'Line'}
-                                                    </th>
-                                                    <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Timestamp</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-white divide-y divide-slate-100">
-                                                {filteredDetailData.map((item, index) => (
-                                                    <tr key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} hover:bg-blue-50/50 transition-colors`}>
-                                                        <td className="px-4 py-3 text-sm font-semibold text-slate-600 text-center" style={{ fontFamily: 'Poppins, sans-serif' }}>{index + 1}</td>
-                                                        <td className="px-4 py-3 text-sm font-mono font-bold text-blue-600" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.rfid_garment || '-'}</td>
-                                                        <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.wo || '-'}</td>
-                                                        <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.style || '-'}</td>
-                                                        <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.buyer || '-'}</td>
-                                                        <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.item || '-'}</td>
-                                                        <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.color || '-'}</td>
-                                                        <td className="px-4 py-3 text-sm text-slate-700 font-bold" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.size || '-'}</td>
-                                                        <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                                                            {(detailQueryParams.type === 'REWORK' || detailQueryParams.type === 'WIRA')
-                                                                ? (item.reworkCount !== undefined && item.reworkCount !== null ? item.reworkCount : '-')
-                                                                : (item.line || '-')}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm text-slate-600 font-mono" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                                                            {item.timestamp ? (() => {
-                                                                try {
-                                                                    let date: Date;
-                                                                    const timestamp = item.timestamp;
+                                <div className="flex flex-col gap-2 sm:gap-3 h-full min-h-0 overflow-hidden">
+                                    {/* Output Sewing: Chart per Jam - opsi Bar / Area / Line */}
+                                    {detailType === 'OUTPUT' && outputPerJamChartData.length > 0 && (
+                                        <div className="bg-transparent rounded-xl border border-slate-200/80 px-4 pt-1 pb-2 flex-[1] min-h-0 flex flex-col -mt-2">
+                                            <div className="flex items-center justify-end gap-2 mb-1 flex-shrink-0 relative z-20">
+                                                <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5" role="tablist">
+                                                    {(['area', 'line', 'bar'] as const).map((type) => (
+                                                        <button
+                                                            key={type}
+                                                            type="button"
+                                                            role="tab"
+                                                            aria-selected={outputChartType === type}
+                                                            onClick={() => setOutputChartType(type)}
+                                                            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors capitalize ${outputChartType === type ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
+                                                            style={{ fontFamily: 'Poppins, sans-serif' }}
+                                                        >
+                                                            {type === 'area' ? 'Area' : type === 'line' ? 'Garis' : 'Bar'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 min-h-0 w-full rounded-lg overflow-hidden bg-transparent relative z-0 pb-0 min-h-[120px]">
+                                                <ResponsiveContainer width="100%" height="100%" minHeight={100}>
+                                                    {outputChartType === 'bar' && (
+                                                        <BarChart data={outputPerJamChartData} margin={{ top: 20, right: 12, left: 8, bottom: 8 }} barCategoryGap="8%">
+                                                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                                            <XAxis dataKey="jam" tick={{ fill: '#475569', fontSize: 10 }} axisLine={{ stroke: '#94a3b8' }} tickLine={{ stroke: '#94a3b8' }} />
+                                                            <YAxis domain={[0, outputChartYMax]} tick={{ fill: '#475569', fontSize: 10 }} axisLine={{ stroke: '#94a3b8' }} tickLine={{ stroke: '#94a3b8' }} allowDecimals={false} width={32} />
+                                                            <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 8 }} formatter={(value: number) => [value, 'Jumlah']} labelFormatter={(label) => `Jam ${label}`} />
+                                                            <Bar dataKey="jumlah" fill="#2563eb" radius={[4, 4, 0, 0]} name="Jumlah">
+                                                                <LabelList dataKey="jumlah" position="inside" fill="#fff" fontSize={14} fontWeight={700} />
+                                                            </Bar>
+                                                        </BarChart>
+                                                    )}
+                                                    {outputChartType === 'area' && (
+                                                        <AreaChart data={outputPerJamChartData} margin={{ top: 20, right: 12, left: 8, bottom: 8 }}>
+                                                            <defs>
+                                                                <linearGradient id="outputAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                                                                    <stop offset="0%" stopColor="#2563eb" stopOpacity={0.4} />
+                                                                    <stop offset="100%" stopColor="#2563eb" stopOpacity={0.05} />
+                                                                </linearGradient>
+                                                            </defs>
+                                                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                                            <XAxis dataKey="jam" tick={{ fill: '#475569', fontSize: 10 }} axisLine={{ stroke: '#94a3b8' }} tickLine={{ stroke: '#94a3b8' }} />
+                                                            <YAxis domain={[0, outputChartYMax]} tick={{ fill: '#475569', fontSize: 10 }} axisLine={{ stroke: '#94a3b8' }} tickLine={{ stroke: '#94a3b8' }} allowDecimals={false} width={32} />
+                                                            <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 8 }} formatter={(value: number) => [value, 'Jumlah']} labelFormatter={(label) => `Jam ${label}`} />
+                                                            <Area type="monotone" dataKey="jumlah" stroke="#2563eb" strokeWidth={2} fill="url(#outputAreaGrad)" name="Jumlah">
+                                                                <LabelList dataKey="jumlah" position="top" fill="#000" fontSize={16} fontWeight={700} offset={12} />
+                                                            </Area>
+                                                        </AreaChart>
+                                                    )}
+                                                    {outputChartType === 'line' && (
+                                                        <LineChart data={outputPerJamChartData} margin={{ top: 20, right: 12, left: 8, bottom: 8 }}>
+                                                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                                            <XAxis dataKey="jam" tick={{ fill: '#475569', fontSize: 10 }} axisLine={{ stroke: '#94a3b8' }} tickLine={{ stroke: '#94a3b8' }} />
+                                                            <YAxis domain={[0, outputChartYMax]} tick={{ fill: '#475569', fontSize: 10 }} axisLine={{ stroke: '#94a3b8' }} tickLine={{ stroke: '#94a3b8' }} allowDecimals={false} width={32} />
+                                                            <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 8 }} formatter={(value: number) => [value, 'Jumlah']} labelFormatter={(label) => `Jam ${label}`} />
+                                                            <Line type="monotone" dataKey="jumlah" stroke="#2563eb" strokeWidth={2} dot={{ r: 4, fill: '#2563eb', strokeWidth: 0 }} name="Jumlah">
+                                                                <LabelList dataKey="jumlah" position="top" fill="#000" fontSize={16} fontWeight={700} offset={12} />
+                                                            </Line>
+                                                        </LineChart>
+                                                    )}
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </div>
+                                    )}
 
-                                                                    // Cek apakah timestamp memiliki timezone indicator
-                                                                    const hasTimezone = timestamp.includes('Z') || timestamp.match(/[+-]\d{2}:\d{2}$/);
+                                    {/* Tabel Data Lengkap - 2/3 tinggi */}
+                                    <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex-[2] min-h-0 flex flex-col">
+                                        <div className="overflow-y-auto flex-1 min-h-0">
+                                            <table className="w-full">
+                                                <thead className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-600 border-b-2 border-blue-500 sticky top-0 z-10">
+                                                    <tr>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>No</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>RFID ID</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>WO</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Style</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Buyer</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Item</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Color</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Size</th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>
+                                                            {(detailQueryParams.type === 'REWORK' || detailQueryParams.type === 'WIRA') ? 'Count' : 'Line'}
+                                                        </th>
+                                                        <th className="px-4 py-4 text-left text-xs font-extrabold uppercase tracking-wider border-b-2 border-blue-400 text-white" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Timestamp</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="bg-white divide-y divide-slate-100">
+                                                    {filteredDetailData.map((item, index) => (
+                                                        <tr key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} hover:bg-blue-50/50 transition-colors`}>
+                                                            <td className="px-4 py-3 text-sm font-semibold text-slate-600 text-center" style={{ fontFamily: 'Poppins, sans-serif' }}>{filteredDetailData.length - index}</td>
+                                                            <td className="px-4 py-3 text-sm font-mono font-bold text-blue-600" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.rfid_garment || '-'}</td>
+                                                            <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.wo || '-'}</td>
+                                                            <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.style || '-'}</td>
+                                                            <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.buyer || '-'}</td>
+                                                            <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.item || '-'}</td>
+                                                            <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.color || '-'}</td>
+                                                            <td className="px-4 py-3 text-sm text-slate-700 font-bold" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.size || '-'}</td>
+                                                            <td className="px-4 py-3 text-sm text-slate-700" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                                                                {(detailQueryParams.type === 'REWORK' || detailQueryParams.type === 'WIRA')
+                                                                    ? (item.reworkCount !== undefined && item.reworkCount !== null ? item.reworkCount : '-')
+                                                                    : (item.line || '-')}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm text-slate-600 font-mono" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                                                                {item.timestamp ? (() => {
+                                                                    try {
+                                                                        let date: Date;
+                                                                        const timestamp = item.timestamp;
 
-                                                                    if (!hasTimezone) {
-                                                                        // Timestamp tanpa timezone, parse manual untuk menghindari konversi timezone
-                                                                        // Format: "2026-01-14T10:47:25" atau "2026-01-14T10:47:25.123"
-                                                                        const parts = timestamp.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?/);
-                                                                        if (parts) {
-                                                                            const [, year, month, day, hour, minute, second] = parts;
-                                                                            // Buat Date object dengan waktu lokal (tidak ada konversi timezone)
-                                                                            date = new Date(
-                                                                                parseInt(year),
-                                                                                parseInt(month) - 1, // Month is 0-indexed
-                                                                                parseInt(day),
-                                                                                parseInt(hour),
-                                                                                parseInt(minute),
-                                                                                parseInt(second)
-                                                                            );
+                                                                        // Cek apakah timestamp memiliki timezone indicator
+                                                                        const hasTimezone = timestamp.includes('Z') || timestamp.match(/[+-]\d{2}:\d{2}$/);
+
+                                                                        if (!hasTimezone) {
+                                                                            // Timestamp tanpa timezone, parse manual untuk menghindari konversi timezone
+                                                                            // Format: "2026-01-14T10:47:25" atau "2026-01-14T10:47:25.123"
+                                                                            const parts = timestamp.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?/);
+                                                                            if (parts) {
+                                                                                const [, year, month, day, hour, minute, second] = parts;
+                                                                                // Buat Date object dengan waktu lokal (tidak ada konversi timezone)
+                                                                                date = new Date(
+                                                                                    parseInt(year),
+                                                                                    parseInt(month) - 1, // Month is 0-indexed
+                                                                                    parseInt(day),
+                                                                                    parseInt(hour),
+                                                                                    parseInt(minute),
+                                                                                    parseInt(second)
+                                                                                );
+                                                                            } else {
+                                                                                // Fallback ke parsing normal
+                                                                                date = new Date(timestamp);
+                                                                            }
                                                                         } else {
-                                                                            // Fallback ke parsing normal
+                                                                            // Timestamp dengan timezone, parse normal
                                                                             date = new Date(timestamp);
                                                                         }
-                                                                    } else {
-                                                                        // Timestamp dengan timezone, parse normal
-                                                                        date = new Date(timestamp);
-                                                                    }
 
-                                                                    if (isNaN(date.getTime())) {
+                                                                        if (isNaN(date.getTime())) {
+                                                                            return item.timestamp;
+                                                                        }
+
+                                                                        // Format: DD MMM YYYY, HH.MM.SS (menggunakan waktu lokal, bukan UTC)
+                                                                        const day = String(date.getDate()).padStart(2, '0');
+                                                                        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                                                                        const month = monthNames[date.getMonth()];
+                                                                        const year = date.getFullYear();
+                                                                        const hours = String(date.getHours()).padStart(2, '0');
+                                                                        const minutes = String(date.getMinutes()).padStart(2, '0');
+                                                                        const seconds = String(date.getSeconds()).padStart(2, '0');
+                                                                        return `${day} ${month} ${year}, ${hours}.${minutes}.${seconds}`;
+                                                                    } catch (e) {
                                                                         return item.timestamp;
                                                                     }
-
-                                                                    // Format: DD MMM YYYY, HH.MM.SS (menggunakan waktu lokal, bukan UTC)
-                                                                    const day = String(date.getDate()).padStart(2, '0');
-                                                                    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-                                                                    const month = monthNames[date.getMonth()];
-                                                                    const year = date.getFullYear();
-                                                                    const hours = String(date.getHours()).padStart(2, '0');
-                                                                    const minutes = String(date.getMinutes()).padStart(2, '0');
-                                                                    const seconds = String(date.getSeconds()).padStart(2, '0');
-                                                                    return `${day} ${month} ${year}, ${hours}.${minutes}.${seconds}`;
-                                                                } catch (e) {
-                                                                    return item.timestamp;
-                                                                }
-                                                            })() : '-'}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                                })() : '-'}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             )}

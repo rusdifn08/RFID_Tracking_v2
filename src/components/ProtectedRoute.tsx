@@ -7,6 +7,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { isSessionValid, clearAuthStorage } from '../utils/sessionAuth';
+import MqttLoginSuccessOverlay from './MqttLoginSuccessOverlay';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -25,5 +26,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    return <>{children}</>;
+    return (
+        <>
+            {children}
+            <MqttLoginSuccessOverlay />
+        </>
+    );
 }

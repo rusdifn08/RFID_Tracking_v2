@@ -7,15 +7,19 @@ import { COLORS } from './constants';
 interface OverviewChartProps {
     pieData: Array<{ name: string; value: number; display: string; color: string }>;
     outputLine: number;
+    /** Target tetap (dari data target line). Dipakai sebagai penyebut persentase Good PQC agar bisa >100% saat target terlampaui. */
+    targetForPercentage?: number;
 }
 
 // Custom Tooltip untuk pie chart
 const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
         const data = payload[0];
-        // Ambil total dari payload (data.payload.total sudah di-set di pieDataWithTotal)
-        // Jika tidak ada, hitung total dari semua payload sebagai fallback
-        const total = data.payload?.total || data.payload?.payload?.total || (payload.reduce((sum: number, p: any) => sum + (p.value || 0), 0));
+        // Jika ada targetReference (target tetap), pakai untuk persen dan tampilan Target
+        const targetRef = data.payload?.targetReference ?? data.payload?.payload?.targetReference;
+        const total = targetRef != null && targetRef > 0
+            ? targetRef
+            : (data.payload?.total || data.payload?.payload?.total || (payload.reduce((sum: number, p: any) => sum + (p.value || 0), 0)));
         const percentage = total > 0 ? ((data.value / total) * 100).toFixed(1) : '0';
 
         return (
@@ -39,8 +43,8 @@ const CustomTooltip = ({ active, payload }: any) => {
                         <span className="font-semibold text-blue-600 text-sm">{percentage}%</span>
                     </div>
                     <div className="flex justify-between items-center border-t border-gray-200 pt-1 mt-1">
-                        <span className="text-xs text-gray-600">Total:</span>
-                        <span className="font-semibold text-gray-800 text-sm">{total.toLocaleString()}</span>
+                        <span className="text-xs text-gray-600">Target:</span>
+                        <span className="font-semibold text-gray-800 text-sm">{(targetRef != null ? targetRef : total).toLocaleString()}</span>
                     </div>
                 </div>
             </div>
@@ -49,24 +53,40 @@ const CustomTooltip = ({ active, payload }: any) => {
     return null;
 };
 
-const OverviewChart = memo(({ pieData, outputLine }: OverviewChartProps) => {
+const OverviewChart = memo(({ pieData, outputLine, targetForPercentage }: OverviewChartProps) => {
+    const isComparisonMode = useMemo(() => {
+        const names = pieData.map((p) => p.name);
+        return pieData.length === 2 && names.includes('Good PQC') && (names.includes('Target') || names.includes('Sisa Target'));
+    }, [pieData]);
+
+    const isTargetBasedMode = useMemo(() => {
+        const hasGoodPqc = pieData.some(p => p.name.toLowerCase().includes('good pqc'));
+        return hasGoodPqc && targetForPercentage != null && targetForPercentage > 0;
+    }, [pieData, targetForPercentage]);
+
     const totalCount = useMemo(() => {
-        // Selalu gunakan outputLine sebagai total jika ada, karena outputLine adalah total output yang sebenarnya
-        // Jangan gunakan jumlah dari pieData karena pieData mungkin tidak lengkap atau sudah difilter
+        // Target tetap: persentase = Good PQC / target (bisa >100% jika target terlampaui)
+        if (isTargetBasedMode) {
+            return targetForPercentage!;
+        }
+        // Mode perbandingan (dev: Good PQC vs Sisa Target): total = target = jumlah kedua nilai
+        if (isComparisonMode) {
+            return pieData.reduce((sum, item) => sum + item.value, 0);
+        }
         if (outputLine && outputLine > 0) {
             return outputLine;
         }
-        // Fallback: jika outputLine tidak ada, gunakan jumlah dari pieData
         return pieData.reduce((sum, item) => sum + item.value, 0);
-    }, [outputLine, pieData]);
+    }, [outputLine, pieData, isComparisonMode, isTargetBasedMode, targetForPercentage]);
 
-    // Tambahkan total ke setiap data untuk tooltip
+    // Tambahkan total dan targetReference ke setiap data untuk tooltip
     const pieDataWithTotal = useMemo(() => {
         return pieData.map(item => ({
             ...item,
-            total: totalCount
+            total: totalCount,
+            ...(isTargetBasedMode && targetForPercentage != null ? { targetReference: targetForPercentage } : {})
         }));
-    }, [pieData, totalCount]);
+    }, [pieData, totalCount, isTargetBasedMode, targetForPercentage]);
 
     // State untuk track active slice saat hover
     const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
@@ -79,20 +99,25 @@ const OverviewChart = memo(({ pieData, outputLine }: OverviewChartProps) => {
     const colorMapping = useMemo(() => {
         const mapping: Array<{ colorKey: string; color: string; name: string; data: any }> = [];
         pieDataWithTotal.forEach((item) => {
-            // Good - Hijau (soft)
-            if (item.color === '#00e676' || item.color === COLORS.green || item.color === COLORS.greenSoft || item.name.toLowerCase() === 'good') {
+            const nameLower = item.name.toLowerCase();
+            // Good / Good PQC - Hijau (soft)
+            if (item.color === COLORS.greenSoft || item.color === '#00e676' || item.color === COLORS.green || nameLower === 'good' || nameLower.includes('good pqc')) {
                 mapping.push({ colorKey: 'green', color: item.color, name: item.name, data: item });
             }
+            // Target / Sisa Output - Biru (tetap biru, tidak berubah saat target tercapai)
+            else if (nameLower === 'target' || nameLower.includes('sisa target') || item.color === COLORS.blueGray) {
+                mapping.push({ colorKey: 'blue', color: item.color || COLORS.blueSoft, name: item.name, data: item });
+            }
             // WIRA - Orange (soft)
-            else if (item.color === '#ff9100' || item.color === COLORS.orange || item.color === COLORS.orangeSoft || item.name.toLowerCase() === 'wira') {
+            else if (item.color === '#ff9100' || item.color === COLORS.orange || item.color === COLORS.orangeSoft || nameLower === 'wira') {
                 mapping.push({ colorKey: 'orange', color: item.color, name: item.name, data: item });
             }
             // Reject - Merah (soft)
-            else if (item.color === '#ff1744' || item.color === COLORS.red || item.color === COLORS.redSoft || item.name.toLowerCase() === 'reject') {
+            else if (item.color === '#ff1744' || item.color === COLORS.red || item.color === COLORS.redSoft || nameLower === 'reject') {
                 mapping.push({ colorKey: 'red', color: item.color, name: item.name, data: item });
             }
             // Sisa Output - Abu ke biruan
-            else if (item.color === '#2979ff' || item.color === COLORS.blue || item.color === COLORS.blueGray || item.name.toLowerCase().includes('sisa')) {
+            else if (item.color === '#2979ff' || item.color === COLORS.blue || nameLower.includes('sisa')) {
                 mapping.push({ colorKey: 'blue', color: COLORS.blueGray, name: item.name, data: item });
             }
         });

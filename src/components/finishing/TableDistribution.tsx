@@ -34,7 +34,7 @@ export const TableDistribution = memo(({ data, themeColor = 'sky', onExport, tit
      <table className="w-full text-left border-collapse">
       <thead className="bg-slate-50/90 backdrop-blur sticky top-0 z-10 shadow-sm">
        <tr>
-        {['Line', 'WO', 'Item', 'Waiting', 'Check In', 'Shipment'].map((h, i) => (
+        {['Line', 'WO', 'Item', 'Waiting', 'Check In', 'Check Out'].map((h, i) => (
          <th key={i} className="px-1.5 sm:px-2 py-1.5 font-bold text-slate-600 uppercase tracking-wider text-center" style={{ fontSize: 'clamp(8px, 1.1vw, 13px)' }}>
           {h === 'Check In' ? (
            <>
@@ -44,12 +44,12 @@ export const TableDistribution = memo(({ data, themeColor = 'sky', onExport, tit
              <span className="leading-tight">In</span>
             </div>
            </>
-          ) : h === 'Shipment' ? (
+          ) : h === 'Check Out' ? (
            <>
-            <span className="hidden lg:inline whitespace-nowrap">Shipment</span>
+            <span className="hidden lg:inline whitespace-nowrap">Check Out</span>
             <div className="lg:hidden flex flex-col items-center justify-center">
-             <span className="leading-tight">Ship</span>
-             <span className="leading-tight">ment</span>
+             <span className="leading-tight">Check</span>
+             <span className="leading-tight">Out</span>
             </div>
            </>
           ) : (

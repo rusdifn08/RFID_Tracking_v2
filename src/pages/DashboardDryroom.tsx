@@ -9,6 +9,7 @@ import {
   Droplet,
   TrendingUp, RefreshCw
 } from 'lucide-react';
+import dryroomIcon from '../assets/dryroom_icon.webp';
 
 // --- IMPORTS COMPONENTS ---
 import Sidebar from '../components/Sidebar';
@@ -333,7 +334,7 @@ export default function DashboardDryroom() {
 
               {/* BAGIAN TENGAH: PIE CHART - Full width di mobile */}
               <div className="flex-none w-full min-h-[250px]">
-                <Card title="Status Distribution Dryroom" icon={Droplet}>
+                <Card title="Status Distribution Dryroom" icon={Droplet} iconImage={{ src: dryroomIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}>
                   <div className="flex items-center justify-between h-full min-h-0 px-2 gap-2">
                     <div className="flex-1 h-full min-h-0 relative">
                       <ResponsiveContainer width="100%" height="100%">
@@ -472,7 +473,7 @@ export default function DashboardDryroom() {
 
                 {/* RIGHT: PIE CHART */}
                 <div className="col-span-12 md:col-span-5 min-h-0 flex flex-col">
-                  <Card title="Status Distribution Dryroom" icon={Droplet}>
+                  <Card title="Status Distribution Dryroom" icon={Droplet} iconImage={{ src: dryroomIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}>
                     <div className="flex items-center justify-between h-full min-h-0 px-2 gap-2">
                       <div className="flex-1 h-full min-h-0 relative">
                         <ResponsiveContainer width="100%" height="100%">

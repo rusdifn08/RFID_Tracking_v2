@@ -146,7 +146,7 @@ const StatusCardsGrid = memo(({ qcData, pqcData, onCardClick, lineId }: StatusCa
                                         <div className="flex items-center justify-between px-1">
                                             <span className="font-semibold text-gray-600 " style={{
                                                 fontSize: 'clamp(0.625vw, 2.111vh, 2.083vw)'
-                                            }}>Shipment</span>
+                                            }}>Check Out</span>
                                             <span className="font-bold text-blue-900 items-center content-center justify-center mr-4" style={{
                                                 fontSize: 'clamp(1.25vw, 2.222vh, 5vw)'
                                             }}>{isLoadingFinishing ? '...' : foldingData.checkout.toLocaleString()}</span>

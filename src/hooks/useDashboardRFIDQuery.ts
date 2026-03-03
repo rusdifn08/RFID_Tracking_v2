@@ -415,16 +415,22 @@ const fetchWoData = async (lineId: string, filterWo: string, filterDateFrom?: st
 
 export const useDashboardRFIDQuery = (lineId: string) => {
     // Get filter dan modal states dari store dengan useShallow untuk mencegah re-render
-    const { filterWo, filterDateFrom, filterDateTo, isDateFilterActive, showExportModal, showDateFilterModal } = useDashboardStore(
+    const { filterWo, filterDateFrom, filterDateTo, appliedFilterDateFrom, appliedFilterDateTo, isDateFilterActive, showExportModal, showDateFilterModal } = useDashboardStore(
         useShallow((state) => ({
             filterWo: state.filterWo,
             filterDateFrom: state.filterDateFrom,
             filterDateTo: state.filterDateTo,
+            appliedFilterDateFrom: state.appliedFilterDateFrom,
+            appliedFilterDateTo: state.appliedFilterDateTo,
             isDateFilterActive: state.isDateFilterActive,
             showExportModal: state.showExportModal,
             showDateFilterModal: state.showDateFilterModal,
         }))
     );
+
+    // Tanggal yang dipakai untuk API: hanya applied dates (berubah saat klik Search), bukan nilai input
+    const dateFromForApi = isDateFilterActive ? (appliedFilterDateFrom || undefined) : undefined;
+    const dateToForApi = isDateFilterActive ? (appliedFilterDateTo || undefined) : undefined;
 
     // ============================================
     // LOGIKA: API POLLING (DEFAULT) vs FILTER TANGGAL
@@ -432,35 +438,18 @@ export const useDashboardRFIDQuery = (lineId: string) => {
     // DEFAULT: Gunakan API /wira dengan polling setiap 1 detik (tanpa filter tanggal)
     // FILTER AKTIF: Gunakan API /wira?tanggalfrom={from}&tanggalto={to} (setelah klik search)
     // ============================================
-    // NOTE: WebSocket hook tetap ada di file useWiraDashboardWebSocket.ts untuk digunakan kembali nanti
-    
-    // Filter tanggal aktif hanya jika:
-    // 1. User sudah klik search (isDateFilterActive = true)
-    // 2. Dan ada minimal satu tanggal yang diisi
-    const hasDateFilter = isDateFilterActive && !!(filterDateFrom?.trim() || filterDateTo?.trim());
+    const hasDateFilter = isDateFilterActive && !!(appliedFilterDateFrom?.trim() || appliedFilterDateTo?.trim());
 
-    // ============================================
-    // DEFAULT: API /wira dengan polling setiap 1 detik
-    // ============================================
-    // API: /wira (tanpa parameter, mengembalikan data hari ini untuk semua line)
-    // Filter berdasarkan line dilakukan di client-side setelah data diterima
-    // Query key hanya include tanggal jika filter aktif (untuk mencegah refetch saat user hanya mengubah tanggal tanpa klik search)
-    const trackingDataQueryKey = ['dashboard-tracking', lineId, filterWo || '', isDateFilterActive, isDateFilterActive ? (filterDateFrom || '') : '', isDateFilterActive ? (filterDateTo || '') : ''] as const;
+    const trackingDataQueryKey = ['dashboard-tracking', lineId, filterWo || '', isDateFilterActive, dateFromForApi || '', dateToForApi || ''] as const;
     
     const trackingDataQuery = useQuery({
         queryKey: trackingDataQueryKey,
         queryFn: () => {
-            // Hanya kirim parameter tanggal jika filter aktif (setelah klik search)
-            const dateFrom = isDateFilterActive ? (filterDateFrom || undefined) : undefined;
-            const dateTo = isDateFilterActive ? (filterDateTo || undefined) : undefined;
-            
-            // Panggil API /wira dengan atau tanpa parameter filter tanggal
-            // Format: /wira (default) atau /wira?tanggalfrom={from}&tanggalto={to}
             return fetchTrackingDataFromAPI(
-                lineId, 
-                filterWo || undefined, 
-                dateFrom, 
-                dateTo
+                lineId,
+                filterWo || undefined,
+                dateFromForApi,
+                dateToForApi
             );
         },
         enabled: true, // Selalu aktif (baik dengan atau tanpa filter tanggal)
@@ -500,16 +489,12 @@ export const useDashboardRFIDQuery = (lineId: string) => {
 
     // Query key untuk WO data - include filter tanggal
     // Query key untuk WO data - hanya include tanggal jika filter aktif (untuk mencegah refetch saat user hanya mengubah tanggal tanpa klik search)
-    const woDataQueryKey = ['dashboard-wo', lineId, filterWo || '', isDateFilterActive, isDateFilterActive ? (filterDateFrom || '') : '', isDateFilterActive ? (filterDateTo || '') : ''] as const;
+    const woDataQueryKey = ['dashboard-wo', lineId, filterWo || '', isDateFilterActive, dateFromForApi || '', dateToForApi || ''] as const;
 
-    // Query untuk WO data dengan polling setiap 5 detik
     const woDataQuery = useQuery({
         queryKey: woDataQueryKey,
         queryFn: () => {
-            // Hanya kirim parameter tanggal jika filter aktif (setelah klik search)
-            const dateFrom = isDateFilterActive ? (filterDateFrom || undefined) : undefined;
-            const dateTo = isDateFilterActive ? (filterDateTo || undefined) : undefined;
-            return fetchWoData(lineId, filterWo || '', dateFrom, dateTo);
+            return fetchWoData(lineId, filterWo || '', dateFromForApi, dateToForApi);
         },
         refetchInterval: (query) => {
             // Hanya refetch jika query tidak dalam state loading/error

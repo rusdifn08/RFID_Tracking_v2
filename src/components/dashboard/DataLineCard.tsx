@@ -1,7 +1,7 @@
 import { memo, useMemo, useState, useRef, useEffect } from 'react';
-import { Table as TableIcon, Filter, Search, ChevronDown, Calendar } from 'lucide-react';
+import { Filter, Search, ChevronDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import ChartCard from './ChartCard';
-import excelIcon from '../../../assets/excel.png';
+import { ExportButton } from '../finishing/ExportButton';
 
 interface DataLineCardProps {
     lineTitle: string;
@@ -15,9 +15,14 @@ interface DataLineCardProps {
     onWoChange: (wo: string) => void;
     onSearchClick: () => void;
     onExportClick: () => void;
+    /** Navigasi ke dashboard line previous/next (hanya untuk halaman dashboard RFID) */
+    onPrevLine?: () => void;
+    onNextLine?: () => void;
+    hasPrev?: boolean;
+    hasNext?: boolean;
 }
 
-const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, filterWo, availableWOList, onDateFromChange, onDateToChange, onWoChange, onSearchClick, onExportClick }: DataLineCardProps) => {
+const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, filterWo, availableWOList, onDateFromChange, onDateToChange, onWoChange, onSearchClick, onExportClick, onPrevLine, onNextLine, hasPrev = false, hasNext = false }: DataLineCardProps) => {
     const [showWoDropdown, setShowWoDropdown] = useState(false);
     const [woSearchTerm, setWoSearchTerm] = useState('');
     const woDropdownRef = useRef<HTMLDivElement>(null);
@@ -144,30 +149,34 @@ const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, fi
                                 </>
                             ) : (
                                 <>
-                                    {/* Desktop/Tablet: Input date normal */}
-                                    <input
-                                        type="date"
-                                        value={filterDateFrom}
-                                        onChange={(e) => onDateFromChange(e.target.value)}
-                                        className="px-2.5 py-1.5 xs:px-3 xs:py-2 sm:px-3.5 sm:py-2 bg-blue-50 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 text-xs sm:text-sm text-blue-700 placeholder-blue-300"
-                                        style={{
-                                            fontFamily: 'Poppins, sans-serif',
-                                            width: 'clamp(90px, 10vw, 130px)',
-                                            maxWidth: '130px'
-                                        }}
-                                    />
+                                    {/* Desktop/Tablet: Input date dengan icon di kanan, format dd/mm/yyyy */}
+                                    <div className="relative inline-block">
+                                        <input
+                                            type="date"
+                                            lang="id-ID"
+                                            value={filterDateFrom}
+                                            onChange={(e) => onDateFromChange(e.target.value)}
+                                            className="date-filter-input py-1.5 xs:py-2 sm:py-2  xs:pl-3 sm:pl-3.5  bg-blue-50 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 text-xs sm:text-sm text-blue-700 placeholder-blue-300 w-full min-w-[128px] max-w-[140px]"
+                                            style={{ fontFamily: 'Poppins, sans-serif' }}
+                                        />
+                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-blue-600 flex items-center justify-center">
+                                            <Calendar className="w-4 h-4" strokeWidth={2.5} />
+                                        </span>
+                                    </div>
                                     <span className="text-blue-400 font-medium text-xs sm:text-sm">-</span>
-                                    <input
-                                        type="date"
-                                        value={filterDateTo}
-                                        onChange={(e) => onDateToChange(e.target.value)}
-                                        className="px-2.5 py-1.5 xs:px-3 xs:py-2 sm:px-3.5 sm:py-2 bg-blue-50 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 text-xs sm:text-sm text-blue-700 placeholder-blue-300"
-                                        style={{
-                                            fontFamily: 'Poppins, sans-serif',
-                                            width: 'clamp(90px, 10vw, 130px)',
-                                            maxWidth: '130px'
-                                        }}
-                                    />
+                                    <div className="relative inline-block">
+                                        <input
+                                            type="date"
+                                            lang="id-ID"
+                                            value={filterDateTo}
+                                            onChange={(e) => onDateToChange(e.target.value)}
+                                            className="date-filter-input py-1.5 xs:py-2 sm:py-2 pl-2.5 xs:pl-3 sm:pl-3.5  bg-blue-50 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 text-xs sm:text-sm text-blue-700 placeholder-blue-300 w-full min-w-[128px] max-w-[140px]"
+                                            style={{ fontFamily: 'Poppins, sans-serif' }}
+                                        />
+                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-blue-600 flex items-center justify-center">
+                                            <Calendar className="w-4 h-4" strokeWidth={2.5} />
+                                        </span>
+                                    </div>
                                 </>
                             )}
                             <button
@@ -175,15 +184,11 @@ const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, fi
                                     // Trigger search/apply filter - aktifkan filter tanggal
                                     onSearchClick();
                                 }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-1.5 xs:p-2 flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-200"
+                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-1 px-2 min-h-[2rem] flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-200"
                                 title="Search"
                             >
                                 <Search
-                                    className="flex-shrink-0 text-white"
-                                    style={{
-                                        width: 'clamp(1rem, 2vw, 1.25rem)',
-                                        height: 'clamp(1rem, 2vw, 1.25rem)'
-                                    }}
+                                    className="flex-shrink-0 text-white w-4 h-4"
                                     strokeWidth={2.5}
                                 />
                             </button>
@@ -192,35 +197,18 @@ const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, fi
                         <div className="relative" ref={woDropdownRef}>
                             <button
                                 onClick={() => setShowWoDropdown(!showWoDropdown)}
-                                className="bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 hover:text-blue-800 rounded-lg border border-blue-200 hover:border-blue-300 flex items-center gap-1 xs:gap-1.5 sm:gap-2 justify-center shadow-sm hover:shadow-md transition-all duration-300 ease-in-out group relative overflow-hidden"
+                                className="bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 hover:text-blue-800 rounded-lg border border-blue-200 hover:border-blue-300 flex items-center gap-1 xs:gap-1.5 justify-center shadow-sm hover:shadow-md transition-all duration-300 ease-in-out group relative overflow-hidden py-1 px-2 min-h-[2rem] min-w-[2rem] w-auto max-w-[7rem]"
                                 title="Filter WO"
                                 style={{
                                     fontFamily: 'Poppins, sans-serif',
                                     fontWeight: 500,
-                                    fontSize: 'clamp(0.5rem, 1vw, 0.7rem)',
-                                    padding: '0.2rem 0.5rem',
-                                    minHeight: '2rem',
-                                    minWidth: '2rem',
-                                    width: 'clamp(2rem, 12vw, 8rem)'
+                                    fontSize: 'clamp(0.625rem, 1vw, 0.75rem)'
                                 }}
                             >
-                                <Filter
-                                    className="flex-shrink-0 text-blue-600"
-                                    style={{
-                                        width: 'clamp(1.5rem, 3vw, 1.5rem)',
-                                        height: 'clamp(1.5rem, 3vw, 1.5rem)',
-                                        minWidth: '1.5rem',
-                                        minHeight: '1.5rem'
-                                    }}
-                                    strokeWidth={2}
-                                />
+                                <Filter className="flex-shrink-0 text-blue-600 w-4 h-4" strokeWidth={2} />
                                 <span className="whitespace-nowrap hidden sm:inline">Filter WO</span>
                                 <ChevronDown
-                                    className={`flex-shrink-0 text-blue-600 transition-transform duration-200 ${showWoDropdown ? 'rotate-180' : ''}`}
-                                    style={{
-                                        width: 'clamp(1rem, 2vw, 1.25rem)',
-                                        height: 'clamp(1rem, 2vw, 1.25rem)'
-                                    }}
+                                    className={`flex-shrink-0 text-blue-600 w-3.5 h-3.5 transition-transform duration-200 ${showWoDropdown ? 'rotate-180' : ''}`}
                                     strokeWidth={2}
                                 />
                             </button>
@@ -271,30 +259,33 @@ const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, fi
                                 </div>
                             )}
                         </div>
-                        <button
-                            onClick={onExportClick}
-                            className="bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 text-green-700 hover:text-green-800 rounded-lg border border-green-200 hover:border-green-300 shadow-sm hover:shadow-md transition-all duration-300 ease-in-out group relative flex items-center justify-center"
-                            title="Export Excel"
-                            style={{
-                                padding: '0.2rem',
-                                minWidth: '2rem',
-                                minHeight: '2rem'
-                            }}
-                        >
-                            <img
-                                src={excelIcon}
-                                alt="Export Excel"
-                                className="flex-shrink-0 object-contain"
-                                style={{
-                                    width: '1.5rem',
-                                    height: '1.5rem'
-                                }}
-                            />
-                        </button>
+                        {/* Tombol navigasi prev/next line (dashboard RFID) */}
+                        {typeof onPrevLine === 'function' && typeof onNextLine === 'function' && (
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={onPrevLine}
+                                    disabled={!hasPrev}
+                                    title="Line sebelumnya"
+                                    className="w-6 h-6 rounded-full flex items-center justify-center bg-white border border-blue-200 text-blue-600 hover:border-blue-300 hover:ring-1 hover:ring-blue-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
+                                >
+                                    <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onNextLine}
+                                    disabled={!hasNext}
+                                    title="Line berikutnya"
+                                    className="w-6 h-6 rounded-full flex items-center justify-center bg-white border border-blue-200 text-blue-600 hover:border-blue-300 hover:ring-1 hover:ring-blue-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
+                                >
+                                    <ChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+                                </button>
+                            </div>
+                        )}
+                        <ExportButton onClick={onExportClick} />
                     </div>
                 </>
             }
-            icon={TableIcon}
             className="h-full w-full"
         >
             <div className="w-full h-full overflow-hidden p-0 xs:p-0 sm:p-0.5 md:p-1 flex flex-col">
@@ -355,7 +346,7 @@ const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, fi
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full gap-1 xs:gap-1.5 sm:gap-2 text-slate-400 animate-pulse">
                         <div className="w-8 xs:w-10 sm:w-12 md:w-14 h-8 xs:h-10 sm:h-12 md:h-14 rounded-full bg-slate-100 flex items-center justify-center">
-                            <TableIcon size={16} className="xs:w-[18px] xs:h-[18px] sm:w-[20px] sm:h-[20px] md:w-[24px] md:h-[24px] opacity-50" />
+                            <div className="w-4 h-4 rounded bg-slate-300 opacity-50" />
                         </div>
                         <span className="text-[10px] xs:text-xs sm:text-sm md:text-base font-medium">Menunggu Data...</span>
                     </div>

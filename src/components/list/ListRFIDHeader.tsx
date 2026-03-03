@@ -41,13 +41,13 @@ const ListRFIDHeader = memo(({
                 </button>
                 <button
                     onClick={onExportClick}
-                    className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg shadow-sm transition-all flex items-center gap-2 font-medium text-sm"
+                    className="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg border border-emerald-200 hover:border-emerald-300 shadow-sm transition-all flex items-center gap-2 font-medium text-sm"
                     title="Export Excel"
                 >
                     <img 
                         src={excelIcon} 
                         alt="Export Excel" 
-                        className="w-4 h-4 object-contain"
+                        className="w-4 h-4 object-contain flex-shrink-0"
                     />
                     <span>Export</span>
                 </button>

@@ -407,9 +407,9 @@ export default function DashboardRFIDReject() {
                                 </button>
                                 <button
                                     onClick={() => setShowExportModal(true)}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-white bg-green-600 hover:bg-green-700 shadow-sm transition-all duration-200"
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-200 hover:border-emerald-300 shadow-sm transition-all duration-200"
                                 >
-                                    <Download className="w-3 h-3" />
+                                    <Download className="w-4 h-4 flex-shrink-0" />
                                     <span>Export</span>
                                 </button>
                             </div>

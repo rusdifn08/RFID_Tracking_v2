@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 interface ChartCardProps {
     children: ReactNode;
     title: string | ReactNode;
-    icon: LucideIcon;
+    icon?: LucideIcon;
     headerAction?: ReactNode;
     className?: string;
     style?: React.CSSProperties;
@@ -38,24 +38,26 @@ const ChartCard = memo(forwardRef<HTMLDivElement, ChartCardProps>(({ children, t
                     gap: 'clamp(0.375rem, 0.8vw + 0.2rem, 0.75rem)'
                 }}
             >
-                <div
-                    className="rounded-md sm:rounded-lg transition-all duration-300 shadow-sm group-hover:shadow-md flex-shrink-0 flex items-center justify-center"
-                    style={{
-                        backgroundColor: iconBgColor,
-                        color: iconColor,
-                        padding: 'clamp(0.375rem, 0.8vh, 0.625rem)'
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = iconColor;
-                        e.currentTarget.style.color = 'white';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = iconBgColor;
-                        e.currentTarget.style.color = iconColor;
-                    }}
-                >
-                    <Icon style={{ width: 'clamp(12px, 1.5vh, 18px)', height: 'clamp(12px, 1.5vh, 18px)' }} strokeWidth={2.5} />
-                </div>
+                {Icon && (
+                    <div
+                        className="rounded-md sm:rounded-lg transition-all duration-300 shadow-sm group-hover:shadow-md flex-shrink-0 flex items-center justify-center"
+                        style={{
+                            backgroundColor: iconBgColor,
+                            color: iconColor,
+                            padding: 'clamp(0.375rem, 0.8vh, 0.625rem)'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = iconColor;
+                            e.currentTarget.style.color = 'white';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = iconBgColor;
+                            e.currentTarget.style.color = iconColor;
+                        }}
+                    >
+                        <Icon style={{ width: 'clamp(12px, 1.5vh, 18px)', height: 'clamp(12px, 1.5vh, 18px)' }} strokeWidth={2.5} />
+                    </div>
+                )}
                 {typeof title === 'string' ? (
                     <h2 className="font-semibold text-gray-700 tracking-tight group-hover:text-blue-600 transition-colors flex-1 min-w-0" style={{ textTransform: 'capitalize', fontSize: 'clamp(0.875rem, 1.2vw + 0.5rem, 1.125rem)', fontWeight: 600 }}>{title}</h2>
                 ) : (

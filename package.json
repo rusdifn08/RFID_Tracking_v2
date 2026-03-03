@@ -18,7 +18,8 @@
     "dev:all:cln": "concurrently \"npm run server:cln\" \"npm run dev\"",
     "dev:all:mjl": "concurrently \"npm run server:mjl\" \"npm run dev\"",
     "dev:all:mjl2": "concurrently \"npm run server:mjl2\" \"npm run dev:mjl2\"",
-    "test:websocket": "node test-websocket.cjs"
+    "test:websocket": "node test-websocket.cjs",
+    "test:mqtt": "node test-mqtt-publish.js"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -33,6 +34,7 @@
     "exceljs": "^4.4.0",
     "express": "^4.18.2",
     "lucide-react": "^0.554.0",
+    "mqtt": "^5.15.0",
     "mysql2": "^3.15.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

@@ -25,16 +25,20 @@ interface DashboardState extends DashboardData {
     showDateFilterModal: boolean;
     setShowDateFilterModal: (show: boolean) => void;
     
-    // Filter states
+    // Filter states (nilai di input - bisa diubah user kapan saja)
     filterDateFrom: string;
     setFilterDateFrom: (date: string) => void;
     filterDateTo: string;
     setFilterDateTo: (date: string) => void;
     filterWo: string;
     setFilterWo: (wo: string) => void;
-    // State untuk tracking apakah filter tanggal sudah di-apply (setelah klik search)
+    // Tanggal yang benar-benar dipakai untuk API (hanya berubah saat klik Search)
+    appliedFilterDateFrom: string;
+    appliedFilterDateTo: string;
     isDateFilterActive: boolean;
     setIsDateFilterActive: (active: boolean) => void;
+    applyDateFilter: () => void;
+    resetFiltersToDefault: () => void;
 }
 
 const initialState: DashboardData = {
@@ -80,10 +84,28 @@ export const useDashboardStore = create<DashboardState>()(
         
         filterWo: '',
         setFilterWo: (wo) => set({ filterWo: wo }),
-        
-        // State untuk tracking apakah filter tanggal sudah di-apply
+
+        appliedFilterDateFrom: new Date().toISOString().split('T')[0],
+        appliedFilterDateTo: new Date().toISOString().split('T')[0],
         isDateFilterActive: false,
         setIsDateFilterActive: (active) => set({ isDateFilterActive: active }),
+        applyDateFilter: () => set((state) => ({
+            appliedFilterDateFrom: state.filterDateFrom || new Date().toISOString().split('T')[0],
+            appliedFilterDateTo: state.filterDateTo || new Date().toISOString().split('T')[0],
+            isDateFilterActive: true,
+        })),
+
+        resetFiltersToDefault: () => {
+            const today = new Date().toISOString().split('T')[0];
+            set({
+                filterDateFrom: today,
+                filterDateTo: today,
+                appliedFilterDateFrom: today,
+                appliedFilterDateTo: today,
+                filterWo: '',
+                isDateFilterActive: false,
+            });
+        },
     }))
 );
 
@@ -109,6 +131,8 @@ export const selectModalStates = (state: DashboardState) => ({
 export const selectFilterStates = (state: DashboardState) => ({
     filterDateFrom: state.filterDateFrom,
     filterDateTo: state.filterDateTo,
+    appliedFilterDateFrom: state.appliedFilterDateFrom,
+    appliedFilterDateTo: state.appliedFilterDateTo,
     filterWo: state.filterWo,
     isDateFilterActive: state.isDateFilterActive,
 });

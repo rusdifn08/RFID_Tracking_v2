@@ -182,16 +182,16 @@ export default function ExportModal({ isOpen, onClose, onExport, lineId = '1' }:
                     <button
                         onClick={handleExport}
                         disabled={isExporting}
-                        className="px-4 xs:px-5 py-1.5 xs:py-2 text-[10px] xs:text-xs sm:text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 xs:gap-2"
+                        className="px-4 xs:px-5 py-1.5 xs:py-2 text-[10px] xs:text-xs sm:text-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold rounded-lg border border-emerald-200 hover:border-emerald-300 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 xs:gap-2"
                     >
                         {isExporting ? (
                             <>
-                                <div className="w-3 xs:w-3.5 h-3 xs:h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                <div className="w-3 xs:w-3.5 h-3 xs:h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
                                 <span>Mengekspor...</span>
                             </>
                         ) : (
                             <>
-                                <Download className="w-3 xs:w-3.5 h-3 xs:h-3.5" />
+                                <Download className="w-3 xs:w-3.5 h-3 xs:h-3.5 flex-shrink-0" />
                                 <span>Export</span>
                             </>
                         )}

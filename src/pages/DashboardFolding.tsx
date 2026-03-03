@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import { useSidebar } from '../context/SidebarContext';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Layers, Scan, RefreshCw, TrendingUp, X } from 'lucide-react';
+import foldingIcon from '../assets/folding_icon.webp';
 import { getFinishingData, getFinishingDataByLine, API_BASE_URL, getDefaultHeaders, getActiveUsers, getScanningUsers } from '../config/api';
 import ScanningFinishingModal from '../components/ScanningFinishingModal';
 import { productionLinesMJL } from '../data/production_line';
@@ -896,7 +897,7 @@ export default function DashboardFolding() {
                       }}
                     />
                     <MetricCard
-                      label="Shipment"
+                      label="Check Out"
                       value={foldingCheckOut}
                       type="checkout"
                       onClick={() => {
@@ -1008,7 +1009,7 @@ export default function DashboardFolding() {
 
               {/* BAGIAN BAWAH: TABLE CARDS - Full width di mobile */}
               <div className="flex-none w-full min-h-[400px]">
-                <Card title="Shipment Station Folding" icon={Layers}>
+                <Card title="Shipment Station Folding" icon={Layers} iconImage={{ src: foldingIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}>
                   <div className="flex-1 min-h-0 overflow-hidden relative rounded-xl border border-slate-200 mt-1 bg-white">
                     <div className="absolute inset-0 overflow-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent p-2">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 h-full">
@@ -1180,7 +1181,7 @@ export default function DashboardFolding() {
                         }}
                       />
                       <MetricCard
-                        label="Shipment"
+                        label="Check Out"
                         value={foldingCheckOut}
                         type="checkout"
                         onClick={() => {
@@ -1298,7 +1299,7 @@ export default function DashboardFolding() {
 
                 {/* RIGHT: TABLE CARDS */}
                 <div className="col-span-12 md:col-span-6 min-h-0 flex flex-col">
-                  <Card title="Shipment Station Folding" icon={Layers}>
+                  <Card title="Shipment Station Folding" icon={Layers} iconImage={{ src: foldingIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}>
                     <div className="flex-1 min-h-0 overflow-hidden relative rounded-xl border border-slate-200 mt-1 bg-white">
                       <div className="absolute inset-0 overflow-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent p-2">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 h-full">

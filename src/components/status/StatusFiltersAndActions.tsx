@@ -58,12 +58,12 @@ const StatusFiltersAndActions = memo(({
                 <button
                     onClick={onExport}
                     disabled={!hasItems}
-                    className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 flex items-center gap-2"
+                    className="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 disabled:bg-gray-200 disabled:cursor-not-allowed text-emerald-800 disabled:text-gray-500 font-medium rounded-lg border border-emerald-200 hover:border-emerald-300 transition-all duration-200 flex items-center gap-2"
                 >
                     <img 
                         src={excelIcon} 
                         alt="Export Excel" 
-                        className="w-4 h-4 object-contain"
+                        className="w-4 h-4 object-contain flex-shrink-0"
                     />
                     Export
                 </button>

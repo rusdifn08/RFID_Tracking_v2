@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import WebSocket from 'ws';
+import mqtt from 'mqtt';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,6 +85,23 @@ const BACKEND_PORT = 7000;
 
 // Backend API URL - menggunakan IP yang sudah dikonfigurasi dengan port yang sesuai
 const BACKEND_API_URL = process.env.BACKEND_API_URL || `http://${BACKEND_IP}:${BACKEND_PORT}`;
+
+// MQTT Broker - sama untuk semua environment (MJL, MJL2, CLN)
+const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://10.5.0.106:1883';
+const MQTT_OPTIONS = {
+    connectTimeout: 10000,
+    keepalive: 60,
+    clean: true,
+    reconnectPeriod: 4000,
+    clientId: `server_${CURRENT_ENV}_${Math.random().toString(36).slice(2, 10)}`,
+};
+
+// Daftar nomor line per environment (sesuai data production line: CLN 5 line, MJL 16, MJL2 9)
+function getMqttLineNumbers() {
+    if (CURRENT_ENV === 'MJL') return Array.from({ length: 16 }, (_, i) => i + 1);
+    if (CURRENT_ENV === 'MJL2') return Array.from({ length: 9 }, (_, i) => i + 1);
+    return Array.from({ length: 5 }, (_, i) => i + 1); // CLN default
+}
 
 // API Key untuk MJL dan CLN (sama untuk semua environment)
 const API_KEY = '6lYZkryM.j50CVZgnpBl8X7Nx6sy5KRyY6ET7k3Cb';
@@ -4171,6 +4189,25 @@ app.get('/api/folding/count', (req, res) => {
 });
 
 // ============================================
+// MQTT LOGIN SUCCESS - Polling untuk dashboard (animasi login)
+// ============================================
+const MQTT_LOGIN_EVENT_TTL_MS = 5000;
+
+app.get('/api/mqtt-login-success', (req, res) => {
+    try {
+        const now = Date.now();
+        const event = lastMqttLoginEvent;
+        if (event && (now - event.at) < MQTT_LOGIN_EVENT_TTL_MS) {
+            return res.json({ success: true, event });
+        }
+        if (event) lastMqttLoginEvent = null;
+        return res.json({ success: true, event: null });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ============================================
 // ERROR HANDLING
 // ============================================
 
@@ -4194,6 +4231,75 @@ app.use((err, req, res, next) => {
         message: err.message
     });
 });
+
+// ============================================
+// MQTT CLIENT - Konektivitas & Log Pesan
+// ============================================
+
+let mqttClient = null;
+/** Event login terakhir dari MQTT, untuk diteruskan ke dashboard via polling */
+let lastMqttLoginEvent = null;
+
+function startMqttClient() {
+    if (mqttClient) {
+        try { mqttClient.end(true); } catch (_) {}
+        mqttClient = null;
+    }
+
+    console.log(`\n📡 [MQTT] Connecting to broker: ${MQTT_BROKER_URL} ...`);
+
+    try {
+        mqttClient = mqtt.connect(MQTT_BROKER_URL, MQTT_OPTIONS);
+    } catch (err) {
+        console.error('❌ [MQTT] Connect error:', err.message);
+        return;
+    }
+
+    mqttClient.on('message', (topic, payload) => {
+        const payloadStr = (payload ? payload.toString() : '').trim();
+        const time = new Date().toISOString();
+        console.log(`📩 [MQTT] Message received | ${time}`);
+        console.log(`   Topic: ${topic}`);
+        console.log(`   Payload: ${payloadStr}`);
+
+        if (payloadStr.toLowerCase() !== 'success') return;
+        const match = topic.match(/^line(\d+)\/(qc|pqc)\/(cln|mjl|mjl2)$/);
+        if (!match) return;
+        lastMqttLoginEvent = { line: match[1], role: match[2], at: Date.now() };
+    });
+
+    mqttClient.on('connect', () => {
+        console.log('✅ [MQTT] CONNECTED');
+        console.log(`   Broker: ${MQTT_BROKER_URL}`);
+        console.log(`   Client ID: ${MQTT_OPTIONS.clientId}`);
+        // Topic per line + environment: line1/qc/mjl, line1/pqc/mjl, ... (env = cln | mjl | mjl2)
+        const envLower = CURRENT_ENV.toLowerCase();
+        const lineNumbers = getMqttLineNumbers();
+        const topics = [];
+        lineNumbers.forEach((n) => {
+            topics.push(`line${n}/qc/${envLower}`);
+            topics.push(`line${n}/pqc/${envLower}`);
+        });
+        console.log(`   Subscribed ${topics.length} topics (line{N}/qc|pqc/${envLower}). Siap menerima pesan.\n`);
+        topics.forEach((topic) => {
+            mqttClient.subscribe(topic, { qos: 0 }, (err) => {
+                if (err) console.error(`❌ [MQTT] Subscribe error [${topic}]:`, err.message);
+            });
+        });
+    });
+
+    mqttClient.on('offline', () => {
+        console.log('⚠️ [MQTT] OFFLINE (disconnected)');
+    });
+
+    mqttClient.on('close', () => {
+        console.log('⚠️ [MQTT] Connection CLOSED');
+    });
+
+    mqttClient.on('error', (err) => {
+        console.error('❌ [MQTT] Error:', err.message);
+    });
+}
 
 // ============================================
 // START SERVER
@@ -4240,6 +4346,8 @@ app.listen(PORT, HOST, () => {
         console.error(`   Error: ${err.message}`);
     });
 
+    // Start MQTT client (connect & log pesan)
+    startMqttClient();
 
     // Load active sessions dari file saat server start
     loadActiveSessionsFromFile();

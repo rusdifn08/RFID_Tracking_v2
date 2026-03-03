@@ -1,9 +1,14 @@
 import { memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import ChartCard from './ChartCard';
-import { BarChart3, Droplets, Package, XCircle } from 'lucide-react';
+import { BarChart3, XCircle } from 'lucide-react';
+import dryroomIcon from '../../assets/dryroom_icon.webp';
+import foldingIcon from '../../assets/folding_icon.webp';
 import { DEFAULT_ROOM_STATUS_ENABLED } from './constants';
 import { getFinishingDataByLine } from '../../config/api';
+
+// Filter CSS agar icon webp tampil biru (#0284C7) sesuai tema Room Status
+const iconBlueFilter = 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)';
 
 interface RoomStatusCardProps {
     lineId?: string;
@@ -41,7 +46,7 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
         <ChartCard
             title="Room Status"
             icon={BarChart3}
-            className="w-full h-full flex flex-col"
+            className="w-full h-full flex flex-col border-sky-500"
         >
             <div
                 className="flex flex-col h-full w-full min-h-0 overflow-hidden"
@@ -61,7 +66,7 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                 >
                     {/* Dryroom Card */}
                     <div
-                        className="relative flex flex-col rounded-lg xs:rounded-xl border border-blue-500 hover:shadow-md transition-all duration-300 cursor-pointer group overflow-hidden h-full"
+                        className="relative flex flex-col rounded-lg xs:rounded-xl border border-sky-500 hover:shadow-md transition-all duration-300 cursor-pointer group overflow-hidden h-full"
                         style={{
                             padding: 'clamp(0.125rem, 0.4vw + 0.1rem, 0.375rem)'
                         }}
@@ -74,16 +79,18 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 marginBottom: 'clamp(0.125rem, 0.4vw + 0.1rem, 0.375rem)'
                             }}
                         >
-                            <Droplets
+                            <img
+                                src={dryroomIcon}
+                                alt=""
+                                className="flex-shrink-0 object-contain"
                                 style={{
                                     width: 'clamp(10px, 1.2vw + 4px, 18px)',
-                                    height: 'clamp(10px, 1.2vw + 4px, 18px)'
+                                    height: 'clamp(10px, 1.2vw + 4px, 18px)',
+                                    filter: iconBlueFilter
                                 }}
-                                className="text-blue-600 flex-shrink-0"
-                                strokeWidth={2.5}
-                                stroke="#0284C7"
+                                aria-hidden
                             />
-                            <h3 className="font-extrabold tracking-widest text-blue-600 truncate" style={{
+                            <h3 className="font-extrabold tracking-widest text-sky-600 truncate" style={{
                                 textTransform: 'uppercase',
                                 fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)'
                             }}>Dryroom</h3>
@@ -95,48 +102,48 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 gap: 'clamp(0.25rem, 0.5vw + 0.15rem, 0.5rem)'
                             }}
                         >
-                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-blue-300 hover:bg-blue-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
+                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-sky-300 hover:bg-sky-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
                                 paddingTop: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingBottom: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingLeft: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-blue-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
                                 }}>Waiting</h4>
-                                <span className="font-bold text-blue-900 flex-shrink-0" style={{
+                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
                                 }}>{isLoadingFinishing ? '...' : dryroomData.waiting.toLocaleString()}</span>
                             </div>
-                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-blue-300 hover:bg-blue-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
+                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-sky-300 hover:bg-sky-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
                                 paddingTop: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingBottom: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingLeft: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-blue-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
                                 }}>In</h4>
-                                <span className="font-bold text-blue-900 flex-shrink-0" style={{
+                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
                                 }}>{isLoadingFinishing ? '...' : dryroomData.checkin.toLocaleString()}</span>
                             </div>
-                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-blue-300 hover:bg-blue-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
+                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-sky-300 hover:bg-sky-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
                                 paddingTop: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingBottom: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingLeft: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-blue-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
                                 }}>Out</h4>
-                                <span className="font-bold text-blue-900 flex-shrink-0" style={{
+                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
                                 }}>{isLoadingFinishing ? '...' : dryroomData.checkout.toLocaleString()}</span>
                             </div>
@@ -144,7 +151,7 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                     </div>
                     {/* Folding Card */}
                     <div
-                        className="relative flex flex-col bg-white rounded-lg xs:rounded-xl border border-blue-500 hover:shadow-md transition-all duration-300 cursor-pointer group overflow-hidden h-full"
+                        className="relative flex flex-col bg-white rounded-lg xs:rounded-xl border border-sky-500 hover:shadow-md transition-all duration-300 cursor-pointer group overflow-hidden h-full"
                         style={{
                             padding: 'clamp(0.125rem, 0.4vw + 0.1rem, 0.375rem)'
                         }}
@@ -157,69 +164,71 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 marginBottom: 'clamp(0.125rem, 0.4vw + 0.1rem, 0.375rem)'
                             }}
                         >
-                            <Package
+                            <img
+                                src={foldingIcon}
+                                alt=""
+                                className="flex-shrink-0 object-contain"
                                 style={{
                                     width: 'clamp(10px, 1.2vw + 4px, 18px)',
-                                    height: 'clamp(10px, 1.2vw + 4px, 18px)'
+                                    height: 'clamp(10px, 1.2vw + 4px, 18px)',
+                                    filter: iconBlueFilter
                                 }}
-                                className="text-blue-600 flex-shrink-0"
-                                strokeWidth={2.5}
-                                stroke="#0284C7"
+                                aria-hidden
                             />
-                            <h3 className="font-extrabold tracking-widest text-blue-600 truncate" style={{
+                            <h3 className="font-extrabold tracking-widest text-sky-600 truncate" style={{
                                 textTransform: 'uppercase',
                                 fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)'
                             }}>Folding</h3>
                         </div>
-                        {/* 3 card kecil: Waiting, In, Shipment - vertikal ke bawah */}
+                        {/* 3 card kecil: Waiting, In, Out - vertikal ke bawah */}
                         <div
                             className="flex-1 flex flex-col min-h-0 overflow-hidden"
                             style={{
                                 gap: 'clamp(0.25rem, 0.5vw + 0.15rem, 0.5rem)'
                             }}
                         >
-                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-blue-300 hover:bg-blue-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
+                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-sky-300 hover:bg-sky-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
                                 paddingTop: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingBottom: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingLeft: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-blue-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
                                 }}>Waiting</h4>
-                                <span className="font-bold text-blue-900 flex-shrink-0" style={{
+                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
                                 }}>{isLoadingFinishing ? '...' : foldingData.waiting.toLocaleString()}</span>
                             </div>
-                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-blue-300 hover:bg-blue-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
+                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-sky-300 hover:bg-sky-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
                                 paddingTop: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingBottom: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingLeft: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-blue-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
                                 }}>In</h4>
-                                <span className="font-bold text-blue-900 flex-shrink-0" style={{
+                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
                                 }}>{isLoadingFinishing ? '...' : foldingData.checkin.toLocaleString()}</span>
                             </div>
-                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-blue-300 hover:bg-blue-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
+                            <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-sky-300 hover:bg-sky-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
                                 paddingTop: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingBottom: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 paddingLeft: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-blue-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
-                                }}>Shipment</h4>
-                                <span className="font-bold text-blue-900 flex-shrink-0" style={{
+                                }}>Out</h4>
+                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
                                     fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
                                 }}>{isLoadingFinishing ? '...' : foldingData.checkout.toLocaleString()}</span>
                             </div>
@@ -229,7 +238,7 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                 {/* Bagian Bawah: Reject Room - sama tinggi dengan bagian atas */}
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden" style={{ flex: '1 1 50%', minHeight: '0' }}>
                     <div
-                        className="relative flex flex-col h-full bg-white rounded-lg xs:rounded-xl border border-blue-500 hover:shadow-md transition-all duration-300 group overflow-hidden"
+                        className="relative flex flex-col h-full bg-white rounded-lg xs:rounded-xl border border-sky-500 hover:shadow-md transition-all duration-300 group overflow-hidden"
                         style={{
                             padding: 'clamp(0.125rem, 0.4vw + 0.1rem, 0.375rem)'
                         }}
@@ -247,11 +256,11 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                     width: 'clamp(10px, 1.2vw + 4px, 18px)',
                                     height: 'clamp(10px, 1.2vw + 4px, 18px)'
                                 }}
-                                className="text-blue-600 flex-shrink-0"
+                                className="text-sky-600 flex-shrink-0"
                                 strokeWidth={2.5}
-                                stroke="#0284C7"
+                                stroke="#0284c7"
                             />
-                            <h3 className="font-extrabold tracking-widest text-blue-600 truncate" style={{
+                            <h3 className="font-extrabold tracking-widest text-sky-600 truncate" style={{
                                 textTransform: 'uppercase',
                                 fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)'
                             }}>Reject Room</h3>

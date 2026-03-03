@@ -25,6 +25,8 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { useSidebar } from '../context/SidebarContext';
 import backgroundImage from '../assets/background.jpg';
+import dryroomIcon from '../assets/dryroom_icon.webp';
+import foldingIcon from '../assets/folding_icon.webp';
 import ExportModal from '../components/ExportModal';
 import { exportFinishingAllToExcel } from '../utils/exportFinishingAllToExcel';
 import { getFinishingData, getFinishingDataByLine, API_BASE_URL, getDefaultHeaders } from '../config/api';
@@ -359,6 +361,7 @@ export default function DashboardRFIDFinishing() {
                                 <Card
                                     title="Dryroom Station Finishing"
                                     icon={Droplet}
+                                    iconImage={{ src: dryroomIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}
                                     className="w-full h-full min-h-[180px] border-l-4 border-l-cyan-400"
                                     iconColor="text-cyan-600"
                                     action={<ScanButton onClick={() => setShowDryroomScanModal(true)} color="cyan" />}
@@ -410,6 +413,7 @@ export default function DashboardRFIDFinishing() {
                                 <Card
                                     title="Folding Station Finishing"
                                     icon={Layers}
+                                    iconImage={{ src: foldingIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}
                                     className="w-full h-full min-h-[180px] border-l-4 border-l-teal-400"
                                     iconColor="text-teal-600"
                                     action={<ScanButton onClick={() => setShowFoldingScanModal(true)} color="teal" />}
@@ -441,7 +445,7 @@ export default function DashboardRFIDFinishing() {
                                             }}
                                         />
                                         <MetricCard
-                                            label="Shipment"
+                                            label="Check Out"
                                             value={foldingCheckOut}
                                             type="checkout"
                                             compact
@@ -670,6 +674,7 @@ export default function DashboardRFIDFinishing() {
                                 <Card
                                     title="Dryroom Station Finishing"
                                     icon={Droplet}
+                                    iconImage={{ src: dryroomIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}
                                     className="flex-[0.3] min-h-0 border-l-4 border-l-cyan-400"
                                     iconColor="text-cyan-600"
                                     action={<ScanButton onClick={() => setShowDryroomScanModal(true)} color="cyan" />}
@@ -719,6 +724,7 @@ export default function DashboardRFIDFinishing() {
                                 <Card
                                     title="Folding Station Finishing"
                                     icon={Layers}
+                                    iconImage={{ src: foldingIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}
                                     className="flex-[0.3] min-h-0 border-l-4 border-l-teal-400"
                                     iconColor="text-teal-600"
                                     action={<ScanButton onClick={() => setShowFoldingScanModal(true)} color="teal" />}
@@ -750,7 +756,7 @@ export default function DashboardRFIDFinishing() {
                                             }}
                                         />
                                         <MetricCard
-                                            label="Shipment"
+                                            label="Check Out"
                                             value={foldingCheckOut}
                                             type="checkout"
                                             compact
@@ -1021,16 +1027,16 @@ function ScanButton({ onClick, color }: any) {
 }
 
 function ActionButton({ onClick, icon: Icon, label, variant = 'default', active }: any) {
-    const baseClass = "relative flex items-center justify-center w-7 h-7 rounded-md transition-all duration-200 active:scale-95 select-none";
+    const baseClass = "relative flex items-center justify-center rounded-lg p-2 min-w-[2.25rem] min-h-[2.25rem] transition-all duration-200 active:scale-95 select-none";
     const variants = {
         default: active
             ? "bg-violet-100 text-violet-600 shadow-sm ring-1 ring-violet-200"
             : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-300 shadow-sm",
-        primary: "bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm hover:shadow",
+        primary: "bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-200 hover:border-emerald-300 shadow-sm hover:shadow",
     };
     return (
         <button onClick={onClick} className={`${baseClass} ${(variants as any)[variant]}`} title={label} aria-label={label}>
-            <Icon className="w-3.5 h-3.5" />
+            <Icon className="w-4 h-4 flex-shrink-0" />
             {active && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-violet-500 rounded-full animate-pulse" />}
         </button>
     );

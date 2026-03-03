@@ -11,6 +11,8 @@ export const COLORS = {
     redSoft: '#ff8a95',
     // Warna abu ke biruan untuk Sisa Output
     blueGray: '#90a4ae',
+    // Warna soft biru (seperti greenSoft) untuk chart Target
+    blueSoft: '#93c5fd',
 } as const;
 
 // Default state untuk popup rework realtime

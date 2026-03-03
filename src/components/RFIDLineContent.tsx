@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, User, Sun, Moon, Edit } from 'lucide-react';
-import targetIcon from '../assets/target.webp';
+import { ArrowRight, User, Sun, Moon, Edit, Tag } from 'lucide-react';
 import { API_BASE_URL, getDefaultHeaders, setBackendEnvironment } from '../config/api';
 import type { ProductionLine } from '../data/production_line';
 import {
@@ -72,10 +71,12 @@ export default function ProductionLine() {
     const [lineShifts, setLineShifts] = useState<Record<number, 'day' | 'night'>>({});
     const [isLoadingShifts, setIsLoadingShifts] = useState(true);
 
-    // State untuk supervisor data, startTimes, dan target dari API
+    // State untuk supervisor data, startTimes, dan target dari API (target dipakai modal edit, tidak ditampilkan di card)
     const [supervisorData, setSupervisorData] = useState<Record<string, string>>({});
     const [startTimesData, setStartTimesData] = useState<Record<string, string>>({});
     const [targetsData, setTargetsData] = useState<Record<string, number>>({});
+    // Style per line untuk card (fetch 1x saja, bukan real-time)
+    const [stylesData, setStylesData] = useState<Record<string, string>>({});
 
     // State untuk active lines dari API wira
     const [activeLines, setActiveLines] = useState<Set<number>>(new Set());
@@ -166,6 +167,56 @@ export default function ProductionLine() {
         }
     };
 
+    // Ambil style dari response /monitoring/line (format sama dengan useDashboardRFIDQuery)
+    const parseStyleFromMonitoringLine = (data: any, lineIdParam: string): string => {
+        if (!data?.success) return '-';
+        let woData: any = null;
+        const normalized = lineIdParam.replace(/[^\d]/g, '') || '1';
+        if (data.data && !Array.isArray(data.data) && typeof data.data === 'object') {
+            woData = data.data;
+        } else if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+            const targetNum = parseInt(normalized, 10);
+            woData = data.data.find((item: any) => {
+                const itemLine = String(item.Line || item.line || item.LINE || '').trim();
+                const match = itemLine.match(/(\d+)/);
+                const num = match ? parseInt(match[1], 10) : parseInt(itemLine, 10);
+                return !isNaN(num) && num === targetNum;
+            }) || data.data[0];
+        } else if (data.wo || data.WO) {
+            woData = data;
+        }
+        return woData ? (woData.Style || woData.style || '-') : '-';
+    };
+
+    // Load style per line sekali saja (1x polling) dari API monitoring/line
+    const loadStylesOnce = async () => {
+        if (!environment) return;
+        const linesToFetch = productionLines.filter(
+            (line) => line.id !== 0 && line.id !== 111 && line.id !== 112
+        );
+        if (linesToFetch.length === 0) return;
+
+        const next: Record<string, string> = {};
+        await Promise.all(
+            linesToFetch.map(async (line) => {
+                const lineParam = line.line || String(line.id);
+                try {
+                    const res = await fetch(
+                        `${API_BASE_URL}/monitoring/line?line=${encodeURIComponent(lineParam)}`,
+                        { headers: getDefaultHeaders() }
+                    );
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const style = parseStyleFromMonitoringLine(data, lineParam);
+                    next[String(line.id)] = style;
+                } catch {
+                    next[String(line.id)] = '-';
+                }
+            })
+        );
+        setStylesData((prev) => ({ ...prev, ...next }));
+    };
+
     // Load supervisor data dari API saat component mount dan saat environment berubah
     useEffect(() => {
         if (!environment) return;
@@ -212,6 +263,12 @@ export default function ProductionLine() {
             }
         };
     }, [environment]);
+
+    // Fetch style per line sekali saja saat halaman Production Lines dibuka (bukan real-time)
+    useEffect(() => {
+        if (!environment || productionLines.length === 0) return;
+        loadStylesOnce();
+    }, [environment, productionLines.length]);
 
     // Handler untuk membuka modal edit
     const handleEditClick = (e: React.MouseEvent, line: ProductionLine) => {
@@ -530,26 +587,34 @@ export default function ProductionLine() {
                                 aspect-[2/1]
                             `}
                         >
-                            {/* Target (dengan icon) + LED Indicator - jarak jelas, All Production Line tanpa target */}
+                            {/* Style (dari API, 1x fetch) + LED Indicator - All Production Line tanpa style */}
                             <div className="absolute top-1.5 xs:top-2 sm:top-2.5 right-1.5 xs:right-2 sm:right-2.5 z-20 flex items-center gap-2 sm:gap-3">
-                                {/* Target badge: icon + nilai, jarak dari LED */}
+                                {/* Style badge: icon + label + nilai — design profesional */}
                                 {(() => {
                                     const isAllProductionLine = line.id === 0 || line.id === 111 || line.id === 112;
-                                    const lineTarget = targetsData[line.id.toString()];
-                                    const targetNum = typeof lineTarget === 'number' && lineTarget >= 0 ? lineTarget : 0;
+                                    const lineStyle = stylesData[line.id.toString()];
+                                    const hasStyle = lineStyle && lineStyle !== '-';
                                     if (isAllProductionLine) return null;
                                     return (
                                         <div
-                                            className={`flex items-center gap-1 xs:gap-1.5 px-2 xs:px-2.5 py-1 rounded-lg border shadow-sm transition-all duration-300 ${isHovered ? 'bg-amber-50/95 border-amber-300 text-amber-900' : 'bg-white border-amber-200/80 text-amber-800'}`}
-                                            title="Target produksi line"
+                                            className={`
+                                                flex items-center gap-1 xs:gap-1.5 min-w-0
+                                                pl-1.5 pr-2 xs:pl-2 xs:pr-2.5 py-1 xs:py-1.5
+                                                rounded-lg border shadow-sm
+                                                transition-all duration-300
+                                                max-w-[88px] xs:max-w-[110px] sm:max-w-[130px]
+                                                ${isHovered
+                                                    ? 'bg-gradient-to-br from-indigo-50 to-slate-50 border-indigo-200/90 text-indigo-900 shadow-md'
+                                                    : 'bg-white/95 border-slate-200 text-slate-700 shadow-slate-200/50'
+                                                }
+                                            `}
+                                            title={hasStyle ? `Style: ${lineStyle}` : 'Style line'}
                                         >
-                                            <img
-                                                src={targetIcon}
-                                                alt=""
-                                                className="w-3 h-3 xs:w-3.5 xs:h-3.5 sm:w-4 sm:h-4 flex-shrink-0 object-contain"
-                                            />
-                                            <span className="text-[10px] xs:text-xs sm:text-sm font-bold tabular-nums leading-none">
-                                                {targetNum > 0 ? targetNum : '–'}
+                                            <div className="flex-shrink-0 w-4 h-4 xs:w-5 xs:h-5 rounded-md bg-indigo-100 flex items-center justify-center">
+                                                <Tag className="w-2 h-2 xs:w-2.5 xs:h-2.5 text-indigo-600" strokeWidth={2.5} aria-hidden />
+                                            </div>
+                                            <span className="text-[9px] xs:text-[10px] sm:text-xs font-semibold truncate leading-tight text-slate-600 min-w-0">
+                                                {hasStyle ? lineStyle : '–'}
                                             </span>
                                         </div>
                                     );
