@@ -60,7 +60,7 @@ export const productionLinesCLN: ProductionLine[] = [
  },
 ];
 
-// Data Production Lines untuk MJL (16 cards: All + 15 lines)
+// Data Production Lines untuk MJL (17 cards: All + Line 1–16, 21)
 export const productionLinesMJL: ProductionLine[] = [
  {
   id: 111,
@@ -197,6 +197,14 @@ export const productionLinesMJL: ProductionLine[] = [
   borderColor: 'border-emerald-500',
   accentColor: 'text-emerald-600',
   line: '16'
+ },
+ {
+  id: 21,
+  title: 'Production Line 21',
+  supervisor: 'Dudung',
+  borderColor: 'border-teal-400',
+  accentColor: 'text-teal-600',
+  line: '21'
  },
 ];
 
