@@ -116,7 +116,7 @@ const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, fi
         <ChartCard
             title={
                 <>
-                    <h2 className="font-semibold text-gray-700 tracking-tight group-hover:text-blue-600 transition-colors flex-1 min-w-0" style={{ textTransform: 'capitalize', fontSize: 'clamp(0.875rem, 1.2vw + 0.5rem, 1.125rem)', fontWeight: 600 }}>{`Data ${formattedLineTitle}`}</h2>
+                    <h2 className="font-semibold text-gray-900 tracking-tight group-hover:text-blue-700 transition-colors flex-1 min-w-0" style={{ textTransform: 'capitalize', fontSize: 'clamp(0.875rem, 1.2vw + 0.5rem, 1.125rem)', fontWeight: 600 }}>{`Data ${formattedLineTitle}`}</h2>
                     <div className="flex items-center gap-0.5 xs:gap-1 sm:gap-1.5 md:gap-2 ml-auto">
                         {/* Date Filter - Input Langsung */}
                         <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2">
@@ -300,16 +300,16 @@ const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, fi
                                             <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-500 via-blue-400 to-amber-400"></div>
                                             <div className="w-full text-center px-0.5 flex flex-col items-center justify-center gap-0 xs:gap-0 sm:gap-0.5 md:gap-0.75 h-full min-h-0">
                                                 <span
-                                                    className="font-medium text-blue-600 tracking-widest group-hover:text-blue-800 transition-colors delay-75 flex-shrink-0"
+                                                    className="font-semibold text-gray-900 transition-colors delay-75 flex-shrink-0"
                                                     style={{
-                                                        textTransform: 'capitalize',
+                                                        textTransform: item.label === 'WO' ? 'uppercase' : 'none',
                                                         fontSize: 'clamp(0.5rem, 0.8vw + 0.2rem, 1rem)'
                                                     }}
                                                 >
                                                     {item.label}
                                                 </span>
                                                 <span
-                                                    className="font-medium text-slate-700 group-hover:text-slate-900 transition-colors truncate block w-full text-center"
+                                                    className="font-medium text-blue-700 transition-colors truncate block w-full text-center"
                                                     style={{
                                                         fontSize: 'clamp(0.5rem, 0.8vw + 0.2rem, 1rem)',
                                                         lineHeight: '1.1'
@@ -332,8 +332,8 @@ const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, fi
                                         <div key={idx} className="group relative overflow-hidden bg-white rounded-lg border border-blue-500 p-0 xs:p-0 sm:p-0.5 flex flex-col items-center justify-center gap-0 xs:gap-0 sm:gap-0.5 transition-all duration-300 hover:shadow-sm h-full min-h-0">
                                             <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-500 via-blue-400 to-amber-400"></div>
                                             <div className="w-full text-center px-0.5 flex flex-col items-center justify-center gap-0 xs:gap-0 sm:gap-0.5 h-full min-h-0">
-                                                <span className="text-[10px] xs:text-[11px] sm:text-[12px] font-medium text-blue-600 tracking-widest group-hover:text-blue-800 transition-colors delay-75 flex-shrink-0" style={{ textTransform: 'capitalize' }}>{item.label}</span>
-                                                <span className="font-medium text-slate-700 group-hover:text-slate-900 transition-colors truncate block w-full text-center" style={{ fontSize: 'clamp(0.5rem, 1.2vw + 0.2rem, 0.875rem)', lineHeight: '1.1' }} title={item.value || '-'}>
+                                                <span className="text-[10px] xs:text-[11px] sm:text-[12px] font-semibold text-gray-900 flex-shrink-0" style={{ textTransform: item.label === 'WO' ? 'uppercase' : 'none' }}>{item.label}</span>
+                                                <span className="font-medium text-blue-700 truncate block w-full text-center" style={{ fontSize: 'clamp(0.5rem, 1.2vw + 0.2rem, 0.875rem)', lineHeight: '1.1' }} title={item.value || '-'}>
                                                     {item.value || '-'}
                                                 </span>
                                             </div>

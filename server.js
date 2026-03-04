@@ -4197,11 +4197,29 @@ app.get('/api/mqtt-login-success', (req, res) => {
     try {
         const now = Date.now();
         const event = lastMqttLoginEvent;
-        if (event && (now - event.at) < MQTT_LOGIN_EVENT_TTL_MS) {
-            return res.json({ success: true, event });
+        const eventWithinTtl = event && (now - event.at) < MQTT_LOGIN_EVENT_TTL_MS;
+        if (event && !eventWithinTtl) lastMqttLoginEvent = null;
+
+        const line = req.query.line != null ? String(req.query.line) : (event && event.line) || null;
+        const ledStatus = { qc: null, pqc: null };
+        if (line && lastMqttLoginByLineAndRole[line]) {
+            const byRole = lastMqttLoginByLineAndRole[line];
+            ['qc', 'pqc'].forEach((role) => {
+                const entry = byRole[role];
+                if (entry) {
+                    ledStatus[role] = { status: entry.status, at: entry.at };
+                }
+            });
         }
-        if (event) lastMqttLoginEvent = null;
-        return res.json({ success: true, event: null });
+        if (eventWithinTtl && event && event.line === line) {
+            ledStatus[event.role] = { status: 'success', at: event.at };
+        }
+
+        return res.json({
+            success: true,
+            event: eventWithinTtl ? event : null,
+            ledStatus
+        });
     } catch (err) {
         return res.status(500).json({ success: false, error: err.message });
     }
@@ -4237,8 +4255,10 @@ app.use((err, req, res, next) => {
 // ============================================
 
 let mqttClient = null;
-/** Event login terakhir dari MQTT, untuk diteruskan ke dashboard via polling */
+/** Event login terakhir dari MQTT, untuk diteruskan ke dashboard via polling (animasi) */
 let lastMqttLoginEvent = null;
+/** Status login per line + role untuk LED indicator: { [line]: { qc: { status, at }, pqc: { status, at } } } */
+let lastMqttLoginByLineAndRole = {};
 
 function startMqttClient() {
     if (mqttClient) {
@@ -4262,10 +4282,19 @@ function startMqttClient() {
         console.log(`   Topic: ${topic}`);
         console.log(`   Payload: ${payloadStr}`);
 
-        if (payloadStr.toLowerCase() !== 'success') return;
         const match = topic.match(/^line(\d+)\/(qc|pqc)\/(cln|mjl|mjl2)$/);
         if (!match) return;
-        lastMqttLoginEvent = { line: match[1], role: match[2], at: Date.now() };
+        const line = match[1];
+        const role = match[2];
+        const isSuccess = payloadStr.toLowerCase() === 'success';
+        const status = isSuccess ? 'success' : 'unsuccess';
+        const at = Date.now();
+
+        if (isSuccess) {
+            lastMqttLoginEvent = { line, role, at };
+        }
+        if (!lastMqttLoginByLineAndRole[line]) lastMqttLoginByLineAndRole[line] = {};
+        lastMqttLoginByLineAndRole[line][role] = { status, at };
     });
 
     mqttClient.on('connect', () => {

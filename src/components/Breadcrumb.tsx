@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, Settings, X, Target } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { API_BASE_URL, getDefaultHeaders, setBackendEnvironment } from '../config/api';
+import { API_BASE_URL, getDefaultHeaders, setBackendEnvironment, getInitialEnvironment } from '../config/api';
 import { productionLinesCLN, productionLinesMJL, productionLinesMJL2 } from '../data/production_line';
 
 // Fungsi untuk mendapatkan environment dari API atau berdasarkan port
@@ -60,7 +60,7 @@ export default function Breadcrumb() {
     const [editingStartTime, setEditingStartTime] = useState<string>('07:30');
     const [editingTarget, setEditingTarget] = useState<number>(0);
     const [isLoading, setIsLoading] = useState(false);
-    const [environment, setEnvironment] = useState<'CLN' | 'MJL' | 'MJL2'>('CLN');
+    const [environment, setEnvironment] = useState<'CLN' | 'MJL' | 'MJL2'>(getInitialEnvironment);
 
     // Fetch environment saat component mount
     useEffect(() => {

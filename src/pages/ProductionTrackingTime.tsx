@@ -3,6 +3,7 @@ import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { useSidebar } from '../context/SidebarContext';
 import { trackingTimeService } from '../services/trackingTimeService';
+import { exportProductionTrackingToExcel } from '../utils/exportProductionTrackingToExcel';
 import {
   Calendar, Search, AlertCircle, RefreshCcw, Truck, Shirt, Timer,
   Wrench, Ban, Download, X, Zap, Clock
@@ -695,8 +696,8 @@ export default function ProductionTrackingTime() {
             </div>
           </div>
 
-          {/* Position Filters (Tabs) */}
-          <div className="mb-6 overflow-x-auto pb-2">
+          {/* Position Filters (Tabs) + Tombol Export sejajar di samping */}
+          <div className="mb-6 overflow-x-auto pb-2 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-max">
               <span className="text-xs font-bold text-gray-500 uppercase mr-2">Filter Berdasarkan Posisi:</span>
               {([
@@ -728,6 +729,20 @@ export default function ProductionTrackingTime() {
                 </button>
               ))}
             </div>
+            <button
+              onClick={async () => {
+                try {
+                  await exportProductionTrackingToExcel(filteredData, dateFrom, dateTo);
+                } catch (err) {
+                  console.error('Export gagal:', err);
+                }
+              }}
+              disabled={filteredData.length === 0}
+              title="Download Excel (data tampilan)"
+              className="flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 active:bg-emerald-700 transition-colors shadow-sm border border-emerald-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+            >
+              <Download className="w-4 h-4" aria-hidden />
+            </button>
           </div>
 
           {/* Complex Data Table */}
@@ -1015,47 +1030,10 @@ export default function ProductionTrackingTime() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center flex-wrap gap-2">
+            <div className="p-4 border-t border-gray-200 bg-gray-50">
               <span className="text-sm text-gray-500">
                 {filteredData.length} baris ditampilkan {filteredData.length !== data.length && `(dari ${data.length} total)`}
               </span>
-              <button
-                onClick={() => {
-                  const headers = ['ID', 'Style', 'Line', 'Buyer', 'WO', 'Start Time', 'Last Status', 'Total Cycle Time', 'QC Rework', 'QC Reject', 'PQC Rework', 'PQC Reject', 'Ready to Ship'];
-                  const escape = (v: unknown) => {
-                    const s = v == null ? '' : String(v);
-                    return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-                  };
-                  const row = (item: any) => [
-                    item.id_garment,
-                    item.style,
-                    item.line,
-                    item.buyer,
-                    item.wo,
-                    item.start_time,
-                    item.lastStatus,
-                    item.total_cycle_time_formatted || '-',
-                    item.qc_rework_count ?? '-',
-                    item.qc_reject ?? '-',
-                    item.pqc_rework_count ?? '-',
-                    item.pqc_reject ?? '-',
-                    (item.lastStatus?.includes('OUT_FOLDING') || item.lastStatus === 'DONE') ? 'Ya' : ''
-                  ].map(escape).join(',');
-                  const csv = [headers.map(escape).join(','), ...filteredData.map(row)].join('\r\n');
-                  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `production-tracking-${dateFrom}-${dateTo}-${filteredData.length}rows.csv`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-                disabled={filteredData.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-shadow shadow-sm font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Download className="w-4 h-4" />
-                Download Excel (data tampilan)
-              </button>
             </div>
           </div>
         </main>

@@ -21,6 +21,7 @@ const log = (msg: string, ...args: unknown[]) => {
 /** Polling event login dari server. Server dapat event dari MQTT (port 1883), frontend ambil lewat API. */
 export function useMqttLoginSuccessPolling(currentLineId: string | null): void {
     const setEvent = useMqttLoginSuccessStore((s) => s.setEvent);
+    const setLedStatus = useMqttLoginSuccessStore((s) => s.setLedStatus);
 
     useEffect(() => {
         if (!currentLineId) return;
@@ -29,15 +30,28 @@ export function useMqttLoginSuccessPolling(currentLineId: string | null): void {
 
         const poll = async () => {
             try {
-                const res = await fetch(`${API_BASE_URL}/api/mqtt-login-success`, { method: 'GET' });
+                const url = `${API_BASE_URL}/api/mqtt-login-success?line=${encodeURIComponent(currentLineId)}`;
+                const res = await fetch(url, { method: 'GET' });
                 const data = await res.json().catch(() => ({}));
-                if (data?.success && data?.event && data.event.line === currentLineId) {
+                if (!data?.success) return;
+                if (data?.ledStatus && typeof data.ledStatus === 'object') {
+                    setLedStatus({
+                        qc: data.ledStatus.qc ?? null,
+                        pqc: data.ledStatus.pqc ?? null,
+                    });
+                }
+                if (data?.event && data.event.line === currentLineId) {
                     setEvent({
                         line: data.event.line,
                         role: data.event.role,
                         at: data.event.at ?? Date.now(),
                     });
                     log('Event dari server (MQTT) → animasi', data.event);
+                    const cur = useMqttLoginSuccessStore.getState().ledStatus;
+                    setLedStatus({
+                        ...cur,
+                        [data.event.role]: { status: 'success' as const, at: data.event.at ?? Date.now() },
+                    });
                 }
             } catch (_) {}
         };
@@ -45,7 +59,7 @@ export function useMqttLoginSuccessPolling(currentLineId: string | null): void {
         poll();
         const interval = setInterval(poll, 1500);
         return () => clearInterval(interval);
-    }, [currentLineId, setEvent]);
+    }, [currentLineId, setEvent, setLedStatus]);
 }
 
 /** Tidak dipakai: MQTT hanya jalan di server. Tetap export agar pemanggil tidak error. */

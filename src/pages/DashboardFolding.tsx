@@ -6,7 +6,7 @@ import { useSidebar } from '../context/SidebarContext';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Layers, Scan, RefreshCw, TrendingUp, X } from 'lucide-react';
 import foldingIcon from '../assets/folding_icon.webp';
-import { getFinishingData, getFinishingDataByLine, API_BASE_URL, getDefaultHeaders, getActiveUsers, getScanningUsers } from '../config/api';
+import { getFinishingData, getFinishingDataWithFilter, getFinishingDataByLine, API_BASE_URL, getDefaultHeaders, getActiveUsers, getScanningUsers } from '../config/api';
 import ScanningFinishingModal from '../components/ScanningFinishingModal';
 import { productionLinesMJL } from '../data/production_line';
 import { Card, MetricCard, TableDistribution, FilterButton } from '../components/finishing';
@@ -169,18 +169,25 @@ export default function DashboardFolding() {
     return map;
   }, [scanningUsersResponse]);
 
-  // Fetch data finishing dari API
+  // Fetch data finishing dari API (filter tanggal & WO aktif)
+  const hasFinishingFilter = !!(filterDateFrom || filterDateTo || filterWo);
   const { data: finishingResponse, refetch: refetchFinishingData } = useQuery({
-    queryKey: ['finishing-data-folding'],
+    queryKey: ['finishing-data-folding', filterDateFrom, filterDateTo, filterWo],
     queryFn: async () => {
-      const response = await getFinishingData();
+      const response = hasFinishingFilter
+        ? await getFinishingDataWithFilter({
+            date_from: filterDateFrom || undefined,
+            date_to: filterDateTo || undefined,
+            wo: filterWo || undefined,
+          })
+        : await getFinishingData();
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Gagal mengambil data finishing');
       }
       return response.data;
     },
-    staleTime: 20000, // Data dianggap fresh selama 20 detik
-    refetchInterval: 1000, // Refresh setiap 1 detik (Realtime Ultra Cepat)
+    staleTime: 20000,
+    refetchInterval: 1000,
     refetchOnWindowFocus: true,
     retry: 3,
   });
@@ -191,13 +198,13 @@ export default function DashboardFolding() {
   const foldingCheckOut = finishingResponse?.folding?.checkout ?? 0;
 
   // Fetch data folding checkout per jam dan per table dari API
-  // Menggunakan tanggal yang valid (hari ini jika sudah jam 8, kemarin jika belum)
+  // Gunakan filter tanggal bila user mengisi, else tanggal valid (hari ini/jam 8)
+  const hourlyDate = filterDateFrom || getValidDate();
   const { data: hourlyFoldingDataResponse, refetch: refetchHourlyData } = useQuery({
-    queryKey: ['hourly-folding-checkout-data', getValidDate()],
+    queryKey: ['hourly-folding-checkout-data', hourlyDate],
     queryFn: async () => {
       try {
-        const validDate = getValidDate();
-        const response = await fetch(`${API_BASE_URL}/api/folding/hourly?date=${validDate}`, {
+        const response = await fetch(`${API_BASE_URL}/api/folding/hourly?date=${hourlyDate}`, {
           headers: getDefaultHeaders()
         });
 
@@ -452,7 +459,8 @@ export default function DashboardFolding() {
     };
   }, [allLineFinishingData, activeLineFinishingData]);
 
-  // Data untuk Tabel Distribution dari API (hanya yang ada data) - menggunakan data FOLDING
+  // Data untuk Tabel Distribution dari API (hanya yang ada data) - menggunakan data FOLDING; filter by WO
+  const woFilterLower = (filterWo || '').trim().toLowerCase();
   const tableDistributionData: TableDistributionData[] = useMemo(() => {
     if (!mergedLineFinishingData) return [];
 
@@ -489,6 +497,12 @@ export default function DashboardFolding() {
 
       const finishing = lineData.finishing;
       const wo = lineData.wo;
+      const rowWo = wo?.wo || '-';
+
+      // Filter by WO (client-side)
+      if (woFilterLower && rowWo !== '-' && !String(rowWo).toLowerCase().includes(woFilterLower)) {
+        return;
+      }
 
       // Gunakan data folding
       const waiting = finishing.folding?.waiting || 0;
@@ -504,7 +518,7 @@ export default function DashboardFolding() {
 
       result.push({
         line: `${lineNumber}`,
-        wo: wo?.wo || '-',
+        wo: rowWo,
         item: wo?.item || '-',
         waiting,
         checkIn,
@@ -515,7 +529,7 @@ export default function DashboardFolding() {
     });
 
     return result;
-  }, [mergedLineFinishingData, productionLines]);
+  }, [mergedLineFinishingData, productionLines, filterWo]);
 
   // Fungsi untuk extract line number dari nama user
   const extractLineFromName = (name: string): number | null => {

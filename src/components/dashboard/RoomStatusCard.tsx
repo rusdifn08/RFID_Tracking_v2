@@ -99,9 +99,10 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 }}
                                 aria-hidden
                             />
-                            <h3 className="font-extrabold tracking-widest text-sky-600 truncate" style={{
-                                textTransform: 'uppercase',
-                                fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)'
+                            <h3 className="font-semibold tracking-tight text-gray-900 truncate" style={{
+                                textTransform: 'capitalize',
+                                fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)',
+                                fontWeight: 600
                             }}>Dryroom</h3>
                         </div>
                         {/* 3 card kecil: Waiting, In, Out - vertikal ke bawah */}
@@ -118,12 +119,14 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-semibold tracking-widest text-gray-900 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)',
+                                    fontWeight: 600
                                 }}>Waiting</h4>
-                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
+                                <span className="font-semibold text-blue-700 flex-shrink-0" style={{
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)',
+                                    fontWeight: 600
                                 }}>{isLoadingFinishing ? '...' : dryroomData.waiting.toLocaleString()}</span>
                             </div>
                             <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-sky-300 hover:bg-sky-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
@@ -133,12 +136,14 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-semibold tracking-widest text-gray-900 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)',
+                                    fontWeight: 600
                                 }}>In</h4>
-                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
+                                <span className="font-semibold text-blue-700 flex-shrink-0" style={{
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)',
+                                    fontWeight: 600
                                 }}>{isLoadingFinishing ? '...' : dryroomData.checkin.toLocaleString()}</span>
                             </div>
                             <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-sky-300 hover:bg-sky-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
@@ -148,12 +153,14 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-semibold tracking-widest text-gray-900 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)',
+                                    fontWeight: 600
                                 }}>Out</h4>
-                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
+                                <span className="font-semibold text-blue-700 flex-shrink-0" style={{
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)',
+                                    fontWeight: 600
                                 }}>{isLoadingFinishing ? '...' : dryroomData.checkout.toLocaleString()}</span>
                             </div>
                         </div>
@@ -189,9 +196,10 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 }}
                                 aria-hidden
                             />
-                            <h3 className="font-extrabold tracking-widest text-sky-600 truncate" style={{
-                                textTransform: 'uppercase',
-                                fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)'
+                            <h3 className="font-semibold tracking-tight text-gray-900 truncate" style={{
+                                textTransform: 'capitalize',
+                                fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)',
+                                fontWeight: 600
                             }}>Folding</h3>
                         </div>
                         {/* 3 card kecil: Waiting, In, Out - vertikal ke bawah */}
@@ -208,12 +216,14 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-semibold tracking-widest text-gray-900 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)',
+                                    fontWeight: 600
                                 }}>Waiting</h4>
-                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
+                                <span className="font-semibold text-blue-700 flex-shrink-0" style={{
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)',
+                                    fontWeight: 600
                                 }}>{isLoadingFinishing ? '...' : foldingData.waiting.toLocaleString()}</span>
                             </div>
                             <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-sky-300 hover:bg-sky-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
@@ -223,12 +233,14 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-semibold tracking-widest text-gray-900 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)',
+                                    fontWeight: 600
                                 }}>In</h4>
-                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
+                                <span className="font-semibold text-blue-700 flex-shrink-0" style={{
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)',
+                                    fontWeight: 600
                                 }}>{isLoadingFinishing ? '...' : foldingData.checkin.toLocaleString()}</span>
                             </div>
                             <div className="flex-1 flex flex-row items-center justify-between bg-white rounded-lg xs:rounded-xl border border-sky-300 hover:bg-sky-50/50 transition-all duration-300 cursor-pointer overflow-hidden" style={{
@@ -238,12 +250,14 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 paddingRight: 'clamp(0.5rem, 1vw + 0.25rem, 1rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest text-sky-600 truncate flex-shrink-0" style={{
+                                <h4 className="font-semibold tracking-widest text-gray-900 truncate flex-shrink-0" style={{
                                     textTransform: 'capitalize',
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)',
+                                    fontWeight: 600
                                 }}>Out</h4>
-                                <span className="font-bold text-sky-900 flex-shrink-0" style={{
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
+                                <span className="font-semibold text-blue-700 flex-shrink-0" style={{
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)',
+                                    fontWeight: 600
                                 }}>{isLoadingFinishing ? '...' : foldingData.checkout.toLocaleString()}</span>
                             </div>
                         </div>
@@ -279,9 +293,10 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 strokeWidth={2.5}
                                 stroke="#0284c7"
                             />
-                            <h3 className="font-extrabold tracking-widest text-sky-600 truncate" style={{
-                                textTransform: 'uppercase',
-                                fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)'
+                            <h3 className="font-semibold tracking-tight text-red-700 truncate" style={{
+                                textTransform: 'capitalize',
+                                fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)',
+                                fontWeight: 600
                             }}>Reject Room</h3>
                         </div>
                         {/* 4 card kecil di dalam Reject Room */}
@@ -296,12 +311,14 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 padding: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest mb-0.5 text-red-600 text-center truncate w-full flex-shrink-0" style={{
+                                <h4 className="font-semibold tracking-widest mb-0.5 text-red-600 text-center truncate w-full flex-shrink-0" style={{
                                     textTransform: 'capitalize',
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)',
+                                    fontWeight: 600
                                 }}>Waiting</h4>
-                                <span className="font-bold leading-none text-red-900 text-center flex-shrink-0" style={{
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
+                                <span className="font-semibold leading-none text-red-800 text-center flex-shrink-0" style={{
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)',
+                                    fontWeight: 600
                                 }}>{isLoadingFinishing ? '...' : rejectRoomData.waiting.toLocaleString()}</span>
                             </div>
                             {/* Check In Card */}
@@ -309,12 +326,14 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 padding: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest mb-0.5 text-red-600 text-center truncate w-full flex-shrink-0" style={{
+                                <h4 className="font-semibold tracking-widest mb-0.5 text-red-600 text-center truncate w-full flex-shrink-0" style={{
                                     textTransform: 'capitalize',
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)',
+                                    fontWeight: 600
                                 }}>In</h4>
-                                <span className="font-bold leading-none text-red-900 text-center flex-shrink-0" style={{
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
+                                <span className="font-semibold leading-none text-red-800 text-center flex-shrink-0" style={{
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)',
+                                    fontWeight: 600
                                 }}>{isLoadingFinishing ? '...' : rejectRoomData.checkin.toLocaleString()}</span>
                             </div>
                             {/* Check Out Card */}
@@ -322,12 +341,14 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 padding: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest mb-0.5 text-red-600 text-center truncate w-full flex-shrink-0" style={{
+                                <h4 className="font-semibold tracking-widest mb-0.5 text-red-600 text-center truncate w-full flex-shrink-0" style={{
                                     textTransform: 'capitalize',
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)',
+                                    fontWeight: 600
                                 }}>Out</h4>
-                                <span className="font-bold leading-none text-red-900 text-center flex-shrink-0" style={{
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
+                                <span className="font-semibold leading-none text-red-800 text-center flex-shrink-0" style={{
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)',
+                                    fontWeight: 600
                                 }}>{isLoadingFinishing ? '...' : rejectRoomData.checkout.toLocaleString()}</span>
                             </div>
                             {/* Reject Mati Card */}
@@ -335,12 +356,14 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                                 padding: 'clamp(0.25rem, 0.6vh, 0.5rem)',
                                 minHeight: 0
                             }}>
-                                <h4 className="font-extrabold tracking-widest mb-0.5 text-red-600 text-center truncate w-full flex-shrink-0" style={{
+                                <h4 className="font-semibold tracking-widest mb-0.5 text-red-600 text-center truncate w-full flex-shrink-0" style={{
                                     textTransform: 'capitalize',
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)'
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1rem)',
+                                    fontWeight: 600
                                 }}>reject</h4>
-                                <span className="font-bold leading-none text-red-900 text-center flex-shrink-0" style={{
-                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)'
+                                <span className="font-semibold leading-none text-red-800 text-center flex-shrink-0" style={{
+                                    fontSize: 'clamp(0.5rem, 0.7vw + 0.2rem, 1.25rem)',
+                                    fontWeight: 600
                                 }}>{isLoadingFinishing ? '...' : rejectRoomData.reject_mati.toLocaleString()}</span>
                             </div>
                         </div>

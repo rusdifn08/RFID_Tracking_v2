@@ -8,7 +8,7 @@ import { useSidebar } from '../context/SidebarContext';
 import backgroundImage from '../assets/background.jpg';
 import LineDetailHeader from '../components/line/LineDetailHeader';
 import LineDetailCardsGrid from '../components/line/LineDetailCardsGrid';
-import { API_BASE_URL, getDefaultHeaders, setBackendEnvironment } from '../config/api';
+import { API_BASE_URL, getDefaultHeaders, setBackendEnvironment, getInitialEnvironment } from '../config/api';
 import { productionLinesCLN, productionLinesMJL, productionLinesMJL2 } from '../data/production_line';
 import daftarRfidIcon from '../assets/daftarrfid.webp';
 import dashboardRfidIcon from '../assets/dashboardrfid.webp';
@@ -54,7 +54,8 @@ const getEnvironment = async (): Promise<'CLN' | 'MJL' | 'MJL2'> => {
 const LineDetail = memo(() => {
     const { id } = useParams<{ id: string }>();
     const { isOpen } = useSidebar();
-    const [environment, setEnvironment] = useState<'CLN' | 'MJL' | 'MJL2'>('CLN');
+    const [environment, setEnvironment] = useState<'CLN' | 'MJL' | 'MJL2'>(getInitialEnvironment);
+    const [supervisorFromAPI, setSupervisorFromAPI] = useState<string | null>(null);
 
     // Fetch environment saat component mount
     useEffect(() => {
@@ -62,6 +63,32 @@ const LineDetail = memo(() => {
             setEnvironment(env);
         });
     }, []);
+
+    // Fetch supervisor dari API (sama sumber dengan monitoring-rfid) agar nama supervisor konsisten
+    useEffect(() => {
+        if (!environment || !id) return;
+        const fetchSupervisor = async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/supervisor-data?environment=${environment}`, {
+                    headers: getDefaultHeaders(),
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data?.success && data?.data?.supervisors) {
+                    const lineKey = id.trim();
+                    const num = parseInt(lineKey, 10);
+                    const name = data.data.supervisors[lineKey] ?? data.data.supervisors[String(num)] ?? null;
+                    setSupervisorFromAPI(name ?? null);
+                }
+            } catch {
+                setSupervisorFromAPI(null);
+            }
+        };
+        fetchSupervisor();
+        const onSupervisorUpdated = () => fetchSupervisor();
+        window.addEventListener('supervisorUpdated', onSupervisorUpdated);
+        return () => window.removeEventListener('supervisorUpdated', onSupervisorUpdated);
+    }, [environment, id]);
 
     // Data Production Lines diambil dari constant file
     // Filter untuk menghilangkan "All Production Line" (id 0, 111, atau 112)
@@ -200,7 +227,7 @@ const LineDetail = memo(() => {
                     <div className="relative z-10">
                         {/* --- TITLE SECTION --- */}
                         <LineDetailHeader
-                            supervisor={currentLine.supervisor}
+                            supervisor={supervisorFromAPI ?? currentLine.supervisor}
                         />
 
                         {/* --- CARDS GRID --- */}

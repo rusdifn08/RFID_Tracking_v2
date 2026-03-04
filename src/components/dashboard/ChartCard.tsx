@@ -59,7 +59,7 @@ const ChartCard = memo(forwardRef<HTMLDivElement, ChartCardProps>(({ children, t
                     </div>
                 )}
                 {typeof title === 'string' ? (
-                    <h2 className="font-semibold text-gray-700 tracking-tight group-hover:text-blue-600 transition-colors flex-1 min-w-0" style={{ textTransform: 'capitalize', fontSize: 'clamp(0.875rem, 1.2vw + 0.5rem, 1.125rem)', fontWeight: 600 }}>{title}</h2>
+                    <h2 className="font-semibold text-gray-900 tracking-tight group-hover:text-blue-700 transition-colors flex-1 min-w-0" style={{ textTransform: 'capitalize', fontSize: 'clamp(0.875rem, 1.2vw + 0.5rem, 1.125rem)', fontWeight: 600 }}>{title}</h2>
                 ) : (
                     <div className="flex items-center justify-between w-full flex-1 min-w-0">{title}</div>
                 )}

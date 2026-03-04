@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, User, Sun, Moon, Edit, Tag } from 'lucide-react';
-import { API_BASE_URL, getDefaultHeaders, setBackendEnvironment } from '../config/api';
+import { API_BASE_URL, getDefaultHeaders, setBackendEnvironment, getInitialEnvironment } from '../config/api';
 import type { ProductionLine } from '../data/production_line';
 import {
     productionLinesCLN,
@@ -65,7 +65,7 @@ const getEnvironment = async (): Promise<'CLN' | 'MJL' | 'MJL2'> => {
 export default function ProductionLine() {
     const navigate = useNavigate();
     const [hoveredCard, setHoveredCard] = useState<number | null>(null);
-    const [environment, setEnvironment] = useState<'CLN' | 'MJL' | 'MJL2'>('CLN');
+    const [environment, setEnvironment] = useState<'CLN' | 'MJL' | 'MJL2'>(getInitialEnvironment);
 
     // State untuk shift per line (day = siang, night = malam)
     const [lineShifts, setLineShifts] = useState<Record<number, 'day' | 'night'>>({});
