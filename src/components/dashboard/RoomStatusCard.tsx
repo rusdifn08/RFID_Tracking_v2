@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import ChartCard from './ChartCard';
 import { BarChart3, XCircle } from 'lucide-react';
@@ -6,6 +6,7 @@ import dryroomIcon from '../../assets/dryroom_icon.webp';
 import foldingIcon from '../../assets/folding_icon.webp';
 import { DEFAULT_ROOM_STATUS_ENABLED } from './constants';
 import { getFinishingDataByLine } from '../../config/api';
+import RoomStatusDetailModal, { type RoomStatusType } from './RoomStatusDetailModal';
 
 // Filter CSS agar icon webp tampil biru (#0284C7) sesuai tema Room Status
 const iconBlueFilter = 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)';
@@ -16,6 +17,9 @@ interface RoomStatusCardProps {
 
 const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
     const showRoomStatus = DEFAULT_ROOM_STATUS_ENABLED;
+    const [detailModalRoom, setDetailModalRoom] = useState<RoomStatusType | null>(null);
+    const openDetail = useCallback((room: RoomStatusType) => () => setDetailModalRoom(room), []);
+    const closeDetail = useCallback(() => setDetailModalRoom(null), []);
 
     // Fetch finishing data per line
     const { data: finishingResponse, isLoading: isLoadingFinishing } = useQuery({
@@ -64,12 +68,17 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                         gap: 'clamp(0.375rem, 0.8vw + 0.2rem, 0.75rem)'
                     }}
                 >
-                    {/* Dryroom Card */}
+                    {/* Dryroom Card - clickable untuk detail mini dashboard */}
                     <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={openDetail('dryroom')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail('dryroom')(); } }}
                         className="relative flex flex-col rounded-lg xs:rounded-xl border border-sky-500 hover:shadow-md transition-all duration-300 cursor-pointer group overflow-hidden h-full"
                         style={{
                             padding: 'clamp(0.125rem, 0.4vw + 0.1rem, 0.375rem)'
                         }}
+                        title="Klik untuk detail Dryroom"
                     >
                         <div
                             className="flex items-center justify-center flex-shrink-0"
@@ -149,12 +158,17 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                             </div>
                         </div>
                     </div>
-                    {/* Folding Card */}
+                    {/* Folding Card - clickable untuk detail mini dashboard */}
                     <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={openDetail('folding')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail('folding')(); } }}
                         className="relative flex flex-col bg-white rounded-lg xs:rounded-xl border border-sky-500 hover:shadow-md transition-all duration-300 cursor-pointer group overflow-hidden h-full"
                         style={{
                             padding: 'clamp(0.125rem, 0.4vw + 0.1rem, 0.375rem)'
                         }}
+                        title="Klik untuk detail Folding"
                     >
                         <div
                             className="flex items-center justify-center flex-shrink-0"
@@ -235,13 +249,18 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                         </div>
                     </div>
                 </div>
-                {/* Bagian Bawah: Reject Room - sama tinggi dengan bagian atas */}
+                {/* Bagian Bawah: Reject Room - clickable untuk detail mini dashboard */}
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden" style={{ flex: '1 1 50%', minHeight: '0' }}>
                     <div
-                        className="relative flex flex-col h-full bg-white rounded-lg xs:rounded-xl border border-sky-500 hover:shadow-md transition-all duration-300 group overflow-hidden"
+                        role="button"
+                        tabIndex={0}
+                        onClick={openDetail('reject_room')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail('reject_room')(); } }}
+                        className="relative flex flex-col h-full bg-white rounded-lg xs:rounded-xl border border-sky-500 hover:shadow-md transition-all duration-300 cursor-pointer group overflow-hidden"
                         style={{
                             padding: 'clamp(0.125rem, 0.4vw + 0.1rem, 0.375rem)'
                         }}
+                        title="Klik untuk detail Reject Room"
                     >
                         {/* Header Reject Room */}
                         <div
@@ -328,6 +347,20 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
                     </div>
                 </div>
             </div>
+
+            <RoomStatusDetailModal
+                isOpen={detailModalRoom !== null}
+                onClose={closeDetail}
+                roomType={detailModalRoom ?? 'dryroom'}
+                data={
+                    detailModalRoom === 'dryroom'
+                        ? dryroomData
+                        : detailModalRoom === 'folding'
+                            ? foldingData
+                            : rejectRoomData
+                }
+                lineId={lineId}
+            />
         </ChartCard>
     );
 });
