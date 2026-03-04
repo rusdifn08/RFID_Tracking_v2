@@ -5,14 +5,18 @@ import reworkIcon from '../../../assets/rework.png';
 import rejectIcon from '../../../assets/reject.png';
 import wiraIcon from '../../../assets/wira.png';
 
+export type LoginLedStatus = 'success' | 'unsuccess';
+
 interface StatusCardProps {
     type: 'GOOD' | 'REWORK' | 'HASPER' | 'REJECT' | 'WIRA';
     count: number;
     label?: string;
     onClick?: () => void;
+    /** Indikator LED login (hanya untuk Good QC / Good PQC): success = hijau, unsuccess = merah, null = abu (standby) */
+    loginLed?: LoginLedStatus | null;
 }
 
-const StatusCard = memo(({ type, count, label, onClick }: StatusCardProps) => {
+const StatusCard = memo(({ type, count, label, onClick, loginLed }: StatusCardProps) => {
     const config = {
         GOOD: { label: 'GOOD', iconSrc: goodIcon, Icon: null, iconColor: '#00e676', textColor: '#2563eb' },
         REWORK: { label: 'REWORK', iconSrc: reworkIcon, Icon: null, iconColor: '#ff9100', textColor: '#2563eb' },
@@ -23,8 +27,8 @@ const StatusCard = memo(({ type, count, label, onClick }: StatusCardProps) => {
 
     const style = config[type];
     const displayLabel = label || style.label;
-    const labelColor = '#2979ff';
-    const countColor = style.textColor;
+    const labelColor = '#111827'; /* gray-900: hitam untuk label (konsisten dengan Data Line) */
+    const countColor = style.textColor; /* biru untuk nilai angka */
     const iconColor = style.iconColor;
 
     return (
@@ -35,6 +39,22 @@ const StatusCard = memo(({ type, count, label, onClick }: StatusCardProps) => {
                 padding: 'clamp(0.25rem, 0.6vw + 0.15rem, 0.75rem)'
             }}
         >
+            {/* LED indikator login di pojok kanan atas (Good QC / Good PQC): hijau = success, merah = unsuccess, abu = standby */}
+            {loginLed !== undefined && (
+                <div
+                    className={`absolute top-2 right-2 z-10 w-3 h-3 rounded-full border-2 border-white shadow-md transition-colors duration-300 ${loginLed === 'success' || loginLed === 'unsuccess' ? 'animate-pulse' : ''}`}
+                    style={{
+                        backgroundColor: loginLed === 'success' ? '#22c55e' : loginLed === 'unsuccess' ? '#ef4444' : '#9ca3af',
+                        boxShadow: loginLed === 'success'
+                            ? '0 0 8px rgba(34,197,94,0.9)'
+                            : loginLed === 'unsuccess'
+                                ? '0 0 8px rgba(239,68,68,0.9)'
+                                : '0 0 4px rgba(156,163,175,0.5)',
+                    }}
+                    title={loginLed === 'success' ? 'Login berhasil' : loginLed === 'unsuccess' ? 'Login gagal' : 'Menunggu login'}
+                    aria-label={loginLed === 'success' ? 'Indikator login berhasil' : loginLed === 'unsuccess' ? 'Indikator login gagal' : 'Indikator standby'}
+                />
+            )}
             {/* Gap: kecil di bawah HD, semakin besar device semakin besar gap (icon–teks–data) */}
             <div
                 className="flex flex-col items-center justify-center flex-1 w-full min-h-0"
@@ -67,11 +87,12 @@ const StatusCard = memo(({ type, count, label, onClick }: StatusCardProps) => {
                     ) : null}
                 </div>
                 <h3 
-                    className="font-extrabold tracking-widest transition-colors text-center flex-shrink-0" 
+                    className="font-semibold tracking-widest transition-colors text-center flex-shrink-0" 
                     style={{ 
                         color: labelColor, 
-                        textTransform: 'capitalize',
-                        fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)'
+                        textTransform: 'uppercase',
+                        fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)',
+                        fontWeight: 600
                     }}
                 >
                     {displayLabel}
@@ -80,7 +101,8 @@ const StatusCard = memo(({ type, count, label, onClick }: StatusCardProps) => {
                     className="font-bold leading-none tracking-tighter transition-all duration-500 ease-in-out transform scale-100 hover:scale-105 text-center flex-shrink-0" 
                     style={{ 
                         color: countColor,
-                        fontSize: 'clamp(1.75rem, 4.5vw + 0.5rem, 5rem)'
+                        fontSize: 'clamp(1.75rem, 4.5vw + 0.5rem, 5rem)',
+                        fontWeight: 700
                     }}
                 >
                     {count}

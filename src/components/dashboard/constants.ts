@@ -29,3 +29,8 @@ export const DEFAULT_ROOM_STATUS_ENABLED = true;
 // true = menu About Us akan tampil di sidebar/navigation
 // false = menu About Us tidak tampil
 export const SHOW_ABOUT_US_MENU = true;
+
+// WebSocket WIRA Dashboard di halaman Dashboard RFID
+// false = hanya pakai API (polling) — tidak ada koneksi ws:// di tab Network
+// true = aktifkan WebSocket untuk data real-time dari backend
+export const ENABLE_WIRA_DASHBOARD_WEBSOCKET = false;

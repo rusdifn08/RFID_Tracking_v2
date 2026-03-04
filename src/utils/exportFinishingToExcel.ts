@@ -165,14 +165,20 @@ export async function exportFinishingToExcel(
     currentRow++;
   });
 
-  // Generate filename
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).replace(/\//g, '-');
-  const filename = `RFID_Tracking_${type === 'dryroom' ? 'DryRoom' : type === 'folding' ? 'Folding' : 'Finishing'}_${dateStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
+  // Nama file: {jenis_dashboard}{date_from}to{date_to}.extension
+  const fmt = (d: string) => {
+    if (!d?.trim()) return '';
+    const x = new Date(d.trim());
+    if (isNaN(x.getTime())) return '';
+    const day = String(x.getDate()).padStart(2, '0');
+    const month = String(x.getMonth() + 1).padStart(2, '0');
+    return `${day}-${month}-${x.getFullYear()}`;
+  };
+  const today = new Date().toISOString().split('T')[0];
+  const fromStr = (filterDateFrom && fmt(filterDateFrom)) || fmt(today);
+  const toStr = (filterDateTo && fmt(filterDateTo)) || fromStr;
+  const jenis = type === 'dryroom' ? 'RFID_Tracking_DryRoom_' : type === 'folding' ? 'RFID_Tracking_Folding_' : 'RFID_Tracking_Finishing_';
+  const filename = `${jenis}${fromStr}to${toStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
 
   // Export
   if (format === 'excel') {

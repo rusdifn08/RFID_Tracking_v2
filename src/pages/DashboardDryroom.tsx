@@ -16,7 +16,7 @@ import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { useSidebar } from '../context/SidebarContext';
 import ScanningFinishingModal from '../components/ScanningFinishingModal';
-import { getFinishingData, getFinishingDataByLine, API_BASE_URL, getDefaultHeaders } from '../config/api';
+import { getFinishingData, getFinishingDataWithFilter, getFinishingDataByLine, API_BASE_URL, getDefaultHeaders } from '../config/api';
 import { productionLinesMJL } from '../data/production_line';
 import { Card, MetricCard, TableDistribution, FilterButton } from '../components/finishing';
 import { FinishingDetailModal, type FinishingMetricType, type FinishingSection } from '../components/finishing/FinishingDetailModal';
@@ -103,13 +103,20 @@ export default function DashboardDryroom() {
     setIsLoaded(true);
   }, []);
 
-  // --- QUERY ---
+  // --- QUERY --- (filter tanggal & WO aktif: kirim ke API bila backend mendukung)
+  const hasFilter = !!(filters.dateFrom || filters.dateTo || filters.wo);
   const { data: finishingResponse, refetch: refetchFinishingData } = useQuery({
-    queryKey: ['finishing-data-dryroom'],
+    queryKey: ['finishing-data-dryroom', filters.dateFrom, filters.dateTo, filters.wo],
     queryFn: async () => {
       try {
-        const response = await getFinishingData();
-        if (!response.success || !response.data) return { dryroom: { waiting: 147, checkin: 396, checkout: 0 } };
+        const response = hasFilter
+          ? await getFinishingDataWithFilter({
+              date_from: filters.dateFrom || undefined,
+              date_to: filters.dateTo || undefined,
+              wo: filters.wo || undefined,
+            })
+          : await getFinishingData();
+        if (!response.success || !response.data) return { dryroom: { waiting: 0, checkin: 0, checkout: 0 } };
         return response.data;
       } catch (err) {
         return { dryroom: { waiting: 0, checkin: 0, checkout: 0 } };
@@ -184,9 +191,11 @@ export default function DashboardDryroom() {
     retry: 2,
   });
 
-  // Data untuk Tabel Distribution dari API (hanya yang ada data)
+  // Data untuk Tabel Distribution dari API (hanya yang ada data); filter client-side by WO & tanggal
   const tableDistributionData: TableDistributionData[] = useMemo(() => {
     if (!allLineFinishingData) return [];
+
+    const woFilter = (filters.wo || '').trim().toLowerCase();
 
     return productionLines
       .map((line) => {
@@ -199,6 +208,12 @@ export default function DashboardDryroom() {
 
         const finishing = lineData.finishing;
         const wo = lineData.wo;
+        const rowWo = wo?.wo || '-';
+
+        // Filter by WO (client-side)
+        if (woFilter && rowWo !== '-' && !String(rowWo).toLowerCase().includes(woFilter)) {
+          return null;
+        }
 
         // Gunakan data dryroom
         const waiting = finishing.dryroom?.waiting || 0;
@@ -212,7 +227,7 @@ export default function DashboardDryroom() {
 
         return {
           line: `Line ${lineNumber}`,
-          wo: wo?.wo || '-',
+          wo: rowWo,
           item: wo?.item || '-',
           waiting,
           checkIn,
@@ -220,7 +235,7 @@ export default function DashboardDryroom() {
         };
       })
       .filter((item): item is TableDistributionData => item !== null);
-  }, [allLineFinishingData, productionLines]);
+  }, [allLineFinishingData, productionLines, filters.wo]);
 
   // Chart data - menggunakan mock data dari dummy.ts
   const chartData: ChartDataPoint[] = useMemo(() => {

@@ -124,6 +124,30 @@ export const MJL_API_KEY_HEADER = 'X-Api-Key';
 // Cache untuk environment (CLN, MJL, atau MJL2)
 let cachedEnvironment: 'CLN' | 'MJL' | 'MJL2' | null = null;
 
+// Inisialisasi dari localStorage/port saat module load agar dari awal tidak pakai CLN saat jalan di MJL
+if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('backend_environment');
+    if (stored === 'MJL' || stored === 'MJL2' || stored === 'CLN') {
+        cachedEnvironment = stored;
+    } else {
+        const port = window.location.port;
+        if (port === '5173') cachedEnvironment = 'MJL';
+        else if (port === '5174') cachedEnvironment = 'MJL2';
+        else cachedEnvironment = 'CLN';
+    }
+}
+
+/** Nilai environment untuk initial state (localStorage lalu port), agar first paint sesuai env (MJL/CLN). */
+export const getInitialEnvironment = (): 'CLN' | 'MJL' | 'MJL2' => {
+    if (typeof window === 'undefined') return 'CLN';
+    const stored = localStorage.getItem('backend_environment');
+    if (stored === 'MJL' || stored === 'MJL2' || stored === 'CLN') return stored;
+    const port = window.location.port;
+    if (port === '5173') return 'MJL';
+    if (port === '5174') return 'MJL2';
+    return 'CLN';
+};
+
 // Fungsi untuk set environment cache (dipanggil dari komponen yang fetch /api/config/environment)
 export const setBackendEnvironment = (env: 'CLN' | 'MJL' | 'MJL2'): void => {
     cachedEnvironment = env;
@@ -874,6 +898,32 @@ export interface FinishingData {
  */
 export const getFinishingData = async (): Promise<ApiResponse<FinishingData>> => {
     return await apiGet<FinishingData>('/finishing');
+};
+
+/**
+ * Params untuk filter finishing (real-time status Dryroom/Folding)
+ */
+export interface GetFinishingDataParams {
+    date_from?: string;
+    date_to?: string;
+    wo?: string;
+}
+
+/**
+ * Get finishing data dengan filter tanggal dan WO (untuk dashboard Dryroom & Folding)
+ * Backend dapat mengembalikan data terfilter; bila backend belum mendukung, response sama dengan getFinishingData().
+ * @param params - Optional filter: date_from (YYYY-MM-DD), date_to (YYYY-MM-DD), wo
+ */
+export const getFinishingDataWithFilter = async (params?: GetFinishingDataParams): Promise<ApiResponse<FinishingData>> => {
+    if (!params?.date_from && !params?.date_to && !params?.wo) {
+        return await apiGet<FinishingData>('/finishing');
+    }
+    const search = new URLSearchParams();
+    if (params.date_from) search.set('date_from', params.date_from);
+    if (params.date_to) search.set('date_to', params.date_to);
+    if (params.wo) search.set('wo', params.wo);
+    const query = search.toString();
+    return await apiGet<FinishingData>(`/finishing${query ? `?${query}` : ''}`);
 };
 
 /**

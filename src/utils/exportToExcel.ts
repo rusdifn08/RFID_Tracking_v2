@@ -1,5 +1,35 @@
 import ExcelJS from 'exceljs';
 
+/** Format tanggal untuk nama file: YYYY-MM-DD → DD-MM-YYYY */
+function formatDateForFilename(isoDate: string): string {
+    if (!isoDate || !isoDate.trim()) return '';
+    const d = new Date(isoDate.trim());
+    if (isNaN(d.getTime())) return '';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+}
+
+/**
+ * Nama file export: {jenis_dashboard}{line_x}{date_from}to{date_to}.extension
+ */
+function buildExportFilename(
+    jenisDashboard: string,
+    lineX: string,
+    extension: 'xlsx' | 'csv',
+    dateFrom?: string,
+    dateTo?: string
+): string {
+    const today = new Date();
+    const todayStr = formatDateForFilename(today.toISOString().split('T')[0]);
+    const fromStr = (dateFrom && formatDateForFilename(dateFrom)) || todayStr;
+    const toStr = (dateTo && formatDateForFilename(dateTo)) || fromStr;
+    const ext = extension;
+    const base = `${jenisDashboard}${lineX}${fromStr}to${toStr}`;
+    return `${base}.${ext}`;
+}
+
 interface ExportData {
     tanggal: string;
     line: string;
@@ -430,14 +460,15 @@ export async function exportToExcel(
     worksheet.getRow(headerRow1).height = 25;
     worksheet.getRow(headerRow2).height = 22;
 
-    // Generate filename
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('id-ID', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    }).replace(/\//g, '-');
-    const filename = `RFID_Tracking_Line${lineId}_${dateStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
+    // Nama file: {jenis_dashboard}{line_x}{date_from}to{date_to}.extension
+    const lineX = `Line${lineId}`;
+    const filename = buildExportFilename(
+        'RFID_Tracking_',
+        lineX,
+        format === 'excel' ? 'xlsx' : 'csv',
+        filterDateFrom,
+        filterDateTo
+    );
 
     // Export
     if (format === 'excel') {
@@ -631,7 +662,9 @@ export async function exportListRFIDToExcel(
     data: ListRFIDItem[],
     lineId: string,
     format: 'excel' | 'csv' = 'excel',
-    summary?: ListRFIDSummary
+    summary?: ListRFIDSummary,
+    filterDateFrom?: string,
+    filterDateTo?: string
 ) {
     // Buat workbook baru
     const workbook = new ExcelJS.Workbook();
@@ -990,14 +1023,14 @@ export async function exportListRFIDToExcel(
         currentRow++;
     });
 
-    // Generate filename
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('id-ID', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    }).replace(/\//g, '-');
-    const filename = `List_RFID_Line${lineId}_${dateStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
+    // Nama file: {jenis_dashboard}{line_x}{date_from}to{date_to}.extension
+    const filename = buildExportFilename(
+        'List_RFID_',
+        `Line${lineId}`,
+        format === 'excel' ? 'xlsx' : 'csv',
+        filterDateFrom,
+        filterDateTo
+    );
 
     // Export
     if (format === 'excel') {

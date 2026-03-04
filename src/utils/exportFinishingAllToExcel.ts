@@ -236,14 +236,19 @@ export async function exportFinishingAllToExcel(
         currentRow++;
     });
 
-    // Generate filename
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('id-ID', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    }).replace(/\//g, '-');
-    const filename = `RFID_Tracking_Finishing_All_${dateStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
+    // Nama file: {jenis_dashboard}{date_from}to{date_to}.extension
+    const fmt = (d: string) => {
+        if (!d?.trim()) return '';
+        const x = new Date(d.trim());
+        if (isNaN(x.getTime())) return '';
+        const day = String(x.getDate()).padStart(2, '0');
+        const month = String(x.getMonth() + 1).padStart(2, '0');
+        return `${day}-${month}-${x.getFullYear()}`;
+    };
+    const today = new Date().toISOString().split('T')[0];
+    const fromStr = (filterDateFrom && fmt(filterDateFrom)) || fmt(today);
+    const toStr = (filterDateTo && fmt(filterDateTo)) || fromStr;
+    const filename = `RFID_Tracking_Finishing_All_${fromStr}to${toStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
 
     // Export
     if (format === 'excel') {

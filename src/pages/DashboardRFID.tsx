@@ -11,6 +11,7 @@ import type { ExportType } from '../components/ExportModal';
 import { exportToExcel } from '../utils/exportToExcel';
 import { useDashboardRFIDQuery } from '../hooks/useDashboardRFIDQuery';
 import { useDashboardStore } from '../stores/dashboardStore';
+import { useMqttLoginSuccessStore } from '../stores/mqttLoginSuccessStore';
 import { formatDateForAPI } from '../utils/dateUtils';
 import { useWiraDashboardWebSocket } from '../hooks/useWiraDashboardWebSocket';
 /* Lazy Load Heavy Components */
@@ -20,7 +21,7 @@ const DataLineCard = lazy(() => import('../components/dashboard/DataLineCard'));
 const RoomStatusCard = lazy(() => import('../components/dashboard/RoomStatusCard'));
 import StatusCard from '../components/dashboard/StatusCard';
 
-import { COLORS, DEFAULT_REWORK_POPUP_ENABLED } from '../components/dashboard/constants';
+import { COLORS, DEFAULT_REWORK_POPUP_ENABLED, ENABLE_WIRA_DASHBOARD_WEBSOCKET } from '../components/dashboard/constants';
 import { XCircle, CheckCircle, Wrench, Clock, Search, Crosshair, AlertCircle } from 'lucide-react';
 import backgroundImage from '../assets/background.jpg';
 import targetIcon from '../assets/target.webp';
@@ -99,6 +100,7 @@ export default function DashboardRFID() {
     } = useDashboardRFIDQuery(lineId);
 
     // Zustand store actions
+    const ledStatus = useMqttLoginSuccessStore((s) => s.ledStatus);
     const setShowExportModal = useDashboardStore((state) => state.setShowExportModal);
     const setFilterDateFromStore = useDashboardStore((state) => state.setFilterDateFrom);
     const setFilterDateToStore = useDashboardStore((state) => state.setFilterDateTo);
@@ -466,9 +468,9 @@ export default function DashboardRFID() {
     }, [woListQuery.data, woListQuery.isError]);
 
 
-    // WebSocket untuk WIRA dashboard data
+    // WebSocket untuk WIRA dashboard data — dinonaktifkan: hanya pakai API (tab Network hanya akses API)
     const { data: wiraWebSocketData } = useWiraDashboardWebSocket({
-        enabled: true,
+        enabled: ENABLE_WIRA_DASHBOARD_WEBSOCKET,
     });
 
 
@@ -633,10 +635,9 @@ export default function DashboardRFID() {
 
     // Data fetching sudah ditangani oleh custom hook useDashboardRFID
 
-    // Cari data dari WebSocket wira-dashboard berdasarkan lineId
+    // Data dari WebSocket (jika diaktifkan) — bila dinonaktifkan selalu null, pakai data API dari hook
     const wiraDashboardData = useMemo(() => {
-        if (!wiraWebSocketData?.data || !lineId) {
-            console.log('🔴 [wiraDashboardData] No data:', { hasData: !!wiraWebSocketData?.data, lineId });
+        if (!ENABLE_WIRA_DASHBOARD_WEBSOCKET || !wiraWebSocketData?.data || !lineId) {
             return null;
         }
 
@@ -1164,23 +1165,23 @@ export default function DashboardRFID() {
 
                             {/* BAGIAN TENGAH: QC CARDS - 2x2 Grid */}
                             <div className="flex-none w-full">
-                                <h2 className="text-sm sm:text-base font-bold text-gray-700 uppercase tracking-wide mb-2 sm:mb-3 px-1">QC Status</h2>
+                                <h2 className="text-sm sm:text-base font-semibold text-gray-900 tracking-wide mb-2 sm:mb-3 px-1" style={{ fontWeight: 600 }}>QC Status</h2>
                                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                                     <StatusCard type="REJECT" count={qcData.reject} label="REJECT QC" onClick={() => fetchDetailData('REJECT', 'QC')} />
                                     <StatusCard type="REWORK" count={qcData.rework} label="REWORK QC" onClick={() => fetchDetailData('REWORK', 'QC')} />
                                     <StatusCard type="WIRA" count={qcData.wira} label="WIRA QC" onClick={() => fetchDetailData('WIRA', 'QC')} />
-                                    <StatusCard type="GOOD" count={qcData.good} label="GOOD QC" onClick={() => fetchDetailData('GOOD', 'QC')} />
+                                    <StatusCard type="GOOD" count={qcData.good} label="GOOD QC" onClick={() => fetchDetailData('GOOD', 'QC')} loginLed={ledStatus?.qc?.status ?? null} />
                                 </div>
                             </div>
 
                             {/* BAGIAN TENGAH: PQC CARDS - 2x2 Grid */}
                             <div className="flex-none w-full">
-                                <h2 className="text-sm sm:text-base font-bold text-gray-700 uppercase tracking-wide mb-2 sm:mb-3 px-1">PQC Status</h2>
+                                <h2 className="text-sm sm:text-base font-semibold text-gray-900 tracking-wide mb-2 sm:mb-3 px-1" style={{ fontWeight: 600 }}>PQC Status</h2>
                                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                                     <StatusCard type="REJECT" count={pqcData.reject} label="REJECT PQC" onClick={() => fetchDetailData('REJECT', 'PQC')} />
                                     <StatusCard type="REWORK" count={pqcData.rework} label="REWORK PQC" onClick={() => fetchDetailData('REWORK', 'PQC')} />
                                     <StatusCard type="WIRA" count={pqcData.wira} label="WIRA PQC" onClick={() => fetchDetailData('WIRA', 'PQC')} />
-                                    <StatusCard type="GOOD" count={pqcData.good} label="GOOD PQC" onClick={() => fetchDetailData('GOOD', 'PQC')} />
+                                    <StatusCard type="GOOD" count={pqcData.good} label="GOOD PQC" onClick={() => fetchDetailData('GOOD', 'PQC')} loginLed={ledStatus?.pqc?.status ?? null} />
                                 </div>
                             </div>
 
@@ -1288,7 +1289,7 @@ export default function DashboardRFID() {
                                         <StatusCard type="REJECT" count={qcData.reject} label="REJECT QC" onClick={() => fetchDetailData('REJECT', 'QC')} />
                                         <StatusCard type="REWORK" count={qcData.rework} label="REWORK QC" onClick={() => fetchDetailData('REWORK', 'QC')} />
                                         <StatusCard type="WIRA" count={qcData.wira} label="WIRA QC" onClick={() => fetchDetailData('WIRA', 'QC')} />
-                                        <StatusCard type="GOOD" count={qcData.good} label="GOOD QC" onClick={() => fetchDetailData('GOOD', 'QC')} />
+                                        <StatusCard type="GOOD" count={qcData.good} label="GOOD QC" onClick={() => fetchDetailData('GOOD', 'QC')} loginLed={ledStatus?.qc?.status ?? null} />
                                     </div>
                                     {/* ROW 3: PQC Cards - min-height sama dengan QC */}
                                     <div
@@ -1302,7 +1303,7 @@ export default function DashboardRFID() {
                                         <StatusCard type="REJECT" count={pqcData.reject} label="REJECT PQC" onClick={() => fetchDetailData('REJECT', 'PQC')} />
                                         <StatusCard type="REWORK" count={pqcData.rework} label="REWORK PQC" onClick={() => fetchDetailData('REWORK', 'PQC')} />
                                         <StatusCard type="WIRA" count={pqcData.wira} label="WIRA PQC" onClick={() => fetchDetailData('WIRA', 'PQC')} />
-                                        <StatusCard type="GOOD" count={pqcData.good} label="GOOD PQC" onClick={() => fetchDetailData('GOOD', 'PQC')} />
+                                        <StatusCard type="GOOD" count={pqcData.good} label="GOOD PQC" onClick={() => fetchDetailData('GOOD', 'PQC')} loginLed={ledStatus?.pqc?.status ?? null} />
                                     </div>
                                 </div>
                                 {/* Bagian Kanan: 1 tall card (Room Status) - span 2 rows */}

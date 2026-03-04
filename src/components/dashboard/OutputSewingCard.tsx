@@ -39,20 +39,20 @@ const OutputSewingCard = memo(({ outputLine, targetOutput, onClick }: OutputSewi
             />
           </div>
           <h3
-            className="font-extrabold tracking-widest transition-colors text-center"
+            className="font-semibold tracking-tight transition-colors text-center text-gray-900"
             style={{
-              color: '#2979ff',
-              textTransform: 'uppercase',
+              textTransform: 'none',
               fontSize: 'clamp(0.5rem, 0.9vw + 0.25rem, 1.25rem)',
+              fontWeight: 600,
             }}
           >
             Sewing Output
           </h3>
           <span
-            className="font-bold leading-none tracking-tighter transition-all duration-500 ease-in-out transform scale-100 hover:scale-105 text-center"
+            className="font-bold leading-none tracking-tighter transition-all duration-500 ease-in-out transform scale-100 hover:scale-105 text-center text-blue-700"
             style={{
-              color: '#2563eb',
               fontSize: 'clamp(1.75rem, 4.5vw + 0.5rem, 5rem)',
+              fontWeight: 700,
             }}
           >
             {outputLine || 0}
@@ -68,7 +68,7 @@ const OutputSewingCard = memo(({ outputLine, targetOutput, onClick }: OutputSewi
             >
               <img src={targetIcon} alt="" className="w-3 h-3 flex-shrink-0 object-contain" aria-hidden />
               {targetMet && <CheckCircle2 className="flex-shrink-0" size={12} strokeWidth={2.5} aria-hidden />}
-              <span className="font-medium tracking-tight">Target: {targetOutput}</span>
+              <span className="font-medium text-gray-600 tracking-tight">Target: {targetOutput}</span>
             </div>
           )}
         </div>
