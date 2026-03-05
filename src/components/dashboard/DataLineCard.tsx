@@ -1,5 +1,5 @@
 import { memo, useMemo, useState, useRef, useEffect } from 'react';
-import { Filter, Search, ChevronDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Filter, Search, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import ChartCard from './ChartCard';
 import { getTodayLocalDateString } from '../../utils/dateUtils';
 import { ExportButton } from '../finishing/ExportButton';
@@ -117,8 +117,8 @@ const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, fi
         <ChartCard
             title={
                 <>
-                    <h2 className="font-semibold text-gray-900 tracking-tight group-hover:text-blue-700 transition-colors flex-1 min-w-0" style={{ textTransform: 'capitalize', fontSize: 'clamp(0.875rem, 1.2vw + 0.5rem, 1.125rem)', fontWeight: 600 }}>{`Data ${formattedLineTitle}`}</h2>
-                    <div className="flex items-center gap-0.5 xs:gap-1 sm:gap-1.5 md:gap-2 ml-auto">
+                    <h2 className="font-semibold text-gray-900 tracking-tight group-hover:text-blue-700 transition-colors flex-1 min-w-0 whitespace-nowrap" style={{ textTransform: 'capitalize', fontSize: 'clamp(0.875rem, 1.2vw + 0.5rem, 1.125rem)', fontWeight: 600 }}>{`Data ${formattedLineTitle}`}</h2>
+                    <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 flex-shrink-0 min-w-0">
                         {/* Date Filter - Input Langsung */}
                         <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2">
                             {isMobilePortrait ? (
@@ -150,68 +150,54 @@ const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, fi
                                 </>
                             ) : (
                                 <>
-                                    {/* Desktop/Tablet: Input date dengan icon di kanan, format dd/mm/yyyy */}
+                                    {/* Desktop/Tablet: Input date, lebar diperkecil untuk tablet kecil; tinggi h-8 sama dengan tombol Filter WO */}
                                     <div className="relative inline-block">
                                         <input
                                             type="date"
                                             lang="id-ID"
                                             value={filterDateFrom}
                                             onChange={(e) => onDateFromChange(e.target.value)}
-                                            className="date-filter-input py-1.5 xs:py-2 sm:py-2  xs:pl-3 sm:pl-3.5  bg-blue-50 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 text-xs sm:text-sm text-blue-700 placeholder-blue-300 w-full min-w-[128px] max-w-[140px]"
+                                            className="date-filter-input h-8 py-0 pl-2 pr-7 bg-blue-50 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 text-xs text-blue-700 placeholder-blue-300 w-full min-w-[90px] max-w-[110px] sm:min-w-[100px] sm:max-w-[120px]"
                                             style={{ fontFamily: 'Poppins, sans-serif' }}
                                         />
-                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-blue-600 flex items-center justify-center">
-                                            <Calendar className="w-4 h-4" strokeWidth={2.5} />
+                                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-blue-600 flex items-center justify-center">
+                                            <Calendar className="w-3.5 h-3.5" strokeWidth={2.5} />
                                         </span>
                                     </div>
-                                    <span className="text-blue-400 font-medium text-xs sm:text-sm">-</span>
+                                    <span className="text-blue-400 font-medium text-xs">-</span>
                                     <div className="relative inline-block">
                                         <input
                                             type="date"
                                             lang="id-ID"
                                             value={filterDateTo}
                                             onChange={(e) => onDateToChange(e.target.value)}
-                                            className="date-filter-input py-1.5 xs:py-2 sm:py-2 pl-2.5 xs:pl-3 sm:pl-3.5  bg-blue-50 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 text-xs sm:text-sm text-blue-700 placeholder-blue-300 w-full min-w-[128px] max-w-[140px]"
+                                            className="date-filter-input h-8 py-0 pl-2 pr-7 bg-blue-50 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 text-xs text-blue-700 placeholder-blue-300 w-full min-w-[90px] max-w-[110px] sm:min-w-[100px] sm:max-w-[120px]"
                                             style={{ fontFamily: 'Poppins, sans-serif' }}
                                         />
-                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-blue-600 flex items-center justify-center">
-                                            <Calendar className="w-4 h-4" strokeWidth={2.5} />
+                                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-blue-600 flex items-center justify-center">
+                                            <Calendar className="w-3.5 h-3.5" strokeWidth={2.5} />
                                         </span>
                                     </div>
                                 </>
                             )}
                             <button
                                 onClick={() => {
-                                    // Trigger search/apply filter - aktifkan filter tanggal
                                     onSearchClick();
                                 }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-1 px-2 min-h-[2rem] flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-200"
+                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-8 w-8 flex items-center justify-center flex-shrink-0 shadow-sm hover:shadow-md transition-all duration-200"
                                 title="Search"
                             >
-                                <Search
-                                    className="flex-shrink-0 text-white w-4 h-4"
-                                    strokeWidth={2.5}
-                                />
+                                <Search className="text-white w-4 h-4" strokeWidth={2.5} />
                             </button>
                         </div>
                         {/* WO Filter - Dropdown */}
-                        <div className="relative" ref={woDropdownRef}>
+                        <div className="relative flex-shrink-0" ref={woDropdownRef}>
                             <button
                                 onClick={() => setShowWoDropdown(!showWoDropdown)}
-                                className="bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 hover:text-blue-800 rounded-lg border border-blue-200 hover:border-blue-300 flex items-center gap-1 xs:gap-1.5 justify-center shadow-sm hover:shadow-md transition-all duration-300 ease-in-out group relative overflow-hidden py-1 px-2 min-h-[2rem] min-w-[2rem] w-auto max-w-[7rem]"
+                                className="bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 hover:text-blue-800 rounded-lg border border-blue-200 hover:border-blue-300 flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-300 ease-in-out h-8 w-8"
                                 title="Filter WO"
-                                style={{
-                                    fontFamily: 'Poppins, sans-serif',
-                                    fontWeight: 500,
-                                    fontSize: 'clamp(0.625rem, 1vw, 0.75rem)'
-                                }}
                             >
-                                <Filter className="flex-shrink-0 text-blue-600 w-4 h-4" strokeWidth={2} />
-                                <span className="whitespace-nowrap hidden sm:inline">Filter WO</span>
-                                <ChevronDown
-                                    className={`flex-shrink-0 text-blue-600 w-3.5 h-3.5 transition-transform duration-200 ${showWoDropdown ? 'rotate-180' : ''}`}
-                                    strokeWidth={2}
-                                />
+                                <Filter className="text-blue-600 w-4 h-4" strokeWidth={2} />
                             </button>
                             {/* Dropdown List */}
                             {showWoDropdown && (
@@ -333,7 +319,7 @@ const DataLineCard = memo(({ lineTitle, woData, filterDateFrom, filterDateTo, fi
                                         <div key={idx} className="group relative overflow-hidden bg-white rounded-lg border border-blue-500 p-0 xs:p-0 sm:p-0.5 flex flex-col items-center justify-center gap-0 xs:gap-0 sm:gap-0.5 transition-all duration-300 hover:shadow-sm h-full min-h-0">
                                             <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-500 via-blue-400 to-amber-400"></div>
                                             <div className="w-full text-center px-0.5 flex flex-col items-center justify-center gap-0 xs:gap-0 sm:gap-0.5 h-full min-h-0">
-                                                <span className="text-[10px] xs:text-[11px] sm:text-[12px] font-semibold text-gray-900 flex-shrink-0" style={{ textTransform: item.label === 'WO' ? 'uppercase' : 'none' }}>{item.label}</span>
+                                                <span className="text-sm font-semibold text-gray-900 flex-shrink-0" style={{ textTransform: item.label === 'WO' ? 'uppercase' : 'none' }}>{item.label}</span>
                                                 <span className="font-medium text-blue-700 truncate block w-full text-center" style={{ fontSize: 'clamp(0.5rem, 1.2vw + 0.2rem, 0.875rem)', lineHeight: '1.1' }} title={item.value || '-'}>
                                                     {item.value || '-'}
                                                 </span>
