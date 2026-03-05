@@ -4296,7 +4296,7 @@ app.get('/api/mqtt-status-online', (req, res) => {
 
 /**
  * GET /api/mqtt-info?line=1
- * Event info dari MQTT (topic info/line{N}/qc|pqc/{env}), payload: BEFORE_OUTPUT, BEFORE_PQC, BEFORE_QC, AFTER_QC, AFTER_PQC.
+ * Event info dari MQTT (topic info/line{N}/qc|pqc/{env}), payload: OUTPUT, QC, PQC. Alur: OUTPUT → QC → PQC.
  * Dikirim 1x lalu di-clear agar animasi info tidak berulang.
  */
 app.get('/api/mqtt-info', (req, res) => {
@@ -4349,7 +4349,7 @@ let lastMqttLoginFailEvent = null;
 let lastMqttLoginByLineAndRole = {};
 /** Status online alat RFID: payload "online" ke status/line{N}/qc|pqc|output/{env}. { [line]: { qc: { at }, pqc: { at }, output: { at } } } */
 let lastStatusOnline = {};
-/** Event info terakhir dari MQTT (topic info/line{N}/qc|pqc/{env}): payload BEFORE_* / AFTER_* untuk animasi info di dashboard. Dikirim 1x ke API lalu di-clear. */
+/** Event info terakhir dari MQTT (topic info/line{N}/qc|pqc/{env}): payload OUTPUT, QC, PQC untuk animasi info (alur OUTPUT→QC→PQC). Dikirim 1x ke API lalu di-clear. */
 let lastMqttInfoEvent = null;
 
 function startMqttClient() {
@@ -4385,13 +4385,13 @@ function startMqttClient() {
             return;
         }
 
-        // Topic info: info/line{N}/qc|pqc/{env} — payload BEFORE_OUTPUT, BEFORE_PQC, BEFORE_QC, AFTER_QC, AFTER_PQC
+        // Topic info: info/line{N}/qc|pqc/{env} — payload OUTPUT, QC, PQC (alur: OUTPUT → QC → PQC)
         const infoMatch = topic.match(/^info\/line(\d+)\/(qc|pqc)\/(cln|mjl|mjl2)$/);
         if (infoMatch) {
             const line = infoMatch[1];
             const role = infoMatch[2];
             const pl = payloadStr.trim().toUpperCase();
-            const allowed = ['BEFORE_OUTPUT', 'BEFORE_PQC', 'BEFORE_QC', 'AFTER_QC', 'AFTER_PQC'];
+            const allowed = ['OUTPUT', 'QC', 'PQC'];
             if (allowed.includes(pl)) {
                 lastMqttInfoEvent = { line, role, payload: pl, at: Date.now() };
             }

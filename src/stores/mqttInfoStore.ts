@@ -2,12 +2,8 @@ import { create } from 'zustand';
 
 export type MqttInfoRole = 'qc' | 'pqc';
 
-export type MqttInfoPayload =
-    | 'BEFORE_OUTPUT'
-    | 'BEFORE_PQC'
-    | 'BEFORE_QC'
-    | 'AFTER_QC'
-    | 'AFTER_PQC';
+/** Posisi garment dalam alur: OUTPUT → QC → PQC */
+export type MqttInfoPayload = 'OUTPUT' | 'QC' | 'PQC';
 
 export interface MqttInfoEvent {
     line: string;
@@ -28,20 +24,22 @@ export const useMqttInfoStore = create<MqttInfoState>((set) => ({
     clearEvent: () => set({ event: null }),
 }));
 
-/** Teks tampilan untuk animasi info berdasarkan payload */
-export function getMqttInfoMessage(payload: MqttInfoPayload): string {
-    switch (payload) {
-        case 'BEFORE_OUTPUT':
-            return 'Garment Masih Berada di Output';
-        case 'BEFORE_PQC':
-            return 'Garment Masih Berada di PQC';
-        case 'BEFORE_QC':
-            return 'Garment Masih Berada di QC';
-        case 'AFTER_QC':
-            return 'Garment Sudah Berada di QC Good';
-        case 'AFTER_PQC':
-            return 'Garment Sudah Berada di PQC Good';
-        default:
-            return payload;
+const STAGE_ORDER: Record<string, number> = { OUTPUT: 0, QC: 1, PQC: 2 };
+const STAGE_LABEL: Record<string, string> = { OUTPUT: 'Output', QC: 'QC', PQC: 'PQC' };
+
+/**
+ * Teks animasi berdasarkan alur: OUTPUT → QC → PQC.
+ * - Topic (role) = stasiun yang mengirim (qc atau pqc).
+ * - Payload = posisi garment saat ini (OUTPUT, QC, atau PQC).
+ * - Jika payload < role (proses sebelumnya) → "Garment Masih Berada di [payload]".
+ * - Jika payload >= role (proses sama atau lebih) → "Garment Sudah Berada di [payload]".
+ */
+export function getMqttInfoMessage(payload: MqttInfoPayload, role: MqttInfoRole): string {
+    const payloadOrder = STAGE_ORDER[payload] ?? 0;
+    const roleOrder = STAGE_ORDER[role.toUpperCase()] ?? 0;
+    const label = STAGE_LABEL[payload] ?? payload;
+    if (payloadOrder < roleOrder) {
+        return `Garment Masih Berada di ${label}`;
     }
+    return `Garment Sudah Berada di ${label}`;
 }
