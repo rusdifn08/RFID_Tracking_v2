@@ -955,7 +955,7 @@ export const getWiraDetail = async (
     status: string,
     line: string | number,
     options?: { tanggal_from?: string; tanggal_to?: string }
-): Promise<ApiResponse<{ status: string; filter_applied?: Record<string, string>; count?: number; data?: any }>> => {
+): Promise<ApiResponse<{ status: string; filter_applied?: Record<string, string>; count?: number; data?: any; summary_per_jam?: unknown[] }>> => {
     const params: Record<string, string> = { status, line: String(line) };
     if (options?.tanggal_from) params.tanggal_from = options.tanggal_from;
     if (options?.tanggal_to) params.tanggal_to = options.tanggal_to;

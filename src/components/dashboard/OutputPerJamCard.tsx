@@ -41,10 +41,9 @@ function formatDate(d: Date) {
     return `${y}-${m}-${day}`;
 }
 
-const OutputPerJamCard = memo(({ lineId, tanggalFrom, tanggalTo, className = '', activeTab: controlledTab, onTabChange }: OutputPerJamCardProps) => {
-    const [internalTab, setInternalTab] = useState<OutputTab>('output_sewing');
+const OutputPerJamCard = memo(({ lineId, tanggalFrom, tanggalTo, className = '', activeTab: controlledTab }: OutputPerJamCardProps) => {
+    const [internalTab] = useState<OutputTab>('output_sewing');
     const activeTab = controlledTab ?? internalTab;
-    const setActiveTab = onTabChange ?? setInternalTab;
     const today = useMemo(() => formatDate(new Date()), []);
     const from = tanggalFrom || today;
     const to = tanggalTo || today;

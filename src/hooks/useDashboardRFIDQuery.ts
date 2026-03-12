@@ -1,7 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useShallow } from 'zustand/react/shallow';
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { API_BASE_URL, getDefaultHeaders } from '../config/api';
+import {
+    POLLING_WIRA_SECONDS,
+    POLLING_WIRA_ERROR_RETRY_SECONDS,
+    POLLING_MONITORING_LINE_SECONDS,
+    POLLING_MONITORING_LINE_ERROR_RETRY_SECONDS,
+} from '../config/polling';
 import { useDashboardStore } from '../stores/dashboardStore';
 // NOTE: useWiraDashboardWebSocket tetap di-import untuk digunakan kembali nanti
 // import { useWiraDashboardWebSocket } from './useWiraDashboardWebSocket';
@@ -438,7 +444,6 @@ export const useDashboardRFIDQuery = (lineId: string) => {
     // DEFAULT: Gunakan API /wira dengan polling setiap 1 detik (tanpa filter tanggal)
     // FILTER AKTIF: Gunakan API /wira?tanggalfrom={from}&tanggalto={to} (setelah klik search)
     // ============================================
-    const hasDateFilter = isDateFilterActive && !!(appliedFilterDateFrom?.trim() || appliedFilterDateTo?.trim());
 
     const trackingDataQueryKey = ['dashboard-tracking', lineId, filterWo || '', isDateFilterActive, dateFromForApi || '', dateToForApi || ''] as const;
     
@@ -455,9 +460,9 @@ export const useDashboardRFIDQuery = (lineId: string) => {
         enabled: true, // Selalu aktif (baik dengan atau tanpa filter tanggal)
         refetchInterval: (query) => {
             if (query.state.status === 'error') {
-                return 10000; // Retry setelah 10 detik jika error
+                return POLLING_WIRA_ERROR_RETRY_SECONDS * 1000;
             }
-            return 1000; // Polling setiap 1 detik (default dan filter aktif)
+            return POLLING_WIRA_SECONDS * 1000;
         },
         staleTime: 0, // Data selalu dianggap stale untuk real-time
         gcTime: 30000, // Cache dihapus setelah 30 detik
@@ -497,13 +502,10 @@ export const useDashboardRFIDQuery = (lineId: string) => {
             return fetchWoData(lineId, filterWo || '', dateFromForApi, dateToForApi);
         },
         refetchInterval: (query) => {
-            // Hanya refetch jika query tidak dalam state loading/error
-            // Fix: Pastikan refetch terus berjalan meskipun ada error sementara
             if (query.state.status === 'error') {
-                // Retry setelah 10 detik jika error
-                return 10000;
+                return POLLING_MONITORING_LINE_ERROR_RETRY_SECONDS * 1000;
             }
-            return 5000; // Polling setiap 5 detik
+            return POLLING_MONITORING_LINE_SECONDS * 1000;
         },
         staleTime: 0, // Data selalu dianggap stale untuk real-time
         gcTime: 30000, // Cache dihapus setelah 30 detik

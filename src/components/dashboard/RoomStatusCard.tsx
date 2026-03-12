@@ -4,7 +4,8 @@ import ChartCard from './ChartCard';
 import { BarChart3, XCircle, Clock } from 'lucide-react';
 import dryroomIcon from '../../assets/dryroom_icon.webp';
 import foldingIcon from '../../assets/folding_icon.webp';
-import { DEFAULT_ROOM_STATUS_ENABLED } from './constants';
+import { HIDE_ROOM_STATUS_CARD } from '../../config/hide';
+import { POLLING_FINISHING_SECONDS } from '../../config/polling';
 import { getFinishingDataByLine } from '../../config/api';
 import RoomStatusDetailModal, { type RoomStatusType } from './RoomStatusDetailModal';
 import OutputPerJamCard, { TAB_CONFIG, type OutputTab } from './OutputPerJamCard';
@@ -19,7 +20,7 @@ interface RoomStatusCardProps {
 type ViewMode = 'room_status' | 'hourly_data';
 
 const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
-    const showRoomStatus = DEFAULT_ROOM_STATUS_ENABLED;
+    const showRoomStatus = !HIDE_ROOM_STATUS_CARD;
     const [viewMode, setViewMode] = useState<ViewMode>('room_status');
     const [activeHourlyTab, setActiveHourlyTab] = useState<OutputTab>('output_sewing');
     const [detailModalRoom, setDetailModalRoom] = useState<RoomStatusType | null>(null);
@@ -38,7 +39,7 @@ const RoomStatusCard = memo(({ lineId }: RoomStatusCardProps) => {
             return response.data;
         },
         enabled: !!lineId && showRoomStatus,
-        refetchInterval: 30000, // Refetch setiap 30 detik
+        refetchInterval: POLLING_FINISHING_SECONDS * 1000,
         retry: 3,
     });
 
