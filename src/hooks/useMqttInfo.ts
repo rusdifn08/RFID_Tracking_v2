@@ -5,6 +5,7 @@
 
 import { useEffect } from 'react';
 import { API_BASE_URL } from '../config/api';
+import { POLLING_MQTT_INFO_SECONDS } from '../config/polling';
 import { useMqttInfoStore } from '../stores/mqttInfoStore';
 
 function log(msg: string, ...args: unknown[]) {
@@ -41,7 +42,8 @@ export function useMqttInfoPolling(currentLineId: string | null): void {
         };
 
         poll();
-        const interval = setInterval(poll, 1500);
+        const intervalMs = POLLING_MQTT_INFO_SECONDS * 1000;
+        const interval = setInterval(poll, intervalMs);
         return () => clearInterval(interval);
     }, [currentLineId, setEvent]);
 }

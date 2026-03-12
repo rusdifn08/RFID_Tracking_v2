@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import StatusCard from './StatusCard';
 import ChartCard from './ChartCard';
 import { BarChart3, Droplets, Package, XCircle } from 'lucide-react';
-import { DEFAULT_ROOM_STATUS_ENABLED } from './constants';
+import { HIDE_ROOM_STATUS_CARD } from '../../config/hide';
+import { POLLING_FINISHING_SECONDS } from '../../config/polling';
 import { getFinishingDataByLine } from '../../config/api';
 
 interface StatusCardsGridProps {
@@ -24,7 +25,7 @@ interface StatusCardsGridProps {
 }
 
 const StatusCardsGrid = memo(({ qcData, pqcData, onCardClick, lineId }: StatusCardsGridProps) => {
-    const showRoomStatus = DEFAULT_ROOM_STATUS_ENABLED;
+    const showRoomStatus = !HIDE_ROOM_STATUS_CARD;
 
     // Fetch finishing data per line
     const { data: finishingResponse, isLoading: isLoadingFinishing } = useQuery({
@@ -38,7 +39,7 @@ const StatusCardsGrid = memo(({ qcData, pqcData, onCardClick, lineId }: StatusCa
             return response.data;
         },
         enabled: !!lineId && showRoomStatus,
-        refetchInterval: 30000, // Refetch setiap 30 detik
+        refetchInterval: POLLING_FINISHING_SECONDS * 1000,
         retry: 3,
     });
 

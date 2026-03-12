@@ -22,6 +22,8 @@ const RoomStatusCard = lazy(() => import('../components/dashboard/RoomStatusCard
 import StatusCard from '../components/dashboard/StatusCard';
 
 import { COLORS, DEFAULT_REWORK_POPUP_ENABLED, ENABLE_WIRA_DASHBOARD_WEBSOCKET } from '../components/dashboard/constants';
+import { HIDE_ROOM_STATUS_CARD } from '../config/hide';
+// Interval polling (/wira, /monitoring/line, mqtt-login-success, mqtt-info, finishing) diatur di config/polling.ts
 import { XCircle, CheckCircle, Wrench, Clock, Search, Crosshair, AlertCircle } from 'lucide-react';
 import backgroundImage from '../assets/background.jpg';
 import targetIcon from '../assets/target.webp';
@@ -133,7 +135,7 @@ export default function DashboardRFID() {
     const [detailType, setDetailType] = useState<'GOOD' | 'REWORK' | 'REJECT' | 'WIRA' | 'OUTPUT' | null>(null);
     // Output Sewing: summary per jam & filter info dari API baru
     const [detailSummaryPerJam, setDetailSummaryPerJam] = useState<any[]>([]);
-    const [detailFilterApplied, setDetailFilterApplied] = useState<Record<string, string> | null>(null);
+    const [, setDetailFilterApplied] = useState<Record<string, string> | null>(null);
     const [outputChartType, setOutputChartType] = useState<'bar' | 'area' | 'line'>('area');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -418,47 +420,16 @@ export default function DashboardRFID() {
         }
     }, [showDetailModal, detailQueryParams.type, detailQueryParams.section, appliedFilterWo, woData]);
 
-    // Query untuk fetch WO List dari API tracking/rfid_garment - selalu enabled untuk dropdown
+    // Query WO List dari API tracking/rfid_garment — dinonaktifkan (tidak ada request ke endpoint ini)
     const woListQuery = useQuery({
         queryKey: ['wo-list', lineId],
-        queryFn: async () => {
-            const response = await fetch(`${API_BASE_URL}/tracking/rfid_garment?line=${encodeURIComponent(lineId)}`, {
-                method: 'GET',
-                headers: {
-                    ...getDefaultHeaders(),
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            // Extract unique WO numbers from the data
-            const woSet = new Set<string>();
-            if (data.data && Array.isArray(data.data)) {
-                data.data.forEach((item: any) => {
-                    if (item.wo) {
-                        woSet.add(item.wo);
-                    }
-                });
-            } else if (Array.isArray(data)) {
-                data.forEach((item: any) => {
-                    if (item.wo) {
-                        woSet.add(item.wo);
-                    }
-                });
-            }
-
-            return Array.from(woSet).sort();
-        },
-        enabled: true, // Selalu enabled untuk dropdown
-        staleTime: 60000, // 1 menit
+        queryFn: async () => [] as string[],
+        enabled: false,
+        staleTime: 60000,
         retry: 1,
     });
 
-    // Update availableWOList dan loading state
+    // Update availableWOList dari query (saat ini selalu [] karena query disabled)
     useEffect(() => {
         if (woListQuery.data) {
             setAvailableWOList(woListQuery.data);
@@ -474,99 +445,10 @@ export default function DashboardRFID() {
     });
 
 
-    // Fungsi untuk fetch data rework terbaru dari List RFID API
-    const fetchLatestReworkData = useCallback(async (type: 'QC' | 'PQC', maxWaitSeconds: number = 10): Promise<any | null> => {
-        const startTime = Date.now();
-        const maxWaitTime = maxWaitSeconds * 1000; // Convert to milliseconds
-        const pollInterval = 1000; // Poll setiap 1 detik
-
-        return new Promise((resolve) => {
-            const poll = async () => {
-                try {
-                    const url = `${API_BASE_URL}/tracking/rfid_garment?line=${encodeURIComponent(lineId)}`;
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        headers: {
-                            ...getDefaultHeaders(),
-                        },
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    let allData = data.data || [];
-
-                    if (Array.isArray(data)) {
-                        allData = data;
-                    }
-
-                    // Filter data berdasarkan status rework
-                    const reworkData = allData.filter((item: any) => {
-                        if (!item.timestamp) return false;
-
-                        const bagian = (item.bagian || '').trim().toUpperCase();
-                        const lastStatus = (item.last_status || '').trim().toUpperCase();
-
-                        if (type === 'QC') {
-                            return bagian === 'QC' && lastStatus === 'REWORK';
-                        } else {
-                            return bagian === 'PQC' && lastStatus === 'PQC_REWORK';
-                        }
-                    });
-
-                    // Sort berdasarkan timestamp terbaru
-                    reworkData.sort((a: any, b: any) => {
-                        const dateA = new Date(a.timestamp).getTime();
-                        const dateB = new Date(b.timestamp).getTime();
-                        return dateB - dateA; // Terbaru di atas
-                    });
-
-                    // Ambil data terbaru
-                    if (reworkData.length > 0) {
-                        const latestRework = reworkData[0];
-
-                        // Cek apakah timestamp dalam rentang waktu yang wajar (dalam 10 detik terakhir)
-                        const itemTime = new Date(latestRework.timestamp).getTime();
-                        const now = Date.now();
-                        const timeDiff = now - itemTime;
-
-                        // Jika data dalam 10 detik terakhir, anggap valid
-                        if (timeDiff <= 10000) {
-                            resolve(latestRework);
-                            return;
-                        }
-                    }
-
-                    // Cek apakah sudah melewati waktu maksimal
-                    const elapsed = Date.now() - startTime;
-                    if (elapsed >= maxWaitTime) {
-                        resolve(null);
-                        return;
-                    }
-
-                    // Lanjutkan polling
-                    setTimeout(poll, pollInterval);
-                } catch (error) {
-                    console.error('Error fetching latest rework data:', error);
-
-                    // Cek apakah sudah melewati waktu maksimal
-                    const elapsed = Date.now() - startTime;
-                    if (elapsed >= maxWaitTime) {
-                        resolve(null);
-                        return;
-                    }
-
-                    // Lanjutkan polling meskipun error
-                    setTimeout(poll, pollInterval);
-                }
-            };
-
-            // Mulai polling
-            poll();
-        });
-    }, [lineId]);
+    // Fetch data rework terbaru — tidak lagi memanggil API /tracking/rfid_garment (selalu return null)
+    const fetchLatestReworkData = useCallback(async (_type: 'QC' | 'PQC', _maxWaitSeconds: number = 10): Promise<any | null> => {
+        return Promise.resolve(null);
+    }, []);
 
     // Initialize previous values saat pertama kali load
     useEffect(() => {
@@ -1185,12 +1067,14 @@ export default function DashboardRFID() {
                                 </div>
                             </div>
 
-                            {/* BAGIAN BAWAH: ROOM STATUS */}
-                            <div className="flex-none w-full" style={{ minHeight: '300px' }}>
-                                <Suspense fallback={<ChartSkeleton />}>
-                                    <RoomStatusCard lineId={lineId} />
-                                </Suspense>
-                            </div>
+                            {/* BAGIAN BAWAH: ROOM STATUS (sembunyikan jika HIDE_ROOM_STATUS_CARD) */}
+                            {!HIDE_ROOM_STATUS_CARD && (
+                                <div className="flex-none w-full" style={{ minHeight: '300px' }}>
+                                    <Suspense fallback={<ChartSkeleton />}>
+                                        <RoomStatusCard lineId={lineId} />
+                                    </Suspense>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         /* DESKTOP VERSION: One page, gap seragam (sama kiri-kanan & atas-bawah) */
@@ -1259,7 +1143,7 @@ export default function DashboardRFID() {
                                 </div>
                             </div>
 
-                            {/* ROW 2 & 3: QC + PQC (sama tinggi, responsive) + Room Status */}
+                            {/* ROW 2 & 3: QC + PQC (sama tinggi, responsive) + Room Status (jika tidak di-hide) */}
                             <div
                                 className="flex-1 flex flex-row min-h-0 overflow-hidden"
                                 style={{
@@ -1268,12 +1152,12 @@ export default function DashboardRFID() {
                                     gap: 'clamp(0.25rem, 0.6vw + 0.15rem, 0.625rem)'
                                 }}
                             >
-                                {/* Bagian Kiri: QC dan PQC sama tinggi, tiap baris punya min-height agar tidak terpotong */}
+                                {/* Bagian Kiri: QC dan PQC sama tinggi; full width jika Room Status di-hide */}
                                 <div
                                     className="flex-[2] min-w-0 flex flex-col overflow-hidden"
                                     style={{
-                                        flex: '2 1 66.666%',
-                                        maxWidth: '66.666%',
+                                        flex: HIDE_ROOM_STATUS_CARD ? '1 1 100%' : '2 1 66.666%',
+                                        maxWidth: HIDE_ROOM_STATUS_CARD ? '100%' : '66.666%',
                                         gap: 'clamp(0.25rem, 0.6vw + 0.15rem, 0.625rem)'
                                     }}
                                 >
@@ -1306,12 +1190,14 @@ export default function DashboardRFID() {
                                         <StatusCard type="GOOD" count={pqcData.good} label="GOOD PQC" onClick={() => fetchDetailData('GOOD', 'PQC')} loginLed={ledStatus?.pqc?.status ?? null} />
                                     </div>
                                 </div>
-                                {/* Bagian Kanan: 1 tall card (Room Status) - span 2 rows */}
-                                <div className="flex-[1] min-w-0 h-full overflow-hidden" style={{ flex: '1 1 33.333%', maxWidth: '33.333%' }}>
-                                    <Suspense fallback={<ChartSkeleton />}>
-                                        <RoomStatusCard lineId={lineId} />
-                                    </Suspense>
-                                </div>
+                                {/* Bagian Kanan: Room Status (hanya render jika tidak di-hide) */}
+                                {!HIDE_ROOM_STATUS_CARD && (
+                                    <div className="flex-[1] min-w-0 h-full overflow-hidden" style={{ flex: '1 1 33.333%', maxWidth: '33.333%' }}>
+                                        <Suspense fallback={<ChartSkeleton />}>
+                                            <RoomStatusCard lineId={lineId} />
+                                        </Suspense>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

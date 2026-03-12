@@ -10,6 +10,7 @@
 
 import { useEffect } from 'react';
 import { API_BASE_URL } from '../config/api';
+import { POLLING_MQTT_LOGIN_SUCCESS_SECONDS } from '../config/polling';
 import { useMqttLoginSuccessStore } from '../stores/mqttLoginSuccessStore';
 
 const log = (msg: string, ...args: unknown[]) => {
@@ -75,7 +76,8 @@ export function useMqttLoginSuccessPolling(currentLineId: string | null): void {
         };
 
         poll();
-        const interval = setInterval(poll, 1500);
+        const intervalMs = POLLING_MQTT_LOGIN_SUCCESS_SECONDS * 1000;
+        const interval = setInterval(poll, intervalMs);
         return () => clearInterval(interval);
     }, [currentLineId, setEvent, setEventFail, setLedStatus]);
 }
