@@ -28,6 +28,9 @@ const ListRFIDReject = lazy(() => import('../pages/ListRFIDReject.tsx'));
 const AllProductionLineDashboard = lazy(() => import('../pages/AllProductionLineDashboard.tsx'));
 const ProductionTrackingTime = lazy(() => import('../pages/ProductionTrackingTime.tsx'));
 const FormData = lazy(() => import('../pages/FormData.tsx'));
+const Cutting = lazy(() => import('../pages/Cutting.tsx'));
+const DashboardCutting = lazy(() => import('../pages/DashboardCutting.tsx'));
+const SewingLine = lazy(() => import('../pages/SewingLine.tsx'));
 
 // Loading component untuk Suspense (ringan agar paint cepat)
 const PageLoader = () => (
@@ -103,6 +106,56 @@ const router = createBrowserRouter([
             <ProtectedRoute>
                 <LazyWrapper>
                     <RFIDTracking />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/cutting',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <Cutting />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/dashboard-cutting',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <DashboardCutting />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/sewing',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <SewingLine />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/sewing/line/:id',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <LineDetail />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/sewing/all',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <AllProductionLineDashboard />
                 </LazyWrapper>
             </ProtectedRoute>
         ),

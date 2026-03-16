@@ -228,7 +228,7 @@ const Register = memo(() => {
     const isSubmitting = registerMutation.isPending;
 
     // Options untuk bagian dan line - dioptimasi dengan useMemo
-    const bagianOptions = useMemo(() => ['SEWING', 'CUTTING', 'QC', 'ROBOTIC', 'IT', 'HR', 'FINANCE', 'WAREHOUSE', "DRYROOM", "FOLDING", "GUDANG", "IE"], []);
+    const bagianOptions = useMemo(() => ['SOFTWARE ENGINEER', 'SEWING', 'CUTTING', 'QC', 'ROBOTIC', 'IT', 'HR', 'FINANCE', 'WAREHOUSE', "DRYROOM", "FOLDING", "GUDANG", "IE"], []);
     // Ambil line options dari production line data (menggunakan MJL sebagai default, bisa disesuaikan dengan environment)
     const lineOptions = useMemo(() => {
         // Filter production lines (exclude All Production Line) dan ambil line number

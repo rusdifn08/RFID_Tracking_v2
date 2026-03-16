@@ -5,4 +5,4 @@
  */
 
 /** Room Status card (Dryroom, Folding, Reject Room, Hourly Data) di Dashboard RFID */
-export const HIDE_ROOM_STATUS_CARD = true;
+export const HIDE_ROOM_STATUS_CARD = false;
