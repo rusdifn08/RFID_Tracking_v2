@@ -12,20 +12,46 @@ import backgroundImage from '../assets/background.jpg';
 // Saat ini menggunakan path string yang akan mencari di public/assets/
 // Pastikan file sudah dipindahkan ke public/assets/ atau src/assets/
 
+// Ikon dari src/assets (Vite resolve path)
+import cuttingIcon from '../assets/cutting.webp';
+import sewingIcon from '../assets/sewing.webp';
 // Path string - akan mencari di public/assets/ saat runtime
 const productionIcon = '/assets/production.webp';
 const rejectIcon = '/assets/reject.webp';
-const timeIcon = '/assets/time.webp';
 const finishingIcon = '/assets/finishing.webp';
+const timeIcon = '/assets/time.webp';
+import { HIDE_CARD_CUTTING_PROSES, HIDE_CARD_SEWING_PROSES } from '../config/hide';
 
 export default function RFIDTracking() {
     const { isOpen } = useSidebar();
     const navigate = useNavigate();
 
-    const cards = [
+    const allCards = [
+        {
+            id: 'cutting',
+            title: 'Cutting Proses',
+            subtitle: 'Monitor dan kelola proses cutting',
+            icon: null,
+            iconImage: cuttingIcon,
+            bgStart: 'from-emerald-400',
+            bgEnd: 'to-emerald-600',
+            shadow: 'shadow-emerald-200',
+            onClick: () => navigate('/cutting')
+        },
+        {
+            id: 'sewing',
+            title: 'Sewing Proses',
+            subtitle: 'Monitor dan kelola proses sewing',
+            icon: null,
+            iconImage: sewingIcon,
+            bgStart: 'from-teal-400',
+            bgEnd: 'to-teal-600',
+            shadow: 'shadow-teal-200',
+            onClick: () => navigate('/sewing')
+        },
         {
             id: 'production-line',
-            title: 'Production Line',
+            title: 'Production Proses',
             subtitle: 'Real-time Tracking of Production Lines',
             icon: null,
             iconImage: productionIcon,
@@ -36,7 +62,7 @@ export default function RFIDTracking() {
         },
         {
             id: 'finishing',
-            title: 'Finishing',
+            title: 'Finishing Proses',
             subtitle: 'Monitor dan kelola finishing process',
             icon: null,
             iconImage: finishingIcon,
@@ -47,7 +73,7 @@ export default function RFIDTracking() {
         },
         {
             id: 'reject-room',
-            title: 'Reject Room',
+            title: 'Reject Proses',
             subtitle: 'Dashboard & list data reject finishing',
             icon: null,
             iconImage: rejectIcon,
@@ -68,6 +94,12 @@ export default function RFIDTracking() {
             onClick: () => navigate('/production-tracking-time')
         }
     ];
+
+    const cards = allCards.filter((c) => {
+        if (c.id === 'cutting' && HIDE_CARD_CUTTING_PROSES) return false;
+        if (c.id === 'sewing' && HIDE_CARD_SEWING_PROSES) return false;
+        return true;
+    });
 
     return (
         <div className="flex min-h-screen w-full h-screen fixed inset-0 m-0 p-0"

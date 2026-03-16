@@ -1243,7 +1243,7 @@
     "ipAddress": "10.5.2.159",
     "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
     "loginTime": "2026-03-11T02:48:32.988Z",
-    "logoutTime": null,
+    "logoutTime": "2026-03-12T17:00:00.015Z",
     "backendIP": "10.5.0.106",
     "environment": "MJL",
     "timestamp": "2026-03-11T02:48:32.988Z"
@@ -1311,5 +1311,21 @@
     "backendIP": "10.5.0.106",
     "environment": "MJL",
     "timestamp": "2026-03-11T08:41:25.316Z"
+  },
+  {
+    "nik": "01",
+    "name": "FO_1",
+    "jabatan": "FOLDING",
+    "bagian": "FOLDING",
+    "role": "user",
+    "rfid_user": "01",
+    "line": "1",
+    "ipAddress": "10.5.191.146",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+    "loginTime": "2026-03-12T01:48:22.049Z",
+    "logoutTime": "2026-03-12T17:00:00.015Z",
+    "backendIP": "10.5.0.106",
+    "environment": "MJL",
+    "timestamp": "2026-03-12T01:48:22.049Z"
   }
 ]

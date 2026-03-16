@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, User, Sun, Moon, Edit, Tag } from 'lucide-react';
+import { ArrowRight, User, Edit, Tag } from 'lucide-react';
 import { API_BASE_URL, getDefaultHeaders, getInitialEnvironment, getEnvironmentFromAPI, getSupervisorDataFromAPI, invalidateSupervisorDataCache } from '../config/api';
 import type { ProductionLine } from '../data/production_line';
 import {
@@ -25,7 +25,14 @@ const formatTime12Hour = (time24: string): { time: string; period: string } => {
     };
 };
 
-export default function ProductionLine() {
+export interface RFIDLineContentProps {
+    /** Base path untuk line detail, e.g. '' = /line/:id, '/sewing' = /sewing/line/:id */
+    linePathPrefix?: string;
+    /** Path untuk "All" card, e.g. '/all-production-line' atau '/sewing/all' */
+    allPath?: string;
+}
+
+export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-production-line' }: RFIDLineContentProps = {}) {
     const navigate = useNavigate();
     const [hoveredCard, setHoveredCard] = useState<number | null>(null);
     const [environment, setEnvironment] = useState<'CLN' | 'MJL' | 'MJL2'>(getInitialEnvironment);
@@ -355,107 +362,6 @@ export default function ProductionLine() {
         });
     }, [productionLines, isLoadingShifts]);
 
-    // Handler untuk toggle shift
-    const handleShiftToggle = async (e: React.MouseEvent, lineId: number) => {
-        e.preventDefault();
-        e.stopPropagation(); // Prevent card click
-
-        const currentShift = lineShifts[lineId] || 'day';
-        const newShift: 'day' | 'night' = currentShift === 'day' ? 'night' : 'day';
-
-        // Optimistic update - langsung update UI
-        setLineShifts(prev => {
-            const updated: Record<number, 'day' | 'night'> = {
-                ...prev,
-                [lineId]: newShift
-            };
-            return updated;
-        });
-
-        // Save to server
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/shift-data`, {
-                method: 'POST',
-                headers: {
-                    ...getDefaultHeaders(),
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    lineId: lineId,
-                    shift: newShift,
-                    environment: environment
-                })
-            });
-
-            if (!response.ok) {
-                const responseData = await response.json();
-                console.error(`❌ [SHIFT TOGGLE] Failed: ${response.status}`, responseData);
-                // Revert on error
-                setLineShifts(prev => ({
-                    ...prev,
-                    [lineId]: currentShift // Revert ke nilai sebelumnya
-                }));
-            }
-        } catch (error) {
-            console.error('❌ [SHIFT TOGGLE] Error:', error);
-            // Revert on error
-            setLineShifts(prev => ({
-                ...prev,
-                [lineId]: currentShift // Revert ke nilai sebelumnya
-            }));
-        }
-    };
-
-    // Helper Render Shift Icon (siang = Sun, malam = Moon) - tidak diubah
-    const renderShiftIcon = (lineId: number) => {
-        const shift = lineShifts[lineId] || 'day';
-        const isDay = shift === 'day';
-
-        return (
-            <div className="w-full h-full flex items-center justify-center relative">
-                {isDay ? (
-                    <div className="relative w-full h-full flex items-center justify-center">
-                        <div
-                            className="absolute inset-0 rounded-full blur-sm opacity-60"
-                            style={{
-                                background: 'radial-gradient(circle, rgba(255,193,7,0.8) 0%, rgba(255,152,0,0.4) 50%, transparent 100%)'
-                            }}
-                        />
-                        <Sun
-                            className="w-5 xs:w-6 sm:w-7 h-5 xs:h-6 sm:h-7 relative z-10"
-                            style={{
-                                color: '#B45309',
-                                filter: 'drop-shadow(0 2px 6px rgb(253, 255, 241)) drop-shadow(0 0 3px rgb(252, 244, 98))',
-                                strokeWidth: 3
-                            }}
-                            fill="#F59E0B"
-                        />
-                    </div>
-                ) : (
-                    <div className="relative w-full h-full flex items-center justify-center">
-                        <div
-                            className="absolute inset-0 rounded-full blur-sm opacity-50"
-                            style={{
-                                background: 'radial-gradient(circle, rgba(147,197,253,0.6) 0%, rgba(59,130,246,0.3) 50%, transparent 100%)'
-                            }}
-                        />
-                        <Moon
-                            className="w-5 xs:w-6 sm:w-7 h-5 xs:h-6 sm:h-7 relative z-10"
-                            style={{
-                                color: '#FBBF24',
-                                filter: 'drop-shadow(0 2px 6px rgba(147,197,253,0.5))',
-                                strokeWidth: 2.5
-                            }}
-                            fill="#FCD34D"
-                        />
-                        <div className="absolute top-0 right-1 w-1 h-1 rounded-full opacity-80" style={{ background: '#FBBF24', boxShadow: '0 0 4px 2px rgba(251,191,36,0.6)' }} />
-                        <div className="absolute bottom-1 left-0 w-0.5 h-0.5 rounded-full opacity-70" style={{ background: '#FBBF24', boxShadow: '0 0 3px 1px rgba(251,191,36,0.5)' }} />
-                    </div>
-                )}
-            </div>
-        );
-    };
-
     return (
         <div className="w-full h-full font-sans"
         >
@@ -470,17 +376,24 @@ export default function ProductionLine() {
                     // Cek apakah line ini aktif berdasarkan data wira
                     const isLineActive = activeLines.has(line.id);
 
+                    // Di konteks Sewing: tampilkan "Sewing Line" / "All Sewing Line", bukan "Production Line"
+                    const isAllLine = line.id === 0 || line.id === 111 || line.id === 112;
+                    const cardTitle = linePathPrefix === '/sewing'
+                        ? (isAllLine ? 'All Sewing Line' : line.title.replace(/^Production Line /i, 'Sewing Line '))
+                        : line.title;
+
                     return (
                         <div
                             key={`line-${currentLine.line || currentLine.id}-${index}`}
                             onClick={() => {
                                 // Gunakan currentLine untuk memastikan data yang benar
                                 if (currentLine.id === 0 || currentLine.id === 111 || currentLine.id === 112) {
-                                    navigate('/all-production-line');
+                                    navigate(allPath);
                                 } else {
                                     // Prioritas: gunakan currentLine.line jika ada, fallback ke currentLine.id
                                     const targetLine = currentLine.line || currentLine.id.toString();
-                                    navigate(`/line/${targetLine}`);
+                                    const linePath = linePathPrefix ? `${linePathPrefix}/line/${targetLine}` : `/line/${targetLine}`;
+                                    navigate(linePath);
                                 }
                             }}
                             onMouseEnter={() => {
@@ -581,36 +494,6 @@ export default function ProductionLine() {
                                 </div>
                             </div>
 
-                            {/* --- FLOATING BOX (Shift Icon) dengan Design Profesional --- */}
-                            <div
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleShiftToggle(e, line.id);
-                                }}
-                                onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                }}
-                                onMouseUp={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                }}
-                                className="absolute -top-2.5 xs:-top-3 sm:-top-3.5 left-3.5 xs:left-4 sm:left-5 w-9 xs:w-11 sm:w-13 h-7 xs:h-9 sm:h-11 rounded-xl shadow-xl flex items-center justify-center z-50 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 border-2 border-white overflow-hidden cursor-pointer hover:shadow-2xl active:scale-95"
-                                style={{
-                                    background: (lineShifts[line.id] || 'day') === 'day'
-                                        ? 'linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%)' // Gradient emas-orange untuk siang
-                                        : 'linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #1E293B 100%)', // Gradient biru gelap untuk malam
-                                    boxShadow: (lineShifts[line.id] || 'day') === 'day'
-                                        ? '0 4px 12px rgba(255,165,0,0.4), 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)'
-                                        : '0 4px 12px rgba(59,130,246,0.4), 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
-                                    pointerEvents: 'auto', // Pastikan bisa di-click
-                                    zIndex: 50 // Pastikan di atas card
-                                }}
-                            >
-                                {renderShiftIcon(line.id)}
-                            </div>
-
                             {/* --- CARD CONTENT --- */}
                             <div className="flex flex-col justify-between h-full flex-1" style={{ paddingTop: '1.5rem' }}>
 
@@ -618,7 +501,7 @@ export default function ProductionLine() {
                                 <div className="flex items-center justify-center flex-1" style={{ minHeight: 0 }}>
                                     <h3 className={`text-[10px] xs:text-xs sm:text-sm md:text-base lg:text-lg tracking-tight text-center truncate w-full transition-colors duration-300 ${isHovered ? 'text-white' : 'text-[#0073ee]'
                                         }`} style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 550, textTransform: 'capitalize' }}>
-                                        {line.title}
+                                        {cardTitle}
                                     </h3>
                                 </div>
 

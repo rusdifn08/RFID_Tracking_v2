@@ -55,6 +55,82 @@ export default function Breadcrumb() {
                 label: 'Production Lines',
                 isActive: true,
             });
+        } else if (path.startsWith('/cutting') && !path.startsWith('/dashboard-cutting')) {
+            breadcrumbs.push({
+                label: 'RFID Tracking',
+                path: '/rfid-tracking',
+            });
+            breadcrumbs.push({
+                label: 'Cutting Proses',
+                isActive: true,
+            });
+        } else if (path.startsWith('/dashboard-cutting')) {
+            breadcrumbs.push({
+                label: 'RFID Tracking',
+                path: '/rfid-tracking',
+            });
+            breadcrumbs.push({
+                label: 'Cutting Proses',
+                path: '/cutting',
+            });
+            breadcrumbs.push({
+                label: 'Dashboard Cutting Proses',
+                isActive: true,
+            });
+        } else if (path.startsWith('/sewing/line/')) {
+            const decodedPath = decodeURIComponent(path);
+            const lineIdMatch = decodedPath.match(/\/sewing\/line\/(\d+)/) || decodedPath.match(/\/sewing\/line\/LINE[% ]*(\d+)/i);
+            const lineId = lineIdMatch?.[1];
+            const lineTitles: { [key: string]: string } = {
+                '1': 'Sewing Line 1', '2': 'Sewing Line 2', '3': 'Sewing Line 3', '4': 'Sewing Line 4',
+                '5': 'Sewing Line 5', '6': 'Sewing Line 6', '7': 'Sewing Line 7', '8': 'Sewing Line 8', '9': 'Sewing Line 9',
+            };
+            breadcrumbs.push({
+                label: 'RFID Tracking',
+                path: '/rfid-tracking',
+            });
+            breadcrumbs.push({
+                label: 'Sewing Proses',
+                path: '/sewing',
+            });
+            breadcrumbs.push({
+                label: 'Sewing Lines',
+                path: '/sewing',
+            });
+            breadcrumbs.push({
+                label: lineTitles[lineId || '1'] || `Sewing Line ${lineId}`,
+                isActive: true,
+            });
+        } else if (path.startsWith('/sewing/all')) {
+            breadcrumbs.push({
+                label: 'RFID Tracking',
+                path: '/rfid-tracking',
+            });
+            breadcrumbs.push({
+                label: 'Sewing Proses',
+                path: '/sewing',
+            });
+            breadcrumbs.push({
+                label: 'Sewing Lines',
+                path: '/sewing',
+            });
+            breadcrumbs.push({
+                label: 'All Sewing Line',
+                isActive: true,
+            });
+        } else if (path.startsWith('/sewing')) {
+            breadcrumbs.push({
+                label: 'RFID Tracking',
+                path: '/rfid-tracking',
+            });
+            breadcrumbs.push({
+                label: 'Sewing Proses',
+                path: '/sewing',
+            });
+            breadcrumbs.push({
+                label: 'Sewing Lines',
+                isActive: true,
+            });
         } else if (path.startsWith('/line/')) {
             // Decode URL untuk menangani format "LINE%203" atau "LINE 3"
             const decodedPath = decodeURIComponent(path);
