@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, User, Edit, Tag } from 'lucide-react';
+import { ArrowRight, User, Sun, Moon, Edit, Tag } from 'lucide-react';
 import { API_BASE_URL, getDefaultHeaders, getInitialEnvironment, getEnvironmentFromAPI, getSupervisorDataFromAPI, invalidateSupervisorDataCache } from '../config/api';
 import type { ProductionLine } from '../data/production_line';
 import {
@@ -10,6 +10,8 @@ import {
 } from '../data/production_line';
 import EditSupervisorShiftModal from './EditSupervisorShiftModal';
 import { preloadLineDetail } from '../utils/preload';
+import { HIDE_SHIFT_ICON, SHOW_PRODUCTION_LINE_CARD } from '../config/hide';
+import brandIconMontbell from '../assets/montbell.svg';
 
 // Helper function untuk convert 24-hour format ke 12-hour format dengan AM/PM
 const formatTime12Hour = (time24: string): { time: string; period: string } => {
@@ -262,15 +264,15 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
 
                             if (lineNum !== null && lineNum !== undefined && lineNum !== '') {
                                 // Convert ke string untuk matching
-                                const lineNumStr = typeof lineNum === 'string' 
-                                    ? lineNum.trim().toUpperCase() 
+                                const lineNumStr = typeof lineNum === 'string'
+                                    ? lineNum.trim().toUpperCase()
                                     : lineNum.toString().trim();
 
                                 // Cari line berdasarkan line number (exact match)
-                                const matchingLine = productionLines.find(line => 
+                                const matchingLine = productionLines.find(line =>
                                     line.line && line.line.toUpperCase() === lineNumStr
                                 );
-                                
+
                                 if (matchingLine && validLineIds.has(matchingLine.id)) {
                                     // Exact match ditemukan, tambahkan line ID
                                     lines.add(matchingLine.id);
@@ -318,7 +320,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
 
         loadActiveLines();
 
-        return () => {};
+        return () => { };
     }, [environment, productionLines]); // Load wira sekali saja saat mount / environment berubah
 
     // Initialize default shifts untuk production lines yang belum ada di data
@@ -361,6 +363,54 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
             return newShifts;
         });
     }, [productionLines, isLoadingShifts]);
+
+    // Handler untuk toggle shift (dipakai saat ikon shift diklik)
+    const handleShiftToggle = async (e: React.MouseEvent, lineId: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const currentShift = lineShifts[lineId] || 'day';
+        const newShift: 'day' | 'night' = currentShift === 'day' ? 'night' : 'day';
+        setLineShifts(prev => ({ ...prev, [lineId]: newShift }));
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/shift-data`, {
+                method: 'POST',
+                headers: { ...getDefaultHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lineId, shift: newShift, environment })
+            });
+            if (!response.ok) {
+                setLineShifts(prev => ({ ...prev, [lineId]: currentShift }));
+            }
+        } catch {
+            setLineShifts(prev => ({ ...prev, [lineId]: currentShift }));
+        }
+    };
+
+    // Normalisasi: tampilkan brand (nama/style + ikon) atau shift (matahari/bulan)
+    const showBrandOnCard = (SHOW_PRODUCTION_LINE_CARD === 'brand' || SHOW_PRODUCTION_LINE_CARD === 0);
+
+    const getBrandIcon = (): string => brandIconMontbell;
+
+    const renderShiftIcon = (lineId: number) => {
+        const shift = lineShifts[lineId] || 'day';
+        const isDay = shift === 'day';
+        return (
+            <div className="w-full h-full flex items-center justify-center relative">
+                {isDay ? (
+                    <div className="relative w-full h-full flex items-center justify-center">
+                        <div className="absolute inset-0 rounded-full blur-sm opacity-60" style={{ background: 'radial-gradient(circle, rgba(255,193,7,0.8) 0%, rgba(255,152,0,0.4) 50%, transparent 100%)' }} />
+                        <Sun className="w-5 xs:w-6 sm:w-7 h-5 xs:h-6 sm:h-7 relative z-10" style={{ color: '#B45309', filter: 'drop-shadow(0 2px 6px rgb(253, 255, 241)) drop-shadow(0 0 3px rgb(252, 244, 98))', strokeWidth: 3 }} fill="#F59E0B" />
+                    </div>
+                ) : (
+                    <div className="relative w-full h-full flex items-center justify-center">
+                        <div className="absolute inset-0 rounded-full blur-sm opacity-50" style={{ background: 'radial-gradient(circle, rgba(147,197,253,0.6) 0%, rgba(59,130,246,0.3) 50%, transparent 100%)' }} />
+                        <Moon className="w-5 xs:w-6 sm:w-7 h-5 xs:h-6 sm:h-7 relative z-10" style={{ color: '#FBBF24', filter: 'drop-shadow(0 2px 6px rgba(147,197,253,0.5))', strokeWidth: 2.5 }} fill="#FCD34D" />
+                        <div className="absolute top-0 right-1 w-1 h-1 rounded-full opacity-80" style={{ background: '#FBBF24', boxShadow: '0 0 4px 2px rgba(251,191,36,0.6)' }} />
+                        <div className="absolute bottom-1 left-0 w-0.5 h-0.5 rounded-full opacity-70" style={{ background: '#FBBF24', boxShadow: '0 0 3px 1px rgba(251,191,36,0.5)' }} />
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     return (
         <div className="w-full h-full font-sans"
@@ -493,6 +543,44 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
                                     </div>
                                 </div>
                             </div>
+
+                            {/* --- FLOATING BOX kiri atas: brand (nama/style) ukuran sama seperti box shift, atau shift (matahari/bulan) --- */}
+                            {showBrandOnCard ? (
+                                <div
+                                    className="absolute -top-2.5 xs:-top-3 sm:-top-3.5 left-3.5 xs:left-4 sm:left-5 w-9 xs:w-11 sm:w-13 h-7 xs:h-9 sm:h-11 rounded-xl shadow-xl flex items-center justify-center z-50 transition-all duration-300 group-hover:scale-110 border-2 border-white overflow-hidden bg-white/95"
+                                    style={{ pointerEvents: 'auto', zIndex: 50 }}
+                                    title="Brand"
+                                >
+                                    <img
+                                        src={getBrandIcon()}
+                                        alt="Brand"
+                                        className="w-8 xs:w-9 sm:w-10 h-8 xs:h-9 sm:h-10 object-contain"
+                                    />
+                                </div>
+                            ) : !HIDE_SHIFT_ICON && (
+                                <div
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleShiftToggle(e, line.id);
+                                    }}
+                                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                    onMouseUp={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                    className="absolute -top-2.5 xs:-top-3 sm:-top-3.5 left-3.5 xs:left-4 sm:left-5 w-9 xs:w-11 sm:w-13 h-7 xs:h-9 sm:h-11 rounded-xl shadow-xl flex items-center justify-center z-50 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 border-2 border-white overflow-hidden cursor-pointer hover:shadow-2xl active:scale-95"
+                                    style={{
+                                        background: (lineShifts[line.id] || 'day') === 'day'
+                                            ? 'linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%)'
+                                            : 'linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #1E293B 100%)',
+                                        boxShadow: (lineShifts[line.id] || 'day') === 'day'
+                                            ? '0 4px 12px rgba(255,165,0,0.4), 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)'
+                                            : '0 4px 12px rgba(59,130,246,0.4), 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+                                        pointerEvents: 'auto',
+                                        zIndex: 50
+                                    }}
+                                >
+                                    {renderShiftIcon(line.id)}
+                                </div>
+                            )}
 
                             {/* --- CARD CONTENT --- */}
                             <div className="flex flex-col justify-between h-full flex-1" style={{ paddingTop: '1.5rem' }}>
