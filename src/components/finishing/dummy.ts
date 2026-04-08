@@ -17,19 +17,6 @@ export const hourlyShipmentTableData = [
  { hour: '15:00', table1: 95, table2: 45, table3: 100, table4: 80, table5: 105, table6: 98, table7: 78, table8: 92 },
 ];
 
-// Mock data untuk Chart Data Per Hour (Dryroom)
-export const dryroomChartData = [
- { hour: '08:00', dryroom: 45, target: 80 },
- { hour: '09:00', dryroom: 58, target: 80 },
- { hour: '10:00', dryroom: 65, target: 80 },
- { hour: '11:00', dryroom: 72, target: 80 },
- { hour: '12:00', dryroom: 68, target: 80 },
- { hour: '13:00', dryroom: 75, target: 80 },
- { hour: '14:00', dryroom: 80, target: 80 },
- { hour: '15:00', dryroom: 78, target: 80 },
- { hour: '16:00', dryroom: 82, target: 80 },
-];
-
 // Mock data untuk Table Detail (Table Detail Modal)
 export interface TableDetailItem {
  id: number;

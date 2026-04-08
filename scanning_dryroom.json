@@ -1,0 +1,36 @@
+{
+  "checkin": {
+    "nama_operator": "RUSDI FADLI NURYUDA",
+    "nik_operator": "11111111",
+    "updatedAt": "2026-04-02T07:03:38.657Z",
+    "last_scan": {
+      "rfid": "0013543154",
+      "wo": "TEST_FINISHING",
+      "item": "TEST_FINISHING",
+      "buyer": "TEST_FINISHING",
+      "style": "TEST_FINISHING",
+      "color": "TEST_FINISHING",
+      "size": "TEST_FINISHING",
+      "status": "IN_DRYROOM",
+      "message": "Success IN Dryroom",
+      "updatedAt": "2026-04-02T07:03:38.657Z"
+    }
+  },
+  "checkout": {
+    "nama_operator": "RUSDI FADLI NURYUDA",
+    "nik_operator": "11111111",
+    "updatedAt": "2026-04-02T07:26:13.908Z",
+    "last_scan": {
+      "rfid": "0013543154",
+      "wo": "TEST_FINISHING",
+      "item": "TEST_FINISHING",
+      "buyer": "TEST_FINISHING",
+      "style": "TEST_FINISHING",
+      "color": "TEST_FINISHING",
+      "size": "TEST_FINISHING",
+      "status": "OUT_DRYROOM",
+      "message": "Success OUT Dryroom",
+      "updatedAt": "2026-04-02T07:26:13.908Z"
+    }
+  }
+}

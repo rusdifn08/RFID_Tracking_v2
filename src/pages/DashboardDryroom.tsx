@@ -3,11 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
   Bar, Line, ComposedChart,
-  XAxis, YAxis, CartesianGrid, Tooltip
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
 import {
-  Droplet,
-  TrendingUp, RefreshCw
+  Droplet, TrendingUp, RefreshCw, Filter, Calendar, Layers, LogIn, LogOut
 } from 'lucide-react';
 import dryroomIcon from '../assets/dryroom_icon.webp';
 
@@ -20,9 +19,8 @@ import { getFinishingData, getFinishingDataWithFilter, getFinishingDataByLine, A
 import { productionLinesMJL } from '../data/production_line';
 import { Card, MetricCard, TableDistribution, FilterButton } from '../components/finishing';
 import { FinishingDetailModal, type FinishingMetricType, type FinishingSection } from '../components/finishing/FinishingDetailModal';
-import { dryroomChartData } from '../components/finishing/dummy';
 import { exportFinishingToExcel } from '../utils/exportFinishingToExcel';
-import { Filter, Calendar } from 'lucide-react';
+import { FINISHING_HOURLY_CHART_LABELS } from '../utils/finishingHourlyAxis';
 
 /**
  * ============================================================================
@@ -33,9 +31,12 @@ import { Filter, Calendar } from 'lucide-react';
 
 interface ChartDataPoint {
   hour: string;
-  dryroom: number;
+  checkIn: number;
+  checkOut: number;
   target: number;
 }
+
+const DRYROOM_HOURLY_TARGET = 80;
 
 interface PieDataPoint {
   name: string;
@@ -89,7 +90,8 @@ export default function DashboardDryroom() {
 
   // --- STATE ---
   const [filters, setFilters] = useState<FilterState>({ dateFrom: '', dateTo: '', wo: '' });
-  const [modals, setModals] = useState({ filter: false, wo: false, export: false, scan: false });
+  const [modals, setModals] = useState({ filter: false, wo: false, export: false });
+  const [scanAction, setScanAction] = useState<'checkin' | 'checkout' | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [showWoFilterModal, setShowWoFilterModal] = useState(false);
   const [showDateFilterModal, setShowDateFilterModal] = useState(false);
@@ -97,6 +99,17 @@ export default function DashboardDryroom() {
   const [detailModalType, setDetailModalType] = useState<FinishingMetricType>('waiting');
   const [detailModalSection, setDetailModalSection] = useState<FinishingSection>('dryroom');
   const [detailSearchQuery, setDetailSearchQuery] = useState('');
+  const userPart = (() => {
+    try {
+      const userRaw = localStorage.getItem('user');
+      if (!userRaw) return '';
+      const user = JSON.parse(userRaw);
+      return String(user?.bagian || user?.jabatan || '').toUpperCase().trim();
+    } catch {
+      return '';
+    }
+  })();
+  const canAccessDryroomScanning = ['DRYROOM', 'ROBOTIC'].includes(userPart);
 
   // --- EFFECT ---
   useEffect(() => {
@@ -111,10 +124,10 @@ export default function DashboardDryroom() {
       try {
         const response = hasFilter
           ? await getFinishingDataWithFilter({
-              date_from: filters.dateFrom || undefined,
-              date_to: filters.dateTo || undefined,
-              wo: filters.wo || undefined,
-            })
+            date_from: filters.dateFrom || undefined,
+            date_to: filters.dateTo || undefined,
+            wo: filters.wo || undefined,
+          })
           : await getFinishingData();
         if (!response.success || !response.data) return { dryroom: { waiting: 0, checkin: 0, checkout: 0 } };
         return response.data;
@@ -237,10 +250,49 @@ export default function DashboardDryroom() {
       .filter((item): item is TableDistributionData => item !== null);
   }, [allLineFinishingData, productionLines, filters.wo]);
 
-  // Chart data - menggunakan mock data dari dummy.ts
+  const hourlyChartDate = (filters.dateFrom && filters.dateFrom.trim())
+    ? filters.dateFrom.trim()
+    : new Date().toISOString().split('T')[0];
+
+  const { data: dryroomHourlyResponse, refetch: refetchDryroomHourly } = useQuery({
+    queryKey: ['dryroom-hourly-throughput', hourlyChartDate],
+    queryFn: async () => {
+      const response = await fetch(
+        `${API_BASE_URL}/api/dryroom/hourly?date=${encodeURIComponent(hourlyChartDate)}`,
+        { headers: getDefaultHeaders() }
+      );
+      if (!response.ok) throw new Error('Gagal mengambil hourly dryroom');
+      const json = await response.json();
+      if (json.success && Array.isArray(json.data)) return json.data as { hour: string; checkIn: number; checkOut: number }[];
+      return [];
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: 2,
+  });
+
   const chartData: ChartDataPoint[] = useMemo(() => {
-    return dryroomChartData;
-  }, []);
+    const hours = FINISHING_HOURLY_CHART_LABELS;
+    const byHour = new Map<string, { checkIn: number; checkOut: number }>();
+    (dryroomHourlyResponse || []).forEach((row) => {
+      if (row?.hour) {
+        byHour.set(row.hour, {
+          checkIn: Number(row.checkIn) || 0,
+          checkOut: Number(row.checkOut) || 0,
+        });
+      }
+    });
+    return hours.map((hour) => {
+      const row = byHour.get(hour);
+      return {
+        hour,
+        checkIn: row?.checkIn ?? 0,
+        checkOut: row?.checkOut ?? 0,
+        target: DRYROOM_HOURLY_TARGET,
+      };
+    });
+  }, [dryroomHourlyResponse]);
 
 
   // --- LAYOUT ---
@@ -398,16 +450,21 @@ export default function DashboardDryroom() {
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                         <defs>
-                          <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.9} /><stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.2} />
+                          <linearGradient id="dryBarInMobile" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.95} /><stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.2} />
+                          </linearGradient>
+                          <linearGradient id="dryBarOutMobile" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.95} /><stop offset="95%" stopColor="#22c55e" stopOpacity={0.2} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                         <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 9, fontWeight: 500 }} dy={5} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 9 }} />
                         <Tooltip content={<CustomTooltip type="bar" />} cursor={{ fill: '#f1f5f9' }} />
-                        <Bar dataKey="dryroom" fill="url(#barGrad)" radius={[4, 4, 0, 0]} barSize={24} animationDuration={1500} />
-                        <Line type="stepAfter" dataKey="target" stroke="#8b5cf6" strokeWidth={2} dot={false} strokeDasharray="5 5" animationDuration={2000} />
+                        <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }} formatter={(v) => <span className="text-slate-600 text-[10px] font-semibold">{v}</span>} />
+                        <Bar dataKey="checkIn" name="Check In" fill="url(#dryBarInMobile)" radius={[3, 3, 0, 0]} barSize={16} animationDuration={1200} />
+                        <Bar dataKey="checkOut" name="Check Out" fill="url(#dryBarOutMobile)" radius={[3, 3, 0, 0]} barSize={16} animationDuration={1200} />
+                        <Line type="stepAfter" dataKey="target" name="Target" stroke="#8b5cf6" strokeWidth={2} dot={false} strokeDasharray="5 5" animationDuration={1500} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
@@ -437,7 +494,7 @@ export default function DashboardDryroom() {
             </div>
           ) : (
             /* DESKTOP VERSION: One page, layout tetap sama seperti sebelumnya */
-            <div className="pt-12 flex-1 flex flex-col gap-3 md:gap-4 lg:gap-5 min-h-0 overflow-hidden">
+            <div className="pt-8 md:pt-10 lg:pt-12 flex-1 flex flex-col gap-2.5 md:gap-3 lg:gap-5 min-h-0 overflow-hidden">
               {/* ROW 1: STATUS & PIE */}
               <div className="flex-[4] min-h-[160px] md:min-h-[200px] lg:min-h-[220px] grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 lg:gap-5">
                 {/* LEFT: STATUS CARDS */}
@@ -486,79 +543,8 @@ export default function DashboardDryroom() {
                   </Card>
                 </div>
 
-                {/* RIGHT: PIE CHART */}
+                {/* RIGHT: TABLE DISTRIBUTION (samakan layout dengan Folding) */}
                 <div className="col-span-12 md:col-span-5 min-h-0 flex flex-col">
-                  <Card title="Status Distribution Dryroom" icon={Droplet} iconImage={{ src: dryroomIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}>
-                    <div className="flex items-center justify-between h-full min-h-0 px-2 gap-2">
-                      <div className="flex-1 h-full min-h-0 relative">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={pieData}
-                              cx="50%" cy="50%"
-                              innerRadius="50%"
-                              outerRadius="62%"
-                              paddingAngle={4}
-                              dataKey="value"
-                              stroke="none"
-                              cornerRadius={10}
-                            >
-                              {pieData.map((e, i) => <Cell key={i} fill={e.color} className="hover:opacity-80 transition-opacity cursor-pointer filter drop-shadow-sm" />)}
-                            </Pie>
-                            <Tooltip content={<CustomTooltip type="pie" />} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none animate-in fade-in zoom-in duration-500">
-                          <span className="text-xl font-black text-slate-800 tracking-tight">{totalDryroom}</span>
-                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Total</span>
-                        </div>
-                      </div>
-                      <div className="w-[110px] flex flex-col gap-2 justify-center pr-1 shrink-0">
-                        {pieData.map((item, idx) => (
-                          <div key={idx} className="group cursor-pointer">
-                            <div className="flex justify-between items-center mb-0.5">
-                              <span className="text-[10px] font-bold text-slate-600 group-hover:text-slate-900">{item.name}</span>
-                              <span className="text-[10px] font-bold" style={{ color: item.color }}>{item.percent}%</span>
-                            </div>
-                            <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full rounded-full transition-all duration-700 ease-out group-hover:brightness-90" style={{ width: `${item.percent}%`, background: item.color }} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </Card>
-                </div>
-              </div>
-
-              {/* ROW 2: CHART & TABLE */}
-              <div className="flex-[6] min-h-[200px] md:min-h-[250px] lg:min-h-[300px] grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 lg:gap-5">
-
-                {/* LEFT: CHART */}
-                <div className="col-span-12 md:col-span-6 min-h-0 flex flex-col">
-                  <Card title="Hourly Throughput Dryroom" icon={TrendingUp}>
-                    <div className="w-full h-full min-h-0 pt-3 pl-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.9} /><stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.2} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                          <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 9, fontWeight: 500 }} dy={5} />
-                          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 9 }} />
-                          <Tooltip content={<CustomTooltip type="bar" />} cursor={{ fill: '#f1f5f9' }} />
-                          <Bar dataKey="dryroom" fill="url(#barGrad)" radius={[4, 4, 0, 0]} barSize={24} animationDuration={1500} />
-                          <Line type="stepAfter" dataKey="target" stroke="#8b5cf6" strokeWidth={2} dot={false} strokeDasharray="5 5" animationDuration={2000} />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* RIGHT: TABLE */}
-                <div className="col-span-12 md:col-span-6 min-h-0 flex flex-col">
                   <TableDistribution
                     data={tableDistributionData}
                     title="Tabel Distribution Dryroom"
@@ -576,6 +562,133 @@ export default function DashboardDryroom() {
                       await exportFinishingToExcel(exportData, 'dryroom', 'excel', filters.dateFrom, filters.dateTo);
                     }}
                   />
+                </div>
+              </div>
+
+              {/* ROW 2: CHART & TABLE */}
+              <div className="flex-[6] min-h-[220px] md:min-h-[290px] lg:min-h-[320px] grid grid-cols-1 md:grid-cols-12 gap-2.5 md:gap-3 lg:gap-5">
+
+                {/* LEFT: CHART */}
+                <div className="col-span-12 md:col-span-6 min-h-0 flex flex-col">
+                  <Card title="Hourly Throughput Dryroom" icon={TrendingUp}>
+                    <div className="w-full h-full min-h-0 pt-1 md:pt-2 pl-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="dryBarInDesktop" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.95} /><stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.2} />
+                            </linearGradient>
+                            <linearGradient id="dryBarOutDesktop" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#22c55e" stopOpacity={0.95} /><stop offset="95%" stopColor="#22c55e" stopOpacity={0.2} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 9, fontWeight: 500 }} dy={5} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 9 }} />
+                          <Tooltip content={<CustomTooltip type="bar" />} cursor={{ fill: '#f1f5f9' }} />
+                          <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }} formatter={(v) => <span className="text-slate-600 text-[10px] font-semibold">{v}</span>} />
+                          <Bar dataKey="checkIn" name="Check In" fill="url(#dryBarInDesktop)" radius={[4, 4, 0, 0]} barSize={18} animationDuration={1200} />
+                          <Bar dataKey="checkOut" name="Check Out" fill="url(#dryBarOutDesktop)" radius={[4, 4, 0, 0]} barSize={18} animationDuration={1200} />
+                          <Line type="stepAfter" dataKey="target" name="Target" stroke="#8b5cf6" strokeWidth={2} dot={false} strokeDasharray="5 5" animationDuration={1500} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </Card>
+                </div>
+
+                {/* RIGHT: SCANNING STATION (2 tombol card) */}
+                <div className="col-span-12 md:col-span-6 min-h-0 flex flex-col">
+                  <Card title="Scanning Station Dryroom" icon={Layers}>
+                    <div className="h-full min-h-0 grid grid-cols-2 gap-2 md:gap-3 lg:gap-4">
+                      <button
+                        type="button"
+                        onClick={() => canAccessDryroomScanning && setScanAction('checkin')}
+                        disabled={!canAccessDryroomScanning}
+                        className={`group min-h-[150px] md:min-h-[180px] lg:min-h-[210px] rounded-2xl border p-2.5 md:p-3.5 lg:p-5 text-left transition-all duration-200 ${
+                          canAccessDryroomScanning
+                            ? 'border-emerald-300 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-sm hover:-translate-y-0.5 hover:shadow-lg cursor-pointer'
+                            : 'border-slate-400/70 bg-gradient-to-br from-slate-200 to-slate-300 shadow-none cursor-not-allowed grayscale contrast-[0.92] opacity-[0.92] brightness-95'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`inline-flex items-center gap-1 md:gap-2 rounded-full px-2 md:px-3 py-1 font-bold border ${
+                              canAccessDryroomScanning
+                                ? 'bg-white text-emerald-700 border-emerald-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-400/70'
+                            }`}
+                            style={{ fontSize: 'clamp(9px, 0.75vw, 12px)' }}
+                          >
+                            <LogIn size={14} /> SCAN CARD
+                          </span>
+                          <span
+                            className={`font-bold ${canAccessDryroomScanning ? 'text-emerald-700' : 'text-slate-600'}`}
+                            style={{ fontSize: 'clamp(10px, 0.82vw, 13px)' }}
+                          >
+                            DRYROOM
+                          </span>
+                        </div>
+                        <div className="mt-2 md:mt-3 lg:mt-5">
+                          <h4
+                            className={`font-black tracking-tight leading-tight ${canAccessDryroomScanning ? 'text-emerald-800' : 'text-slate-700'}`}
+                            style={{ fontSize: 'clamp(20px, 2vw, 40px)' }}
+                          >
+                            Check In
+                          </h4>
+                          <p
+                            className={`mt-2 font-medium leading-tight ${canAccessDryroomScanning ? 'text-emerald-700/90' : 'text-slate-600'}`}
+                            style={{ fontSize: 'clamp(11px, 0.95vw, 18px)' }}
+                          >
+                            {canAccessDryroomScanning ? 'Klik untuk mulai scanning RFID Check In' : 'Akses hanya untuk bagian DRYROOM'}
+                          </p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => canAccessDryroomScanning && setScanAction('checkout')}
+                        disabled={!canAccessDryroomScanning}
+                        className={`group min-h-[150px] md:min-h-[180px] lg:min-h-[210px] rounded-2xl border p-2.5 md:p-3.5 lg:p-5 text-left transition-all duration-200 ${
+                          canAccessDryroomScanning
+                            ? 'border-cyan-300 bg-gradient-to-br from-cyan-50 to-sky-50 shadow-sm hover:-translate-y-0.5 hover:shadow-lg cursor-pointer'
+                            : 'border-slate-400/70 bg-gradient-to-br from-slate-200 to-slate-300 shadow-none cursor-not-allowed grayscale contrast-[0.92] opacity-[0.92] brightness-95'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`inline-flex items-center gap-1 md:gap-2 rounded-full px-2 md:px-3 py-1 font-bold border ${
+                              canAccessDryroomScanning
+                                ? 'bg-white text-cyan-700 border-cyan-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-400/70'
+                            }`}
+                            style={{ fontSize: 'clamp(10px, 0.85vw, 13px)' }}
+                          >
+                            <LogOut size={14} /> SCAN CARD
+                          </span>
+                          <span
+                            className={`font-bold ${canAccessDryroomScanning ? 'text-cyan-700' : 'text-slate-600'}`}
+                            style={{ fontSize: 'clamp(10px, 0.82vw, 13px)' }}
+                          >
+                            DRYROOM
+                          </span>
+                        </div>
+                        <div className="mt-2 md:mt-3 lg:mt-5">
+                          <h4
+                            className={`font-black tracking-tight leading-tight ${canAccessDryroomScanning ? 'text-cyan-800' : 'text-slate-700'}`}
+                            style={{ fontSize: 'clamp(20px, 2vw, 40px)' }}
+                          >
+                            Check Out
+                          </h4>
+                          <p
+                            className={`mt-2 font-medium leading-tight ${canAccessDryroomScanning ? 'text-cyan-700/90' : 'text-slate-600'}`}
+                            style={{ fontSize: 'clamp(11px, 0.95vw, 18px)' }}
+                          >
+                            {canAccessDryroomScanning ? 'Klik untuk mulai scanning RFID Check Out' : 'Akses hanya untuk bagian DRYROOM'}
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+                  </Card>
                 </div>
 
               </div>
@@ -597,7 +710,24 @@ export default function DashboardDryroom() {
           </div>
         </ModalOverlay>
       )}
-      <ScanningFinishingModal isOpen={modals.scan} onClose={() => { setModals(m => ({ ...m, scan: false })); refetchFinishingData(); }} type="dryroom" />
+      <ScanningFinishingModal
+        isOpen={scanAction !== null && canAccessDryroomScanning}
+        onClose={() => {
+          setScanAction(null);
+          void refetchFinishingData();
+          void refetchDryroomHourly();
+        }}
+        type="dryroom"
+        defaultAction={scanAction ?? 'checkin'}
+        dryroomDashboardMode
+        dryroomBaselineCheckIn={dryroomCheckIn}
+        dryroomBaselineCheckOut={dryroomCheckOut}
+        customActionLabel={scanAction === 'checkout' ? 'Check Out' : 'Check In'}
+        onSuccess={() => {
+          void refetchFinishingData();
+          void refetchDryroomHourly();
+        }}
+      />
 
       {/* Finishing Detail Modal */}
       <FinishingDetailModal
