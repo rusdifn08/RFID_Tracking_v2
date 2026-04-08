@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-import { X, CheckCircle2, Loader2, LogIn, LogOut } from 'lucide-react';
-import { dryroomCheckIn, dryroomCheckOut, foldingCheckIn, foldingCheckOut, rejectRoomCheckIn, rejectRoomCheckOut, rejectRoomScrap, API_BASE_URL, getDefaultHeaders, getActiveUsers } from '../config/api';
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
+import { X, CheckCircle2, Loader2, LogIn, LogOut, User, ClipboardList, Hash, Package, Users, Palette, Ruler, BadgeCheck, Info, Tags } from 'lucide-react';
+import { dryroomCheckIn, dryroomCheckOut, foldingCheckIn, foldingCheckOut, rejectRoomCheckIn, rejectRoomCheckOut, rejectRoomScrap, API_BASE_URL, getDefaultHeaders, getActiveUsers, getScanningDryroomOperator, type ScanningDryroomLastScan } from '../config/api';
 
 // Sound effect paths - file ada di root assets folder
 const successSoundPath = '/assets/succes.mp3';
@@ -17,6 +17,12 @@ interface ScanningFinishingModalProps {
     onSuccess?: (tableNumber?: number) => void; // Callback saat scan berhasil, dengan tableNumber untuk optimistik update
     compact?: boolean; // Compact mode (tidak fullscreen, untuk embedded)
     customActionLabel?: string; // Custom label untuk action (optional, untuk kasus khusus seperti Reject Mati)
+    /** Layout dashboard Dryroom: 2 kolom (info operator + detail tanpa tabel) dan satu mode scan saja */
+    dryroomDashboardMode?: boolean;
+    /** Total Check In real-time dari dashboard (Ringkasan = baseline + scan sukses sesi) */
+    dryroomBaselineCheckIn?: number;
+    /** Total Check Out real-time dari dashboard */
+    dryroomBaselineCheckOut?: number;
 }
 
 interface ScannedItem {
@@ -25,6 +31,11 @@ interface ScannedItem {
     status: 'success' | 'error';
     message?: string;
     action?: 'checkin' | 'checkout'; // Action yang dilakukan
+    wo?: string;
+    item?: string;
+    color?: string;
+    size?: string;
+    statusText?: string;
 }
 
 export default function ScanningFinishingModal({
@@ -37,7 +48,10 @@ export default function ScanningFinishingModal({
     nik,
     onSuccess,
     compact = false,
-    customActionLabel
+    customActionLabel,
+    dryroomDashboardMode = false,
+    dryroomBaselineCheckIn = 0,
+    dryroomBaselineCheckOut = 0
 }: ScanningFinishingModalProps) {
     const [rfidInput, setRfidInput] = useState('');
     const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
@@ -51,6 +65,104 @@ export default function ScanningFinishingModal({
     const errorAudioRef = useRef<HTMLAudioElement | null>(null);
     const rfidInputRef = useRef<string>(''); // Ref untuk menyimpan nilai rfidInput terbaru
     const selectedActionRef = useRef<'checkin' | 'checkout'>(defaultAction); // Ref untuk menyimpan selectedAction terbaru
+    const dryroomModalWasOpenRef = useRef(false);
+    const [dryroomBaselineSnapshot, setDryroomBaselineSnapshot] = useState({ checkin: 0, checkout: 0 });
+    /** Panel Check In / Check Out terpisah (operator + detail scan terakhir) dari scanning_dryroom.json */
+    const [dryroomPanel, setDryroomPanel] = useState<{
+        nama_operator: string;
+        nik_operator: string;
+        last_scan: ScanningDryroomLastScan | null;
+    }>({ nama_operator: '', nik_operator: '', last_scan: null });
+
+    const isDryroomDashboardLayout = type === 'dryroom' && dryroomDashboardMode && !compact;
+
+    const sessionUser = useMemo(() => {
+        try {
+            const raw = localStorage.getItem('user');
+            if (!raw) return { name: '—', nik: '—' };
+            const u = JSON.parse(raw);
+            return {
+                name: String(u?.name || u?.nama || u?.fullName || u?.username || '—'),
+                nik: String(u?.nik || u?.NIK || '—'),
+            };
+        } catch {
+            return { name: '—', nik: '—' };
+        }
+    }, [isOpen]);
+
+    const refreshDryroomPanel = useCallback(
+        async (modeOverride?: 'checkin' | 'checkout') => {
+            const mode = modeOverride ?? selectedAction;
+            try {
+                const res = await getScanningDryroomOperator(mode);
+                if (res.success && res.data) {
+                    setDryroomPanel({
+                        nama_operator: String(res.data.nama_operator ?? '').trim(),
+                        nik_operator: String(res.data.nik_operator ?? '').trim(),
+                        last_scan: res.data.last_scan ?? null,
+                    });
+                }
+            } catch {
+                /* abaikan */
+            }
+        },
+        [selectedAction]
+    );
+
+    useEffect(() => {
+        if (!isOpen || !isDryroomDashboardLayout) return;
+        void refreshDryroomPanel();
+        const t = setInterval(() => void refreshDryroomPanel(), 5000);
+        return () => clearInterval(t);
+    }, [isOpen, isDryroomDashboardLayout, selectedAction, refreshDryroomPanel]);
+
+    const dryroomOperatorDisplay = {
+        name: dryroomPanel.nama_operator || '—',
+        nik: dryroomPanel.nik_operator || '—',
+    };
+
+    const dryroomLastScanFormattedTime = useMemo(() => {
+        const iso = dryroomPanel.last_scan?.updatedAt;
+        if (!iso) return '';
+        try {
+            return new Date(iso).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'medium' });
+        } catch {
+            return String(iso);
+        }
+    }, [dryroomPanel.last_scan?.updatedAt]);
+
+    const hasDryroomLastScanDetail = useMemo(() => {
+        const s = dryroomPanel.last_scan;
+        if (!s) return false;
+        return [s.rfid, s.wo, s.item, s.buyer, s.style, s.color, s.size, s.status, s.message].some(
+            (v) => v != null && String(v).trim() !== ''
+        );
+    }, [dryroomPanel.last_scan]);
+
+    const successScans = scannedItems.filter(i => i.status === 'success');
+    const successScanCount = successScans.length;
+    const displayWo = successScans.find(i => i.wo)?.wo ?? '—';
+    const summaryWo =
+        (dryroomPanel.last_scan?.wo && String(dryroomPanel.last_scan.wo).trim()) || displayWo || '—';
+
+    /** Ringkasan dryroom dashboard: angka real-time saat buka modal + scan sukses di sesi ini */
+    const dryroomActiveBaseline =
+        selectedAction === 'checkin' ? dryroomBaselineSnapshot.checkin : dryroomBaselineSnapshot.checkout;
+    const dryroomDisplayTotal = isDryroomDashboardLayout
+        ? dryroomActiveBaseline + successScanCount
+        : successScanCount;
+
+    useLayoutEffect(() => {
+        const wasOpen = dryroomModalWasOpenRef.current;
+        const opening = isOpen && !wasOpen;
+        if (opening && isDryroomDashboardLayout) {
+            setDryroomBaselineSnapshot({
+                checkin: Math.max(0, Math.floor(Number(dryroomBaselineCheckIn) || 0)),
+                checkout: Math.max(0, Math.floor(Number(dryroomBaselineCheckOut) || 0)),
+            });
+        }
+        dryroomModalWasOpenRef.current = isOpen;
+    }, [isOpen, isDryroomDashboardLayout, dryroomBaselineCheckIn, dryroomBaselineCheckOut]);
 
     // Initialize audio objects
     useEffect(() => {
@@ -339,9 +451,9 @@ export default function ScanningFinishingModal({
         }
     }, [scannedItems]);
 
-    // Prevent body scroll when modal is open
+    // Prevent body scroll hanya untuk mode fullscreen modal
     useEffect(() => {
-        if (isOpen) {
+        if (!compact && isOpen) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = 'unset';
@@ -349,7 +461,7 @@ export default function ScanningFinishingModal({
         return () => {
             document.body.style.overflow = 'unset';
         };
-    }, [isOpen]);
+    }, [isOpen, compact]);
 
     // Handle RFID input dan proses check in/out
     const handleRfidSubmit = async (rfid: string) => {
@@ -412,10 +524,11 @@ export default function ScanningFinishingModal({
             let response;
 
             if (type === 'dryroom') {
+                const bodyNik = nik?.trim() || (sessionUser.nik !== '—' ? sessionUser.nik : '') || undefined;
                 if (currentAction === 'checkin') {
-                    response = await dryroomCheckIn(trimmedRfid);
+                    response = await dryroomCheckIn(trimmedRfid, bodyNik);
                 } else {
-                    response = await dryroomCheckOut(trimmedRfid);
+                    response = await dryroomCheckOut(trimmedRfid, bodyNik);
                 }
             } else if (type === 'folding') {
                 if (currentAction === 'checkin') {
@@ -511,13 +624,22 @@ export default function ScanningFinishingModal({
                 // Play success sound
                 playSound('success');
 
+                if (type === 'dryroom' && isDryroomDashboardLayout) {
+                    void refreshDryroomPanel(currentAction);
+                }
+
                 setScannedItems(prev => {
                     const newItems: ScannedItem[] = [...prev, {
                         rfid: trimmedRfid,
                         timestamp,
                         status: 'success' as const,
                         message: message,
-                        action: currentAction
+                        action: currentAction,
+                        wo: responseData?.wo,
+                        item: responseData?.item,
+                        color: responseData?.color,
+                        size: responseData?.size,
+                        statusText: typeof responseData?.status === 'string' ? responseData.status : undefined,
                     }];
                     return newItems.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
                 });
@@ -1087,7 +1209,7 @@ export default function ScanningFinishingModal({
             >
                 <div
                     ref={containerRef}
-                    className="bg-white rounded-xl xs:rounded-2xl sm:rounded-3xl shadow-2xl w-[95%] max-w-[900px] max-h-[95vh] flex flex-col"
+                    className={`bg-white rounded-xl xs:rounded-2xl sm:rounded-3xl shadow-2xl w-[95%] max-h-[95vh] flex flex-col min-h-0 ${isDryroomDashboardLayout ? 'max-w-[min(96vw,1120px)]' : 'max-w-[900px]'}`}
                     style={{
                         background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(148, 163, 184, 0.1), 0 8px 16px -8px rgba(59, 130, 246, 0.1)',
@@ -1113,12 +1235,12 @@ export default function ScanningFinishingModal({
                                     letterSpacing: '-0.5px'
                                 }}
                             >
-                                📡 Scanning {theme.name}
+                                {isDryroomDashboardLayout ? '📡 Scanning Station Dryroom' : `📡 Scanning ${theme.name}`}
                             </h2>
                             <p className="text-xs xs:text-sm font-medium" style={{ color: '#475569' }}>
                                 Scan RFID untuk {customActionLabel || (selectedAction === 'checkin' ? 'Check In' : 'Check Out')}
                             </p>
-                            {autoSubmit && (
+                            {autoSubmit && !isDryroomDashboardLayout && (
                                 <div className="mt-1 px-2 py-0.5 rounded-md inline-block text-[10px] font-semibold"
                                     style={{
                                         background: selectedAction === 'checkin'
@@ -1154,8 +1276,163 @@ export default function ScanningFinishingModal({
                         </div>
                     </div>
 
+                    <div className="flex flex-col md:flex-row gap-3 flex-1 min-h-0 overflow-hidden">
+                    {isDryroomDashboardLayout && (
+                        <div className="flex flex-col gap-3 w-full md:w-[min(40%,380px)] shrink-0 min-h-0 md:max-h-full overflow-y-auto pr-0.5">
+                            <div className="rounded-xl border border-sky-200 bg-white p-3 shadow-sm">
+                                <div className="flex items-center justify-between gap-2 mb-2">
+                                    <div className="flex items-center gap-2 text-sky-800">
+                                        <User className="w-4 h-4 shrink-0" />
+                                        <span className="text-xs font-bold uppercase tracking-wide">Operator</span>
+                                    </div>
+                                    <span
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${selectedAction === 'checkin'
+                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                            : 'bg-sky-100 text-sky-900 border border-sky-200'
+                                            }`}
+                                    >
+                                        {selectedAction === 'checkin' ? 'Check In' : 'Check Out'}
+                                    </span>
+                                </div>
+                                <p className="text-sm font-semibold text-slate-900 leading-snug">{dryroomOperatorDisplay.name}</p>
+                                <p className="text-xs text-slate-600 mt-1">NIK: <span className="font-mono font-medium">{dryroomOperatorDisplay.nik}</span></p>
+                            </div>
+                            <div className="rounded-xl border-2 border-sky-200 bg-gradient-to-br from-sky-50 to-cyan-50/80 p-4 text-center shadow-sm">
+                                <p className="text-[11px] font-bold text-sky-800 uppercase tracking-wide mb-2">Ringkasan</p>
+                                <div
+                                    className="text-4xl font-black text-sky-950 tabular-nums"
+                                    style={{ fontSize: 'clamp(28px, 4vw, 40px)' }}
+                                >
+                                    {dryroomDisplayTotal.toLocaleString('id-ID')}
+                                </div>
+                                <p className="text-xs font-medium text-sky-800 mt-1">Total {dryroomDisplayTotal.toLocaleString('id-ID')} items</p>
+                                {successScanCount > 0 && (
+                                    <p className="text-[10px] font-medium text-sky-700/90 mt-0.5">
+                                        +{successScanCount} dari sesi scan ini
+                                    </p>
+                                )}
+                                <p className="text-sm font-semibold text-sky-900 mt-3">
+                                    WO: <span className="font-mono">{summaryWo}</span>
+                                </p>
+                            </div>
+                            <div className="rounded-xl border border-slate-200/90 bg-gradient-to-b from-slate-50 via-white to-slate-50/80 flex flex-col min-h-[200px] flex-1 shadow-md shadow-slate-200/50 overflow-hidden ring-1 ring-slate-100/80">
+                                <div className="px-3 py-2.5 border-b border-slate-200/80 bg-gradient-to-r from-sky-600/90 to-cyan-600/90 flex justify-between items-center gap-2 shrink-0">
+                                    <div className="flex items-center gap-2 text-white min-w-0">
+                                        <ClipboardList className="w-4 h-4 shrink-0 opacity-95" />
+                                        <span className="text-xs font-bold tracking-wide truncate">Detail Data Terakhir</span>
+                                    </div>
+                                    {dryroomLastScanFormattedTime ? (
+                                        <span className="text-[10px] font-semibold text-white/90 whitespace-nowrap shrink-0">
+                                            {dryroomLastScanFormattedTime}
+                                        </span>
+                                    ) : (
+                                        <span className="text-[10px] font-semibold text-white/75">—</span>
+                                    )}
+                                </div>
+                                <div className="overflow-y-auto p-3 flex-1 min-h-0">
+                                    {!hasDryroomLastScanDetail ? (
+                                        <div className="flex flex-col items-center justify-center py-10 text-center px-2">
+                                            <Package className="w-10 h-10 text-slate-300 mb-2" />
+                                            <p className="text-xs font-medium text-slate-500">Belum ada scan sukses untuk mode ini</p>
+                                            <p className="text-[10px] text-slate-400 mt-1">Data WO, item, buyer, dll. akan tampil setelah scan berhasil</p>
+                                        </div>
+                                    ) : (() => {
+                                        const s = dryroomPanel.last_scan;
+                                        if (!s) return null;
+                                        return (
+                                        <div className="space-y-0 rounded-lg border border-slate-100 bg-white/90 divide-y divide-slate-100 overflow-hidden">
+                                            {s.rfid ? (
+                                                <div className="flex gap-3 items-start px-3 py-2.5">
+                                                    <Hash className="w-3.5 h-3.5 text-sky-600 mt-0.5 shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">RFID</p>
+                                                        <p className="text-xs font-mono font-semibold text-slate-900 break-all leading-snug">{s.rfid}</p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            {s.wo ? (
+                                                <div className="flex gap-3 items-start px-3 py-2.5">
+                                                    <Tags className="w-3.5 h-3.5 text-violet-600 mt-0.5 shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">WO</p>
+                                                        <p className="text-xs font-semibold text-slate-900 break-words">{s.wo}</p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            {s.style ? (
+                                                <div className="flex gap-3 items-start px-3 py-2.5">
+                                                    <Package className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Style</p>
+                                                        <p className="text-xs font-medium text-slate-800 break-words">{s.style}</p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            {s.item ? (
+                                                <div className="flex gap-3 items-start px-3 py-2.5">
+                                                    <Package className="w-3.5 h-3.5 text-teal-600 mt-0.5 shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Item</p>
+                                                        <p className="text-xs font-medium text-slate-800 break-words">{s.item}</p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            {s.buyer ? (
+                                                <div className="flex gap-3 items-start px-3 py-2.5">
+                                                    <Users className="w-3.5 h-3.5 text-indigo-600 mt-0.5 shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Buyer</p>
+                                                        <p className="text-xs font-medium text-slate-800 break-words">{s.buyer}</p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            {s.color ? (
+                                                <div className="flex gap-3 items-start px-3 py-2.5">
+                                                    <Palette className="w-3.5 h-3.5 text-rose-600 mt-0.5 shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Color</p>
+                                                        <p className="text-xs font-medium text-slate-800">{s.color}</p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            {s.size ? (
+                                                <div className="flex gap-3 items-start px-3 py-2.5">
+                                                    <Ruler className="w-3.5 h-3.5 text-slate-600 mt-0.5 shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Size</p>
+                                                        <p className="text-xs font-medium text-slate-800">{s.size}</p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            {s.status ? (
+                                                <div className="flex gap-3 items-start px-3 py-2.5">
+                                                    <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Status</p>
+                                                        <p className="text-xs font-medium text-slate-800">{s.status}</p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            {s.message ? (
+                                                <div className="flex gap-3 items-start px-3 py-2.5 bg-sky-50/60">
+                                                    <Info className="w-3.5 h-3.5 text-sky-700 mt-0.5 shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Pesan</p>
+                                                        <p className="text-xs font-medium text-slate-800 break-words">{s.message}</p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+
                     {/* Action Selection Buttons - Hidden jika autoSubmit aktif */}
-                    {!autoSubmit && (
+                    {!autoSubmit && !isDryroomDashboardLayout && (
                     <div className="mb-2 flex flex-wrap gap-2 xs:gap-2.5 sm:gap-3">
                             <button
                                 onClick={() => updateSelectedAction('checkin')}
@@ -1364,7 +1641,7 @@ export default function ScanningFinishingModal({
 
                     {/* Scanned List */}
                     <div
-                        className="mb-2 flex flex-col flex-shrink-0"
+                        className={`mb-2 flex flex-col flex-shrink-0 ${isDryroomDashboardLayout ? 'flex-1 min-h-0 mb-0' : ''}`}
                         style={{
                             border: `2px solid ${theme.borderColor}40`,
                             borderRadius: '6px',
@@ -1373,7 +1650,9 @@ export default function ScanningFinishingModal({
                             boxShadow: `0 4px 6px -1px ${theme.primaryColor}05`,
                             display: 'flex',
                             flexDirection: 'column',
-                            height: '280px'
+                            ...(isDryroomDashboardLayout
+                                ? { flex: 1, minHeight: 0, height: 'auto' }
+                                : { height: '280px' })
                         }}
                     >
                         <div
@@ -1410,8 +1689,9 @@ export default function ScanningFinishingModal({
                                     scrollbarColor: `${theme.primaryColor} #F1F5F9`,
                                     overflowY: 'auto',
                                     overflowX: 'hidden',
-                                    height: '230px',
-                                    maxHeight: '230px'
+                                    ...(isDryroomDashboardLayout
+                                        ? { flex: 1, minHeight: 0, height: 0 }
+                                        : { height: '230px', maxHeight: '230px' })
                                 }}
                             >
                                 {scannedItems.map((item, index) => {
@@ -1507,6 +1787,9 @@ export default function ScanningFinishingModal({
                                 })}
                             </div>
                         )}
+                    </div>
+
+                    </div>
                     </div>
 
                     {/* Action Buttons */}

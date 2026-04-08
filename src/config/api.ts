@@ -31,6 +31,25 @@ const getProxyPort = (): number => {
 const PROXY_PORT = getProxyPort(); // Port untuk proxy server (server.js) - dinamis berdasarkan environment
 // Backend API menggunakan IP eksplisit 10.8.0.104:7000 (dikonfigurasi di server.js)
 
+/**
+ * Base URL server frontend / proxy lokal (Node `server.js`), host = sama dengan tab browser.
+ * Hanya untuk route yang **tidak ada di backend Django** (mis. `GET /api/scanning/dryroom/operator` + file `scanning_dryroom.json`).
+ * Scan Dryroom Check In/Out tetap memakai backend: `POST /garment/dryroom/in|out` lewat `API_BASE_URL` — jangan ubah ke sini.
+ */
+export const getNodeProxyBaseUrl = (): string => {
+    const fromEnv = import.meta.env.VITE_NODE_PROXY_URL as string | undefined;
+    if (fromEnv != null && String(fromEnv).trim() !== '') {
+        return String(fromEnv).replace(/\/$/, '');
+    }
+    const port = getProxyPort();
+    if (typeof window === 'undefined') {
+        return getApiBaseUrl(port);
+    }
+    const hostname = window.location.hostname;
+    const host = hostname === '127.0.0.1' ? 'localhost' : hostname;
+    return `http://${host}:${port}`;
+};
+
 // Base URL untuk API Server (Proxy Server)
 // FLEKSIBILITAS: Otomatis menyesuaikan dengan IP/hostname dari mesin yang menjalankan frontend
 // - Jika akses dari localhost → proxy di localhost:8000
@@ -1058,26 +1077,107 @@ export interface FinishingCheckResponse {
     size?: string;
     status?: string;
     nik_operator?: string;
+    nama_operator?: string;
     is_done?: string;
     error?: string;
 }
 
 /**
- * Dryroom Check In
- * @param rfid_garment - Nomor RFID garment yang akan di-check in
- * @returns Response data check in
+ * Dryroom Check In — API backend (Django): `POST /garment/dryroom/in?rfid_garment=…` (+ body `{ nik }` opsional).
+ * Request lewat `API_BASE_URL` (biasanya proxy `server.js` → forward ke backend :7000).
  */
-export const dryroomCheckIn = async (rfid_garment: string): Promise<ApiResponse<FinishingCheckResponse>> => {
-    return await apiPost<FinishingCheckResponse>(`/garment/dryroom/in?rfid_garment=${encodeURIComponent(rfid_garment)}`, {});
+export const dryroomCheckIn = async (rfid_garment: string, nik?: string): Promise<ApiResponse<FinishingCheckResponse>> => {
+    const trimmed = nik?.trim();
+    const body = trimmed ? { nik: trimmed } : {};
+    return await apiPost<FinishingCheckResponse>(`/garment/dryroom/in?rfid_garment=${encodeURIComponent(rfid_garment)}`, body);
 };
 
 /**
- * Dryroom Check Out
- * @param rfid_garment - Nomor RFID garment yang akan di-check out
- * @returns Response data check out
+ * Dryroom Check Out — API backend: `POST /garment/dryroom/out?rfid_garment=…` (+ body `{ nik }` opsional).
+ * Sama seperti check in: lewat `API_BASE_URL`, bukan endpoint `/api/scanning/...`.
  */
-export const dryroomCheckOut = async (rfid_garment: string): Promise<ApiResponse<FinishingCheckResponse>> => {
-    return await apiPost<FinishingCheckResponse>(`/garment/dryroom/out?rfid_garment=${encodeURIComponent(rfid_garment)}`, {});
+export const dryroomCheckOut = async (rfid_garment: string, nik?: string): Promise<ApiResponse<FinishingCheckResponse>> => {
+    const trimmed = nik?.trim();
+    const body = trimmed ? { nik: trimmed } : {};
+    return await apiPost<FinishingCheckResponse>(`/garment/dryroom/out?rfid_garment=${encodeURIComponent(rfid_garment)}`, body);
+};
+
+/** Satu scan sukses terakhir per mode (dari respons API dryroom in/out). */
+export interface ScanningDryroomLastScan {
+    rfid: string | null;
+    wo: string | null;
+    item: string | null;
+    buyer: string | null;
+    style: string | null;
+    color: string | null;
+    size: string | null;
+    status: string | null;
+    message: string | null;
+    updatedAt: string | null;
+}
+
+/**
+ * Panel dryroom per mode: operator terpisah Check In vs Check Out + detail scan terakhir.
+ * Hanya di `server.js`; query `mode=checkin|checkout`.
+ */
+export interface ScanningDryroomPanelState {
+    mode: 'checkin' | 'checkout';
+    nama_operator: string;
+    nik_operator: string;
+    updatedAt: string | null;
+    last_scan: ScanningDryroomLastScan | null;
+}
+
+/** Baca operator + last scan — server Node; `mode` harus sesuai tab Check In / Check Out. */
+export const getScanningDryroomOperator = async (
+    mode: 'checkin' | 'checkout' = 'checkin'
+): Promise<ApiResponse<ScanningDryroomPanelState>> => {
+    const q = mode === 'checkout' ? '?mode=checkout' : '?mode=checkin';
+    const url = `${getNodeProxyBaseUrl()}/api/scanning/dryroom/operator${q}`;
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: getDefaultHeaders(),
+        });
+        const contentType = response.headers.get('content-type');
+        let data: Record<string, unknown>;
+        if (contentType && contentType.includes('application/json')) {
+            data = (await response.json()) as Record<string, unknown>;
+        } else {
+            const text = await response.text();
+            return {
+                success: false,
+                error: text || `HTTP ${response.status}`,
+                data: undefined,
+                status: response.status,
+            };
+        }
+        if (!response.ok) {
+            return {
+                success: false,
+                error: String(data.message || data.error || `HTTP ${response.status}`),
+                data: undefined,
+                status: response.status,
+            };
+        }
+        const responseData = (data.data !== undefined ? data.data : data) as ScanningDryroomPanelState;
+        return {
+            success: true,
+            data: responseData,
+            status: response.status,
+        };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        if (isDevelopment) {
+            console.warn('[getScanningDryroomOperator] Proxy Node harus jalan di', getNodeProxyBaseUrl(), errorMessage);
+        }
+        return {
+            success: false,
+            error: errorMessage,
+            data: undefined,
+            status: 0,
+        };
+    }
 };
 
 /**

@@ -140,14 +140,131 @@ const scanningUsers = new Map();
 // Contoh: { '2025-01-19': { '3': { '08': 5, '09': 10, ... }, ... } }
 const foldingCheckoutData = new Map();
 
+/** date -> { checkin: Map(hourKey,count), checkout ... } untuk CURRENT_ENV (sinkron dengan file) */
+const dryroomHourlyByDate = new Map();
+
 // Path file untuk menyimpan data folding checkout
 const FOLDING_CHECKOUT_FILE = path.join(__dirname, 'folding_checkout_data.json');
 // Path file untuk menyimpan data detail folding checkout (rfid, wo, item, dll)
 const FOLDING_CHECKOUT_DETAIL_FILE = path.join(__dirname, 'folding_checkout_detail.json');
+/** Per jam Check In / Check Out Dryroom (per environment, per tanggal) */
+const DRYROOM_HOURLY_FILE = path.join(__dirname, 'dryroom_hourly_data.json');
 // Path file untuk menyimpan data shift (siang/malam) per line
 const SHIFT_DATA_FILE = path.join(__dirname, 'shift_data.json');
 // Path file untuk menyimpan data supervisor per line
 const SUPERVISOR_DATA_FILE = path.join(__dirname, 'supervisor_data.json');
+/** Operator + detail scan terakhir per mode (check in / check out terpisah) — sinkron via proxy */
+const SCANNING_DRYROOM_FILE = path.join(__dirname, 'scanning_dryroom.json');
+
+function emptyScanningDryroomBranch() {
+    return {
+        nama_operator: '',
+        nik_operator: '',
+        updatedAt: null,
+        last_scan: null,
+    };
+}
+
+function normalizeLastScanRecord(s) {
+    if (!s || typeof s !== 'object') return null;
+    return {
+        rfid: s.rfid != null ? String(s.rfid) : null,
+        wo: s.wo != null ? String(s.wo) : null,
+        item: s.item != null ? String(s.item) : null,
+        buyer: s.buyer != null ? String(s.buyer) : null,
+        style: s.style != null ? String(s.style) : null,
+        color: s.color != null ? String(s.color) : null,
+        size: s.size != null ? String(s.size) : null,
+        status: s.status != null ? String(s.status) : null,
+        message: s.message != null ? String(s.message) : null,
+        updatedAt: s.updatedAt != null ? String(s.updatedAt) : null,
+    };
+}
+
+function normalizeScanningDryroomBranch(b) {
+    if (!b || typeof b !== 'object') return emptyScanningDryroomBranch();
+    return {
+        nama_operator: String(b.nama_operator ?? '').trim(),
+        nik_operator: String(b.nik_operator ?? '').trim(),
+        updatedAt: b.updatedAt ?? null,
+        last_scan: normalizeLastScanRecord(b.last_scan),
+    };
+}
+
+/** Dokumen penuh — migrasi format lama (flat) → checkin saja, checkout kosong */
+function loadScanningDryroomDoc() {
+    try {
+        if (!fs.existsSync(SCANNING_DRYROOM_FILE)) {
+            return { checkin: emptyScanningDryroomBranch(), checkout: emptyScanningDryroomBranch() };
+        }
+        const raw = fs.readFileSync(SCANNING_DRYROOM_FILE, 'utf-8');
+        const j = JSON.parse(raw);
+        if (j.checkin != null || j.checkout != null) {
+            return {
+                checkin: normalizeScanningDryroomBranch(j.checkin),
+                checkout: normalizeScanningDryroomBranch(j.checkout),
+            };
+        }
+        const legacyOp = {
+            nama_operator: String(j.nama_operator ?? '').trim(),
+            nik_operator: String(j.nik_operator ?? '').trim(),
+            updatedAt: j.updatedAt ?? null,
+        };
+        return {
+            checkin: {
+                ...emptyScanningDryroomBranch(),
+                ...legacyOp,
+                last_scan: normalizeLastScanRecord(j.last_scan),
+            },
+            checkout: emptyScanningDryroomBranch(),
+        };
+    } catch (e) {
+        console.warn('⚠️ [SCANNING_DRYROOM] load:', e.message);
+        return { checkin: emptyScanningDryroomBranch(), checkout: emptyScanningDryroomBranch() };
+    }
+}
+
+function buildLastScanFromBackendResponse(data) {
+    const rfid = String(data?.rfid ?? data?.rfid_garment ?? '').trim();
+    return {
+        rfid: rfid || null,
+        wo: data?.wo != null ? String(data.wo) : null,
+        item: data?.item != null ? String(data.item) : null,
+        buyer: data?.buyer != null ? String(data.buyer) : null,
+        style: data?.style != null ? String(data.style) : null,
+        color: data?.color != null ? String(data.color) : null,
+        size: data?.size != null ? String(data.size) : null,
+        status: data?.status != null ? String(data.status) : null,
+        message: data?.message != null ? String(data.message) : null,
+        updatedAt: new Date().toISOString(),
+    };
+}
+
+/** @param {'checkin'|'checkout'} action */
+function saveScanningDryroomFromBackendResponse(data, action) {
+    const key = action === 'checkout' ? 'checkout' : 'checkin';
+    try {
+        const doc = loadScanningDryroomDoc();
+        const branch = { ...doc[key] };
+
+        const namaRaw = data?.nama_operator ?? data?.namaOperator ?? data?.nama;
+        const nikRaw = data?.nik_operator ?? data?.nikOperator ?? data?.nik;
+        const namaStr = namaRaw != null ? String(namaRaw).trim() : '';
+        const nikStr = nikRaw != null ? String(nikRaw).trim() : '';
+        if (namaStr || nikStr) {
+            branch.nama_operator = namaStr || branch.nama_operator || '';
+            branch.nik_operator = nikStr || branch.nik_operator || '';
+            branch.updatedAt = new Date().toISOString();
+        }
+
+        branch.last_scan = buildLastScanFromBackendResponse(data);
+        doc[key] = branch;
+
+        fs.writeFileSync(SCANNING_DRYROOM_FILE, JSON.stringify(doc, null, 2), 'utf-8');
+    } catch (e) {
+        console.error('❌ [SCANNING_DRYROOM] save:', e.message);
+    }
+}
 
 /**
  * Fungsi untuk menyimpan data folding checkout
@@ -393,6 +510,111 @@ function loadFoldingCheckoutData() {
 
     } catch (error) {
         console.error('❌ [FOLDING CHECKOUT] Error loading data:', error.message);
+    }
+}
+
+/** Slot jam sama seperti folding checkout (07:30 + jam penuh) */
+function getDryroomHourlySlotKey() {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    if (currentHour === 7 && currentMinute >= 30) return '07:30';
+    if (currentHour === 8) return '07:30';
+    return currentHour.toString().padStart(2, '0');
+}
+
+function migrateDryroomHourlyDataIfNeeded(raw) {
+    if (!raw || typeof raw !== 'object') return { CLN: {}, MJL: {}, MJL2: {} };
+    if (raw.CLN || raw.MJL || raw.MJL2) return raw;
+    return { CLN: raw, MJL: {}, MJL2: {} };
+}
+
+function readDryroomHourlyFile() {
+    if (!fs.existsSync(DRYROOM_HOURLY_FILE)) {
+        return { CLN: {}, MJL: {}, MJL2: {} };
+    }
+    try {
+        const fileContent = fs.readFileSync(DRYROOM_HOURLY_FILE, 'utf-8');
+        return migrateDryroomHourlyDataIfNeeded(JSON.parse(fileContent));
+    } catch (e) {
+        return { CLN: {}, MJL: {}, MJL2: {} };
+    }
+}
+
+/**
+ * Simpan count Check In / Check Out Dryroom per jam (server-side, setelah backend sukses)
+ */
+function saveDryroomHourly(action, _responseData) {
+    try {
+        if (action !== 'checkin' && action !== 'checkout') return;
+        const hour = getDryroomHourlySlotKey();
+        const date = new Date().toISOString().split('T')[0];
+
+        const all = readDryroomHourlyFile();
+        if (!all[CURRENT_ENV]) all[CURRENT_ENV] = {};
+        if (!all[CURRENT_ENV][date]) all[CURRENT_ENV][date] = { checkin: {}, checkout: {} };
+        if (!all[CURRENT_ENV][date][action]) all[CURRENT_ENV][date][action] = {};
+
+        const bucket = all[CURRENT_ENV][date][action];
+        bucket[hour] = (bucket[hour] || 0) + 1;
+
+        fs.writeFileSync(DRYROOM_HOURLY_FILE, JSON.stringify(all, null, 2), 'utf-8');
+
+        if (!dryroomHourlyByDate.has(date)) {
+            dryroomHourlyByDate.set(date, {
+                checkin: new Map(),
+                checkout: new Map()
+            });
+        }
+        const mem = dryroomHourlyByDate.get(date);
+        const m = action === 'checkin' ? mem.checkin : mem.checkout;
+        m.set(hour, bucket[hour]);
+    } catch (error) {
+        console.error('❌ [DRYROOM HOURLY] Error saving:', error.message);
+    }
+}
+
+function getDryroomDateDataFromMemoryOrFile(date) {
+    if (dryroomHourlyByDate.has(date)) {
+        const mem = dryroomHourlyByDate.get(date);
+        const checkin = Object.fromEntries(mem.checkin.entries());
+        const checkout = Object.fromEntries(mem.checkout.entries());
+        return { checkin, checkout };
+    }
+    const all = readDryroomHourlyFile();
+    const envBlock = all[CURRENT_ENV] || {};
+    const day = envBlock[date] || { checkin: {}, checkout: {} };
+    return {
+        checkin: { ...(day.checkin || {}) },
+        checkout: { ...(day.checkout || {}) }
+    };
+}
+
+function sumDryroomHourBucket(bucket, hourDef) {
+    if (!bucket || typeof bucket !== 'object') return 0;
+    if (hourDef === '07:30') {
+        const keys = ['07:30', '07:30-09:00', '07', '08'];
+        return keys.reduce((s, k) => s + (Number(bucket[k]) || 0), 0);
+    }
+    return Number(bucket[hourDef]) || 0;
+}
+
+/**
+ * Load dryroom hourly ke memory untuk tanggal yang ada di file (env saat ini)
+ */
+function loadDryroomHourlyData() {
+    try {
+        dryroomHourlyByDate.clear();
+        const all = readDryroomHourlyFile();
+        const envBlock = all[CURRENT_ENV] || {};
+        Object.keys(envBlock).forEach((date) => {
+            const day = envBlock[date] || { checkin: {}, checkout: {} };
+            const checkin = new Map(Object.entries(day.checkin || {}));
+            const checkout = new Map(Object.entries(day.checkout || {}));
+            dryroomHourlyByDate.set(date, { checkin, checkout });
+        });
+    } catch (error) {
+        console.error('❌ [DRYROOM HOURLY] Error loading:', error.message);
     }
 }
 
@@ -837,6 +1059,41 @@ app.get('/api/config/environment', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
+
+/**
+ * GET operator + detail scan terakhir — ?mode=checkin | checkout (default checkin).
+ * API lokal proxy; scan tetap POST /garment/dryroom/in|out ke backend.
+ */
+function handleScanningDryroomOperatorGet(req, res) {
+    try {
+        const mode = req.query.mode === 'checkout' ? 'checkout' : 'checkin';
+        const doc = loadScanningDryroomDoc();
+        const branch = doc[mode];
+        return res.json({
+            success: true,
+            data: {
+                mode,
+                nama_operator: branch.nama_operator,
+                nik_operator: branch.nik_operator,
+                updatedAt: branch.updatedAt,
+                last_scan: branch.last_scan,
+            },
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('❌ [SCANNING_DRYROOM GET]', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error reading scanning dryroom state',
+            error: error.message,
+            timestamp: new Date().toISOString(),
+        });
+    }
+}
+
+app.get('/api/scanning/dryroom/operator', handleScanningDryroomOperatorGet);
+app.get('/api/scanning/dryroom/operator/', handleScanningDryroomOperatorGet);
+app.get('/api/scanning-dryroom-operator', handleScanningDryroomOperatorGet);
 
 // ============================================
 // CONNECTION HEALTH CHECK
@@ -2406,13 +2663,62 @@ app.post('/scrap', async (req, res) => {
 // ============================================
 
 /**
+ * Proxy dryroom in/out + track hourly Check In / Check Out di server (mirip folding checkout)
+ */
+async function proxyDryroomWithHourlyTracking(endpoint, req, res, action) {
+    try {
+        const queryParams = new URLSearchParams();
+        Object.keys(req.query).forEach(key => {
+            if (req.query[key]) queryParams.append(key, req.query[key]);
+        });
+        const qs = queryParams.toString();
+        const url = `${BACKEND_API_URL}${endpoint}${qs ? `?${qs}` : ''}`;
+        const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            [API_KEY_HEADER]: API_KEY
+        };
+        if (req.headers.authorization) headers['Authorization'] = req.headers.authorization;
+        if (req.headers.cookie) headers['Cookie'] = req.headers.cookie;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: req.body && Object.keys(req.body).length > 0 ? JSON.stringify(req.body) : undefined
+        });
+
+        let data = {};
+        const text = await response.text();
+        if (text) {
+            try {
+                data = JSON.parse(text);
+            } catch (_e) {
+                data = { success: false, message: 'Invalid JSON from backend' };
+            }
+        }
+
+        const isSuccess = response.status !== 404 &&
+            (data?.success === true ||
+                (typeof data?.message === 'string' && data.message.includes('Success')));
+
+        if (isSuccess) {
+            saveDryroomHourly(action, data);
+            saveScanningDryroomFromBackendResponse(data, action);
+        }
+
+        return res.status(response.status).json(data);
+    } catch (error) {
+        console.error(`❌ [DRYROOM ${action}]`, error.message);
+        return await proxyRequest(endpoint, req, res);
+    }
+}
+
+/**
  * POST /garment/dryroom/in - Check in RFID garment ke area Dryroom
  * Query: ?rfid_garment=xxx
  */
 app.post('/garment/dryroom/in', async (req, res) => {
-    // Log removed for successful requests
-    // Log removed for successful requests
-    return await proxyRequest('/garment/dryroom/in', req, res);
+    return proxyDryroomWithHourlyTracking('/garment/dryroom/in', req, res, 'checkin');
 });
 
 /**
@@ -2420,12 +2726,11 @@ app.post('/garment/dryroom/in', async (req, res) => {
  * Query: ?rfid_garment=xxx
  */
 app.post('/garment/dryroom/out', async (req, res) => {
-    // Log removed for successful requests
-    return await proxyRequest('/garment/dryroom/out', req, res);
+    return proxyDryroomWithHourlyTracking('/garment/dryroom/out', req, res, 'checkout');
 });
 
-/** Base URL untuk Reject Room in/out (port 7000) */
-const REJECT_ROOM_INOUT_URL = 'http://10.5.0.106:7000';
+/** Base URL untuk Reject Room in/out (port 7000); override lewat REJECT_ROOM_INOUT_URL */
+const REJECT_ROOM_INOUT_URL = process.env.REJECT_ROOM_INOUT_URL || 'http://10.5.0.106:7000';
 
 /**
  * POST /garment/reject/in - Reject Room check in → 10.5.0.106:7000
@@ -3257,6 +3562,41 @@ app.get('/api/folding/hourly', (req, res) => {
         return res.status(500).json({
             success: false,
             message: 'Error fetching hourly folding data',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+/**
+ * GET /api/dryroom/hourly - Check In & Check Out per jam (2 series, struktur mirip folding hourly tanpa table)
+ * Query: ?date=YYYY-MM-DD (opsional, default: hari ini)
+ */
+app.get('/api/dryroom/hourly', (req, res) => {
+    try {
+        const date = req.query.date || new Date().toISOString().split('T')[0];
+        const hours = ['07:30', '09', '10', '11', '12', '13', '14', '15', '16', '17'];
+        const day = getDryroomDateDataFromMemoryOrFile(date);
+
+        const result = hours.map((hour) => {
+            const hourFormatted = hour.includes(':') ? hour : `${hour}:00`;
+            const slotKey = hour === '07:30' ? '07:30' : hour;
+            const checkIn = sumDryroomHourBucket(day.checkin, slotKey);
+            const checkOut = sumDryroomHourBucket(day.checkout, slotKey);
+            return { hour: hourFormatted, checkIn, checkOut };
+        });
+
+        return res.json({
+            success: true,
+            data: result,
+            date,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('❌ [DRYROOM HOURLY GET] Error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching hourly dryroom data',
             error: error.message,
             timestamp: new Date().toISOString()
         });
@@ -4497,7 +4837,8 @@ app.listen(PORT, HOST, () => {
     console.log(`   Backend IP: ${BACKEND_IP}`);
     console.log(`   Backend Port: ${BACKEND_PORT}`);
     console.log(`   Backend URL: ${BACKEND_API_URL}`);
-    console.log(`   Proxy Server: http://${LOCAL_IP}:${PORT}\n`);
+    console.log(`   Proxy Server: http://${LOCAL_IP}:${PORT}`);
+    console.log(`   Scanning dryroom: GET /api/scanning/dryroom/operator → scanning_dryroom.json\n`);
 
     // Test koneksi MySQL saat server start
     checkMySQLConnection().then(result => {
@@ -4548,6 +4889,9 @@ app.listen(PORT, HOST, () => {
 
     // Load folding checkout data dari file saat server start
     loadFoldingCheckoutData();
+
+    // Load dryroom hourly (check in / check out per jam) dari file
+    loadDryroomHourlyData();
 
     // ============================================
     // AUTO-LOGOUT SETIAP HARI

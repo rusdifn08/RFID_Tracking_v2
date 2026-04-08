@@ -15,6 +15,7 @@ import { exportFinishingToExcel } from '../utils/exportFinishingToExcel';
 import { Filter, Calendar } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { isAllUsersMode } from '../config/foldingConfig';
+import { FINISHING_HOURLY_CHART_LABELS } from '../utils/finishingHourlyAxis';
 
 // Warna untuk 8 tables
 const TABLE_COLORS = [
@@ -224,8 +225,7 @@ export default function DashboardFolding() {
       } catch (error) {
         console.error('Error fetching hourly folding data:', error);
         // Return empty array dengan struktur yang benar jika error
-        const hours = ['07:30', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
-        return hours.map(hour => ({
+        return [...FINISHING_HOURLY_CHART_LABELS].map(hour => ({
           hour,
           table1: 0,
           table2: 0,
@@ -248,9 +248,7 @@ export default function DashboardFolding() {
   // Data untuk 8 tables dengan shipment per jam - HANYA menggunakan data real dari API
   // TIDAK menggunakan localStorage untuk konsistensi data antar browser/user
   const lineChartData = useMemo(() => {
-    // Default hours (07:30-09:00, kemudian 09:00 - 17:00)
-    const defaultHours = ['07:30', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
-    const baseData = defaultHours.map(hour => ({
+    const baseData = [...FINISHING_HOURLY_CHART_LABELS].map(hour => ({
       hour,
       table1: 0, table2: 0, table3: 0, table4: 0,
       table5: 0, table6: 0, table7: 0, table8: 0,
