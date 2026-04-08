@@ -291,3 +291,61 @@ export const productionLinesMJL2: ProductionLine[] = [
   line: '9'
  },
 ];
+
+// GCC: Line 1–21 (All + 21 line) — supervisor sesuai mapping GCC
+const gccPalette: { border: string; accent: string }[] = [
+  { border: 'border-purple-500', accent: 'text-purple-600' },
+  { border: 'border-pink-500', accent: 'text-pink-600' },
+  { border: 'border-yellow-400', accent: 'text-yellow-600' },
+  { border: 'border-emerald-500', accent: 'text-emerald-600' },
+  { border: 'border-teal-400', accent: 'text-teal-600' },
+  { border: 'border-blue-400', accent: 'text-blue-600' },
+  { border: 'border-indigo-500', accent: 'text-indigo-600' },
+  { border: 'border-rose-400', accent: 'text-rose-600' },
+];
+const gccSupervisorByLine: Record<number, string> = {
+  1: 'IYAH',
+  2: 'LINA',
+  3: 'WIDYA',
+  4: 'DEDE R',
+  5: 'DEDE R',
+  6: 'DEDE W',
+  7: 'DEDE W',
+  8: 'DATI',
+  9: 'DATI',
+  10: 'HAWA',
+  11: 'IYAH',
+  12: 'HAWA',
+  13: 'LINA',
+  14: 'TINI',
+  15: 'WIDYA',
+  16: 'TINI',
+  17: 'TATAN',
+  18: 'DALENA',
+  19: 'DALENA',
+  20: 'SITI',
+  21: 'DUDUNG',
+};
+
+export const productionLinesGCC: ProductionLine[] = [
+  {
+    id: 113,
+    title: 'All Production Line',
+    supervisor: 'Rusdi',
+    borderColor: 'border-blue-500',
+    accentColor: 'text-blue-600',
+    line: undefined,
+  },
+  ...Array.from({ length: 21 }, (_, i) => {
+    const n = i + 1;
+    const pal = gccPalette[i % gccPalette.length];
+    return {
+      id: n,
+      title: `Production Line ${n}`,
+      supervisor: gccSupervisorByLine[n] ?? '-',
+      borderColor: pal.border,
+      accentColor: pal.accent,
+      line: String(n),
+    } satisfies ProductionLine;
+  }),
+];

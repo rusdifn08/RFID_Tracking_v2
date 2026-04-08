@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, User, Sun, Moon, Edit, Tag } from 'lucide-react';
-import { API_BASE_URL, getDefaultHeaders, getInitialEnvironment, getEnvironmentFromAPI, getSupervisorDataFromAPI, invalidateSupervisorDataCache } from '../config/api';
+import { API_BASE_URL, getDefaultHeaders, getInitialEnvironment, getEnvironmentFromAPI, getSupervisorDataFromAPI, invalidateSupervisorDataCache, type BackendEnvironment } from '../config/api';
 import type { ProductionLine } from '../data/production_line';
 import {
     productionLinesCLN,
     productionLinesMJL,
     productionLinesMJL2,
+    productionLinesGCC,
 } from '../data/production_line';
 import EditSupervisorShiftModal from './EditSupervisorShiftModal';
 import { preloadLineDetail } from '../utils/preload';
@@ -37,7 +38,7 @@ export interface RFIDLineContentProps {
 export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-production-line' }: RFIDLineContentProps = {}) {
     const navigate = useNavigate();
     const [hoveredCard, setHoveredCard] = useState<number | null>(null);
-    const [environment, setEnvironment] = useState<'CLN' | 'MJL' | 'MJL2'>(getInitialEnvironment);
+    const [environment, setEnvironment] = useState<BackendEnvironment>(getInitialEnvironment);
 
     // State untuk shift per line (day = siang, night = malam)
     const [lineShifts, setLineShifts] = useState<Record<number, 'day' | 'night'>>({});
@@ -74,6 +75,8 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
             return productionLinesMJL2;
         } else if (environment === 'MJL') {
             return productionLinesMJL;
+        } else if (environment === 'GCC') {
+            return productionLinesGCC;
         } else {
             return productionLinesCLN;
         }
@@ -146,7 +149,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
     const loadStylesOnce = async () => {
         if (!environment) return;
         const linesToFetch = productionLines.filter(
-            (line) => line.id !== 0 && line.id !== 111 && line.id !== 112
+            (line) => line.id !== 0 && line.id !== 111 && line.id !== 112 && line.id !== 113
         );
         if (linesToFetch.length === 0) return;
 
@@ -427,7 +430,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
                     const isLineActive = activeLines.has(line.id);
 
                     // Di konteks Sewing: tampilkan "Sewing Line" / "All Sewing Line", bukan "Production Line"
-                    const isAllLine = line.id === 0 || line.id === 111 || line.id === 112;
+                    const isAllLine = line.id === 0 || line.id === 111 || line.id === 112 || line.id === 113;
                     const cardTitle = linePathPrefix === '/sewing'
                         ? (isAllLine ? 'All Sewing Line' : line.title.replace(/^Production Line /i, 'Sewing Line '))
                         : line.title;
@@ -437,7 +440,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
                             key={`line-${currentLine.line || currentLine.id}-${index}`}
                             onClick={() => {
                                 // Gunakan currentLine untuk memastikan data yang benar
-                                if (currentLine.id === 0 || currentLine.id === 111 || currentLine.id === 112) {
+                                if (currentLine.id === 0 || currentLine.id === 111 || currentLine.id === 112 || currentLine.id === 113) {
                                     navigate(allPath);
                                 } else {
                                     // Prioritas: gunakan currentLine.line jika ada, fallback ke currentLine.id
@@ -475,7 +478,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
                             <div className="absolute top-1.5 xs:top-2 sm:top-2.5 right-1.5 xs:right-2 sm:right-2.5 z-20 flex items-center gap-2 sm:gap-3">
                                 {/* Style badge: icon + label + nilai — design profesional */}
                                 {(() => {
-                                    const isAllProductionLine = line.id === 0 || line.id === 111 || line.id === 112;
+                                    const isAllProductionLine = line.id === 0 || line.id === 111 || line.id === 112 || line.id === 113;
                                     const lineStyle = stylesData[line.id.toString()];
                                     const hasStyle = lineStyle && lineStyle !== '-';
                                     if (isAllProductionLine) return null;
@@ -596,7 +599,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
                                 {/* Footer: untuk All Production Line hanya Arrow; untuk line lain: Supervisor + Jam Masuk + Arrow */}
                                 <div className="flex items-center justify-between pt-1.5 xs:pt-2 border-t border-slate-200 gap-2">
                                     {(() => {
-                                        const isAllProductionLine = line.id === 0 || line.id === 111 || line.id === 112;
+                                        const isAllProductionLine = line.id === 0 || line.id === 111 || line.id === 112 || line.id === 113;
                                         if (isAllProductionLine) {
                                             return (
                                                 <>

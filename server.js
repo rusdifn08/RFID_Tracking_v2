@@ -62,6 +62,9 @@ if (args.includes('cln')) {
 } else if (args.includes('mjl2')) {
     BACKEND_IP = '10.5.0.99';
     CURRENT_ENV = 'MJL2';
+} else if (args.includes('gcc')) {
+    BACKEND_IP = '10.5.0.201';
+    CURRENT_ENV = 'GCC';
 } else if (process.env.BACKEND_IP) {
     BACKEND_IP = process.env.BACKEND_IP;
     CURRENT_ENV = BACKEND_IP === '10.5.0.106' ? 'MJL' : 'CLN';
@@ -73,6 +76,8 @@ if (args.includes('cln')) {
 let PORT = process.env.PORT || 8000;
 if (CURRENT_ENV === 'MJL2') {
     PORT = 8001; // Port berbeda untuk MJL2 agar bisa run bersamaan dengan MJL
+} else if (CURRENT_ENV === 'GCC') {
+    PORT = 8002; // Port untuk GCC (bersamaan dengan MJL/MJL2/CLN)
 } else if (CURRENT_ENV === 'MJL') {
     PORT = 8000; // Port untuk MJL
 } else {
@@ -101,6 +106,7 @@ const MQTT_OPTIONS = {
 function getMqttLineNumbers() {
     if (CURRENT_ENV === 'MJL') return Array.from({ length: 16 }, (_, i) => i + 1);
     if (CURRENT_ENV === 'MJL2') return Array.from({ length: 9 }, (_, i) => i + 1);
+    if (CURRENT_ENV === 'GCC') return Array.from({ length: 21 }, (_, i) => i + 1);
     return Array.from({ length: 5 }, (_, i) => i + 1); // CLN default
 }
 
@@ -660,7 +666,8 @@ function loadActiveSessionsFromFile() {
             // Cek environment dari log.environment atau log.backendIP
             const logEnvironment = log.environment || (log.backendIP === '10.8.0.104' ? 'CLN' :
                 log.backendIP === '10.5.0.106' ? 'MJL' :
-                    log.backendIP === '10.5.0.99' ? 'MJL2' : null);
+                    log.backendIP === '10.5.0.99' ? 'MJL2' :
+                        log.backendIP === '10.5.0.201' ? 'GCC' : null);
             const isSameEnvironment = logEnvironment === CURRENT_ENV;
 
             // Hanya load jika: FOLDING, belum logout, dan environment sama
@@ -844,7 +851,8 @@ function updateUserLogout(nik, req) {
                 const lineNumber = extractLineNumber(loggedOutUser.name) || loggedOutUser.line;
                 const logEnvironment = loggedOutUser.environment || (loggedOutUser.backendIP === '10.8.0.104' ? 'CLN' :
                     loggedOutUser.backendIP === '10.5.0.106' ? 'MJL' :
-                        loggedOutUser.backendIP === '10.5.0.99' ? 'MJL2' : null);
+                        loggedOutUser.backendIP === '10.5.0.99' ? 'MJL2' :
+                            loggedOutUser.backendIP === '10.5.0.201' ? 'GCC' : null);
                 const isSameEnvironment = logEnvironment === CURRENT_ENV;
 
                 if (lineNumber && (loggedOutUser.jabatan === 'FOLDING' || loggedOutUser.bagian === 'FOLDING') && isSameEnvironment) {
@@ -1043,6 +1051,8 @@ app.get('/api/config/environment', (req, res) => {
     // Jika port 5174 terdeteksi, pastikan environment adalah MJL2
     if (port === '5174') {
         environment = 'MJL2';
+    } else if (port === '5175') {
+        environment = 'GCC';
     } else if (port === '5173' && CURRENT_ENV === 'MJL') {
         environment = 'MJL';
     } else {
@@ -2598,15 +2608,164 @@ app.get('/monitoring/line', async (req, res) => {
     return await proxyRequest('/monitoring/line', req, res);
 });
 
+// --- GCC: dashboard memakai GET /output/gcc (bukan /wira); disatukan lewat /wira agar frontend tetap sama ---
+const GCC_LINE_COUNT = 21;
+const GCC_OUTPUT_PATH = '/output/gcc';
+
+function gccTodayYmd() {
+    return new Date().toISOString().split('T')[0];
+}
+
+async function fetchGccOutputJson(lineNum, tanggalfrom, tanggalto) {
+    const tf = tanggalfrom || gccTodayYmd();
+    const tt = tanggalto || tf;
+    const qs = `line=${encodeURIComponent(lineNum)}&tanggalfrom=${encodeURIComponent(tf)}&tanggalto=${encodeURIComponent(tt)}`;
+    const url = `${BACKEND_API_URL}${GCC_OUTPUT_PATH}?${qs}`;
+    const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        [API_KEY_HEADER]: API_KEY,
+    };
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(url, { headers, signal: controller.signal }).finally(() => clearTimeout(tid));
+    const text = await response.text();
+    return text ? JSON.parse(text) : {};
+}
+
+function gccResumeToWiraRow(lineNum, resume) {
+    if (!resume || typeof resume !== 'object') return null;
+    const L = String(lineNum);
+    return {
+        Line: L,
+        line: L,
+        LINE: L,
+        Good: Number(resume.total_qty_good) || 0,
+        Rework: Number(resume.total_qty_rework) || 0,
+        Reject: Number(resume.total_qty_reject) || 0,
+        WIRA: Number(resume.total_qty_wira) || 0,
+        'PQC Good': Number(resume.total_qty_pqc_good) || 0,
+        'PQC Rework': Number(resume.total_qty_pqc_rework) || 0,
+        'PQC Reject': Number(resume.total_qty_pqc_reject) || 0,
+        'PQC WIRA': Number(resume.total_qty_pqc_wira) || 0,
+        'Output Sewing': Number(resume.total_qty_output) || 0,
+    };
+}
+
+function gccDataRowToWiraWoRow(row, lineNum) {
+    const L = String(lineNum);
+    return {
+        WO: row.wo,
+        wo: row.wo,
+        Style: row.style,
+        style: row.style,
+        Buyer: row.buyer,
+        buyer: row.buyer,
+        Item: row.item,
+        item: row.item,
+        Good: Number(row.qty_good) || 0,
+        Rework: Number(row.qty_rework) || 0,
+        Reject: Number(row.qty_reject) || 0,
+        WIRA: Number(row.qty_wira) || 0,
+        'PQC Good': Number(row.qty_pqc_good) || 0,
+        'PQC Rework': Number(row.qty_pqc_rework) || 0,
+        'PQC Reject': Number(row.qty_pqc_reject) || 0,
+        'PQC WIRA': Number(row.qty_pqc_wira) || 0,
+        'Output Sewing': Number(row.qty_output) || 0,
+        line: L,
+        Line: L,
+    };
+}
+
 /**
  * GET /wira?line=1 - WIRA data untuk Dashboard RFID
+ * Environment GCC: proxy ke /output/gcc dan normalisasi ke bentuk mirip /wira
  */
 app.get('/wira', async (req, res) => {
+    if (CURRENT_ENV === 'GCC') {
+        const q = req.query;
+        const tanggalfrom = (q.tanggalfrom || q.tanggal_from || '').toString() || gccTodayYmd();
+        const tanggalto = (q.tanggalto || q.tanggal_to || '').toString() || tanggalfrom;
+        const lineParam = q.LINE || q.line || q.Line;
+        const woFilter = (q.wo || q.WO || '').toString().trim();
+        try {
+            if (woFilter && !lineParam) {
+                const rows = await Promise.all(
+                    Array.from({ length: GCC_LINE_COUNT }, (_, i) => i + 1).map(async (ln) => {
+                        try {
+                            const raw = await fetchGccOutputJson(ln, tanggalfrom, tanggalto);
+                            const dataRows = Array.isArray(raw.data) ? raw.data : [];
+                            const hit = dataRows.find((r) => String(r.wo) === woFilter);
+                            return hit ? gccDataRowToWiraWoRow(hit, ln) : null;
+                        } catch {
+                            return null;
+                        }
+                    })
+                );
+                const found = rows.find(Boolean);
+                if (found) {
+                    return res.json({ success: true, data: [found], tanggal: tanggalfrom, source: 'gcc-output' });
+                }
+                return res.json({ success: true, data: [], tanggal: tanggalfrom, source: 'gcc-output' });
+            }
+            if (lineParam) {
+                const lineNum = parseInt(String(lineParam), 10);
+                if (Number.isNaN(lineNum) || lineNum < 1 || lineNum > GCC_LINE_COUNT) {
+                    return res.status(400).json({ success: false, message: `Invalid line for GCC (1-${GCC_LINE_COUNT})` });
+                }
+                const raw = await fetchGccOutputJson(lineNum, tanggalfrom, tanggalto);
+                if (woFilter && Array.isArray(raw.data)) {
+                    const hit = raw.data.find((r) => String(r.wo) === woFilter);
+                    if (hit) {
+                        return res.json({
+                            success: true,
+                            data: [gccDataRowToWiraWoRow(hit, lineNum)],
+                            tanggal: raw.tanggal || tanggalfrom,
+                            source: 'gcc-output',
+                        });
+                    }
+                    return res.json({ success: true, data: [], tanggal: raw.tanggal || tanggalfrom, source: 'gcc-output' });
+                }
+                const resume = raw.resume_qty_gcc;
+                const row = gccResumeToWiraRow(lineNum, resume);
+                if (row) {
+                    return res.json({
+                        success: true,
+                        data: [row],
+                        tanggal: raw.tanggal || tanggalfrom,
+                        line: lineNum,
+                        resume_qty_gcc: resume,
+                        source: 'gcc-output',
+                    });
+                }
+                return res.json({ success: true, data: [], tanggal: raw.tanggal || tanggalfrom, source: 'gcc-output' });
+            }
+            const results = await Promise.all(
+                Array.from({ length: GCC_LINE_COUNT }, (_, i) => i + 1).map(async (ln) => {
+                    try {
+                        const raw = await fetchGccOutputJson(ln, tanggalfrom, tanggalto);
+                        return gccResumeToWiraRow(ln, raw.resume_qty_gcc);
+                    } catch {
+                        return null;
+                    }
+                })
+            );
+            const data = results.filter(Boolean);
+            return res.json({ success: true, data, tanggal: tanggalfrom, source: 'gcc-output' });
+        } catch (error) {
+            console.error('❌ [GCC /wira]', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Error fetching GCC output data',
+                error: error.message,
+                backend: `${BACKEND_IP}:${BACKEND_PORT}`,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
     try {
-        const result = await proxyRequest('/wira', req, res);
-        return result;
+        await proxyRequest('/wira', req, res);
     } catch (error) {
-        // Log sudah di-throttle di proxyRequest; di sini hanya kirim response JSON
         return res.status(500).json({
             success: false,
             message: 'Error fetching WIRA data',
@@ -2615,6 +2774,16 @@ app.get('/wira', async (req, res) => {
             timestamp: new Date().toISOString()
         });
     }
+});
+
+/**
+ * GET /output/gcc — proxy langsung ke backend (environment GCC); parameter: line, tanggalfrom, tanggalto
+ */
+app.get('/output/gcc', async (req, res) => {
+    if (CURRENT_ENV !== 'GCC') {
+        return res.status(404).json({ success: false, message: 'Endpoint /output/gcc hanya untuk server environment GCC' });
+    }
+    return await proxyRequest('/output/gcc', req, res);
 });
 
 /**
@@ -3684,6 +3853,18 @@ function loadShiftData() {
             }
         }
 
+        // Migrate GCC (line 1-21)
+        for (let i = 1; i <= 21; i++) {
+            const lineId = i.toString();
+            const envKey = `GCC_${lineId}`;
+            if (!shiftData.shifts[envKey]) {
+                shiftData.shifts[envKey] = 'day';
+            }
+        }
+        if (!shiftData.shifts['113']) {
+            shiftData.shifts['113'] = 'day';
+        }
+
         // Migrate All Production Line untuk setiap environment
         if (!shiftData.shifts['0']) {
             shiftData.shifts['0'] = defaultShifts.CLN['0'] || 'day';
@@ -3746,11 +3927,13 @@ app.get('/api/shift-data', (req, res) => {
         // Jika port 5174 terdeteksi, pastikan environment adalah MJL2
         if (port === '5174') {
             detectedEnv = 'MJL2';
+        } else if (port === '5175') {
+            detectedEnv = 'GCC';
         } else if (port === '5173' && CURRENT_ENV === 'MJL') {
             detectedEnv = 'MJL';
         }
 
-        const environment = queryEnv === 'MJL' || queryEnv === 'MJL2' || queryEnv === 'CLN' ? queryEnv : detectedEnv;
+        const environment = queryEnv === 'MJL' || queryEnv === 'MJL2' || queryEnv === 'CLN' || queryEnv === 'GCC' ? queryEnv : detectedEnv;
 
         const shiftData = loadShiftData();
         const allShifts = shiftData.shifts || {};
@@ -3777,6 +3960,9 @@ app.get('/api/shift-data', (req, res) => {
             '6': 'day', '7': 'day', '8': 'day', '9': 'day'
         };
 
+        const defaultGCC = { '113': 'day' };
+        for (let g = 1; g <= 21; g++) defaultGCC[String(g)] = 'day';
+
         if (environment === 'MJL') {
             // MJL: ambil line 111 dan 1-15
             const defaultData = defaultMJL;
@@ -3802,6 +3988,17 @@ app.get('/api/shift-data', (req, res) => {
                     filteredShifts[lineId] = allShifts[envKey] || allShifts[lineId] || defaultData[lineId];
                 } else {
                     // Line 112: gunakan dari JSON jika ada, jika tidak gunakan default
+                    filteredShifts[lineId] = allShifts[lineId] || defaultData[lineId];
+                }
+            });
+        } else if (environment === 'GCC') {
+            const defaultData = defaultGCC;
+            Object.keys(defaultData).forEach(lineId => {
+                const id = parseInt(lineId, 10);
+                if (id >= 1 && id <= 21) {
+                    const envKey = `GCC_${lineId}`;
+                    filteredShifts[lineId] = allShifts[envKey] || allShifts[lineId] || defaultData[lineId];
+                } else {
                     filteredShifts[lineId] = allShifts[lineId] || defaultData[lineId];
                 }
             });
@@ -3877,11 +4074,13 @@ app.post('/api/shift-data', (req, res) => {
         // Jika port 5174 terdeteksi, pastikan environment adalah MJL2
         if (port === '5174') {
             detectedEnv = 'MJL2';
+        } else if (port === '5175') {
+            detectedEnv = 'GCC';
         } else if (port === '5173' && CURRENT_ENV === 'MJL') {
             detectedEnv = 'MJL';
         }
 
-        const environment = reqEnv === 'MJL' || reqEnv === 'MJL2' || reqEnv === 'CLN' ? reqEnv : detectedEnv;
+        const environment = reqEnv === 'MJL' || reqEnv === 'MJL2' || reqEnv === 'CLN' || reqEnv === 'GCC' ? reqEnv : detectedEnv;
 
         const shiftData = loadShiftData();
         if (!shiftData.shifts) {
@@ -3904,6 +4103,8 @@ app.post('/api/shift-data', (req, res) => {
         } else if (environment === 'MJL2' && id >= 1 && id <= 9) {
             // Line 1-9 untuk MJL2: simpan dengan environment prefix
             storageKey = `MJL2_${lineIdStr}`;
+        } else if (environment === 'GCC' && id >= 1 && id <= 21) {
+            storageKey = `GCC_${lineIdStr}`;
         }
 
         const oldShift = shiftData.shifts[storageKey] || shiftData.shifts[lineIdStr] || 'day';
@@ -4164,11 +4365,13 @@ app.get('/api/supervisor-data', (req, res) => {
         // Jika port 5174 terdeteksi, pastikan environment adalah MJL2
         if (port === '5174') {
             detectedEnv = 'MJL2';
+        } else if (port === '5175') {
+            detectedEnv = 'GCC';
         } else if (port === '5173' && CURRENT_ENV === 'MJL') {
             detectedEnv = 'MJL';
         }
 
-        const environment = queryEnv === 'MJL' || queryEnv === 'MJL2' || queryEnv === 'CLN' ? queryEnv : detectedEnv;
+        const environment = queryEnv === 'MJL' || queryEnv === 'MJL2' || queryEnv === 'CLN' || queryEnv === 'GCC' ? queryEnv : detectedEnv;
 
         const supervisorData = loadSupervisorData();
         const allSupervisors = supervisorData.supervisors || {};
@@ -4217,6 +4420,14 @@ app.get('/api/supervisor-data', (req, res) => {
             '6': 'ENO KARMI', '7': 'DINI AGUSTINA', '8': 'NINING SRI WAHYUNI', '9': 'NENG DIAH RODIAH'
         };
 
+        const defaultGCC = {
+            '113': 'Rusdi',
+            '1': 'IYAH', '2': 'LINA', '3': 'WIDYA', '4': 'DEDE R', '5': 'DEDE R',
+            '6': 'DEDE W', '7': 'DEDE W', '8': 'DATI', '9': 'DATI',
+            '10': 'HAWA', '11': 'IYAH', '12': 'HAWA', '13': 'LINA', '14': 'TINI', '15': 'WIDYA',
+            '16': 'TINI', '17': 'TATAN', '18': 'DALENA', '19': 'DALENA', '20': 'SITI', '21': 'DUDUNG'
+        };
+
         if (environment === 'MJL') {
             // MJL: ambil line 111, 1-16, dan 21
             const defaultData = defaultMJL;
@@ -4262,6 +4473,20 @@ app.get('/api/supervisor-data', (req, res) => {
                     filteredSupervisors[lineId] = allSupervisors[lineId] || defaultData[lineId];
                     filteredStartTimes[lineId] = allStartTimes[lineId] || defaultStartData[lineId] || '07:30';
                     filteredTargets[lineId] = typeof allTargets[lineId] === 'number' ? allTargets[lineId] : 0;
+                }
+            });
+        } else if (environment === 'GCC') {
+            Object.keys(defaultGCC).forEach(lineId => {
+                const id = parseInt(lineId, 10);
+                if (id >= 1 && id <= 21) {
+                    const envKey = `GCC_${lineId}`;
+                    filteredSupervisors[lineId] = allSupervisors[envKey] || defaultGCC[lineId];
+                    filteredStartTimes[lineId] = allStartTimes[envKey] || '07:30';
+                    filteredTargets[lineId] = typeof allTargets[envKey] === 'number' ? allTargets[envKey] : (typeof allTargets[lineId] === 'number' ? allTargets[lineId] : 0);
+                } else if (lineId === '113') {
+                    filteredSupervisors[lineId] = allSupervisors['113'] || defaultGCC['113'];
+                    filteredStartTimes[lineId] = allStartTimes['113'] || '07:30';
+                    filteredTargets[lineId] = typeof allTargets['113'] === 'number' ? allTargets['113'] : 0;
                 }
             });
         } else {
@@ -4322,8 +4547,9 @@ app.get('/api/target-data', (req, res) => {
         const queryEnv = req.query.environment;
         let detectedEnv = CURRENT_ENV;
         if (port === '5174') detectedEnv = 'MJL2';
+        else if (port === '5175') detectedEnv = 'GCC';
         else if (port === '5173' && CURRENT_ENV === 'MJL') detectedEnv = 'MJL';
-        const environment = queryEnv === 'MJL' || queryEnv === 'MJL2' || queryEnv === 'CLN' ? queryEnv : detectedEnv;
+        const environment = queryEnv === 'MJL' || queryEnv === 'MJL2' || queryEnv === 'CLN' || queryEnv === 'GCC' ? queryEnv : detectedEnv;
 
         const supervisorData = loadSupervisorData();
         const allTargets = supervisorData.targets || {};
@@ -4332,6 +4558,8 @@ app.get('/api/target-data', (req, res) => {
         const defaultTargetsCLN = { '0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
         const defaultTargetsMJL = { '111': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, '10': 0, '11': 0, '12': 0, '13': 0, '14': 0, '15': 0, '16': 0 };
         const defaultTargetsMJL2 = { '112': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 };
+        const defaultTargetsGCC = { '113': 0 };
+        for (let i = 1; i <= 21; i++) defaultTargetsGCC[String(i)] = 0;
 
         if (environment === 'MJL') {
             Object.keys(defaultTargetsMJL).forEach(lineId => {
@@ -4344,6 +4572,16 @@ app.get('/api/target-data', (req, res) => {
                 const id = parseInt(lineId, 10);
                 if (id >= 1 && id <= 9) {
                     const envKey = `MJL2_${lineId}`;
+                    filteredTargets[lineId] = typeof allTargets[envKey] === 'number' ? allTargets[envKey] : (typeof allTargets[lineId] === 'number' ? allTargets[lineId] : 0);
+                } else {
+                    filteredTargets[lineId] = typeof allTargets[lineId] === 'number' ? allTargets[lineId] : 0;
+                }
+            });
+        } else if (environment === 'GCC') {
+            Object.keys(defaultTargetsGCC).forEach(lineId => {
+                const id = parseInt(lineId, 10);
+                if (id >= 1 && id <= 21) {
+                    const envKey = `GCC_${lineId}`;
                     filteredTargets[lineId] = typeof allTargets[envKey] === 'number' ? allTargets[envKey] : (typeof allTargets[lineId] === 'number' ? allTargets[lineId] : 0);
                 } else {
                     filteredTargets[lineId] = typeof allTargets[lineId] === 'number' ? allTargets[lineId] : 0;
@@ -4399,7 +4637,7 @@ app.post('/api/supervisor-data', (req, res) => {
 
         // Deteksi environment dari request atau CURRENT_ENV
         const detectedEnv = CURRENT_ENV;
-        const environment = reqEnv === 'MJL' || reqEnv === 'MJL2' || reqEnv === 'CLN' ? reqEnv : detectedEnv;
+        const environment = reqEnv === 'MJL' || reqEnv === 'MJL2' || reqEnv === 'CLN' || reqEnv === 'GCC' ? reqEnv : detectedEnv;
 
         const supervisorData = loadSupervisorData();
         if (!supervisorData.supervisors) {
@@ -4424,6 +4662,8 @@ app.post('/api/supervisor-data', (req, res) => {
             storageKey = `MJL_${lineIdStr}`;
         } else if (environment === 'MJL2' && id >= 1 && id <= 9) {
             storageKey = `MJL2_${lineIdStr}`;
+        } else if (environment === 'GCC' && id >= 1 && id <= 21) {
+            storageKey = `GCC_${lineIdStr}`;
         }
 
         // Update supervisor jika ada

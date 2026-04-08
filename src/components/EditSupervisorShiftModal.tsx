@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, User, Clock, Save, Loader2, Target } from 'lucide-react';
-import { API_BASE_URL, getDefaultHeaders } from '../config/api';
+import { API_BASE_URL, getDefaultHeaders, type BackendEnvironment } from '../config/api';
 
 interface EditSupervisorShiftModalProps {
     isOpen: boolean;
@@ -11,7 +11,7 @@ interface EditSupervisorShiftModalProps {
     currentShift: 'day' | 'night';
     currentStartTime?: string; // Jam masuk (format: HH:mm)
     currentTarget?: number; // Target (acuan distribusi dashboard line)
-    environment: 'CLN' | 'MJL' | 'MJL2';
+    environment: BackendEnvironment;
     onUpdate: () => void; // Callback setelah update berhasil
 }
 
