@@ -3,8 +3,8 @@ import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { useSidebar } from '../context/SidebarContext';
 import backgroundImage from '../assets/background.jpg';
-import { API_BASE_URL, getDefaultHeaders, getEnvironmentFromAPI, getSupervisorDataFromAPI, invalidateSupervisorDataCache } from '../config/api';
-import { productionLinesCLN, productionLinesMJL, productionLinesMJL2 } from '../data/production_line';
+import { API_BASE_URL, getDefaultHeaders, getEnvironmentFromAPI, getSupervisorDataFromAPI, invalidateSupervisorDataCache, type BackendEnvironment } from '../config/api';
+import { productionLinesCLN, productionLinesMJL, productionLinesMJL2, productionLinesGCC } from '../data/production_line';
 import { Clock } from 'lucide-react';
 
 // Helper function untuk convert 24-hour format ke 12-hour format dengan AM/PM
@@ -38,11 +38,12 @@ export default function AllProductionLineDashboard() {
     const [error, setError] = useState<string | null>(null);
     // Initialize environment dari localStorage terlebih dahulu untuk menghindari flash CLN
     // Jika localStorage belum ada, default ke MJL (karena user biasanya menggunakan dev:all:mjl)
-    const [environment, setEnvironment] = useState<'CLN' | 'MJL' | 'MJL2'>(() => {
-        const storedEnv = localStorage.getItem('backend_environment') as 'CLN' | 'MJL' | 'MJL2' | null;
+    const [environment, setEnvironment] = useState<BackendEnvironment>(() => {
+        const storedEnv = localStorage.getItem('backend_environment') as BackendEnvironment | null;
         // Prioritaskan MJL jika storedEnv ada, jika tidak ada default ke MJL (bukan CLN)
         if (storedEnv === 'MJL') return 'MJL';
         if (storedEnv === 'MJL2') return 'MJL2';
+        if (storedEnv === 'GCC') return 'GCC';
         if (storedEnv === 'CLN') return 'CLN';
         // Default ke MJL karena biasanya user menggunakan dev:all:mjl
         return 'MJL';
@@ -80,15 +81,28 @@ export default function AllProductionLineDashboard() {
         []
     );
 
+    const filteredProductionLinesGCC = useMemo(() =>
+        productionLinesGCC
+            .filter(line => line.id !== 113)
+            .map(line => ({
+                id: line.id,
+                title: line.title,
+                supervisor: line.supervisor
+            })),
+        []
+    );
+
     const productionLines = useMemo(() => {
         if (environment === 'MJL2') {
             return filteredProductionLinesMJL2;
         } else if (environment === 'MJL') {
             return filteredProductionLinesMJL;
+        } else if (environment === 'GCC') {
+            return filteredProductionLinesGCC;
         } else {
             return filteredProductionLinesCLN;
         }
-    }, [environment, filteredProductionLinesCLN, filteredProductionLinesMJL, filteredProductionLinesMJL2]);
+    }, [environment, filteredProductionLinesCLN, filteredProductionLinesMJL, filteredProductionLinesMJL2, filteredProductionLinesGCC]);
 
     // Fetch environment (1x shared request), re-check setiap 5 detik (dari cache)
     useEffect(() => {

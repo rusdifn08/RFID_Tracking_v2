@@ -23,6 +23,10 @@ const getProxyPort = (): number => {
     if (currentPort === '5174') {
         return 8001;
     }
+    // Port 5175 = GCC → proxy port 8002
+    if (currentPort === '5175') {
+        return 8002;
+    }
     // Port 5173 = MJL → proxy port 8000
     // Port lainnya (CLN) → proxy port 8000
     return 8000;
@@ -80,6 +84,8 @@ const getBackendIP = (): string => {
             return '10.5.0.106';
         } else if (storedEnv === 'MJL2') {
             return '10.5.0.99';
+        } else if (storedEnv === 'GCC') {
+            return '10.5.0.201';
         }
     }
     // Default: CLN
@@ -140,61 +146,75 @@ export const PROD_SCH_API_KEY = '332100185';
 export const MJL_API_KEY = '6lYZkryM.j50CVZgnpBl8X7Nx6sy5KRyY6ET7k3Cb';
 export const MJL_API_KEY_HEADER = 'X-Api-Key';
 
-// Cache untuk environment (CLN, MJL, atau MJL2)
-let cachedEnvironment: 'CLN' | 'MJL' | 'MJL2' | null = null;
+/** Environment backend (proxy + dashboard). */
+export type BackendEnvironment = 'CLN' | 'MJL' | 'MJL2' | 'GCC';
+
+// Cache untuk environment (CLN, MJL, MJL2, atau GCC)
+let cachedEnvironment: BackendEnvironment | null = null;
 
 // Inisialisasi dari localStorage/port saat module load agar dari awal tidak pakai CLN saat jalan di MJL
 if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('backend_environment');
-    if (stored === 'MJL' || stored === 'MJL2' || stored === 'CLN') {
+    if (stored === 'MJL' || stored === 'MJL2' || stored === 'CLN' || stored === 'GCC') {
         cachedEnvironment = stored;
     } else {
         const port = window.location.port;
         if (port === '5173') cachedEnvironment = 'MJL';
         else if (port === '5174') cachedEnvironment = 'MJL2';
+        else if (port === '5175') cachedEnvironment = 'GCC';
         else cachedEnvironment = 'CLN';
     }
 }
 
 /** Nilai environment untuk initial state (localStorage lalu port), agar first paint sesuai env (MJL/CLN). */
-export const getInitialEnvironment = (): 'CLN' | 'MJL' | 'MJL2' => {
+export const getInitialEnvironment = (): BackendEnvironment => {
     if (typeof window === 'undefined') return 'CLN';
     const stored = localStorage.getItem('backend_environment');
-    if (stored === 'MJL' || stored === 'MJL2' || stored === 'CLN') return stored;
+    if (stored === 'MJL' || stored === 'MJL2' || stored === 'CLN' || stored === 'GCC') return stored;
     const port = window.location.port;
     if (port === '5173') return 'MJL';
     if (port === '5174') return 'MJL2';
+    if (port === '5175') return 'GCC';
     return 'CLN';
 };
 
 // Fungsi untuk set environment cache (dipanggil dari komponen yang fetch /api/config/environment)
-export const setBackendEnvironment = (env: 'CLN' | 'MJL' | 'MJL2'): void => {
+export const setBackendEnvironment = (env: BackendEnvironment): void => {
     cachedEnvironment = env;
     localStorage.setItem('backend_environment', env);
 };
 
 // Getter untuk environment yang sudah di-cache (bisa dipakai untuk conditional logic)
-export const getBackendEnvironment = (): 'CLN' | 'MJL' | 'MJL2' | null => cachedEnvironment;
+export const getBackendEnvironment = (): BackendEnvironment | null => cachedEnvironment;
 
 // -----------------------------------------------
 // Single-request cache: /api/config/environment (1x per refresh)
 // -----------------------------------------------
-let environmentFetchPromise: Promise<'CLN' | 'MJL' | 'MJL2'> | null = null;
+let environmentFetchPromise: Promise<BackendEnvironment> | null = null;
 
 /**
  * Ambil environment dari API. Hanya 1x request per session; pemanggil berikutnya dapat promise yang sama.
  * Gunakan ini di komponen agar /api/config/environment tidak dipanggil berulang (Breadcrumb, LineDetail, dll).
  */
-export async function getEnvironmentFromAPI(): Promise<'CLN' | 'MJL' | 'MJL2'> {
+export async function getEnvironmentFromAPI(): Promise<BackendEnvironment> {
     if (environmentFetchPromise) return environmentFetchPromise;
     const currentPort = typeof window !== 'undefined' ? window.location.port : '';
-    const fallbackEnv: 'CLN' | 'MJL' | 'MJL2' = currentPort === '5174' ? 'MJL2' : currentPort === '5173' ? 'MJL' : 'CLN';
+    const fallbackEnv: BackendEnvironment =
+        currentPort === '5174' ? 'MJL2' : currentPort === '5173' ? 'MJL' : currentPort === '5175' ? 'GCC' : 'CLN';
     environmentFetchPromise = (async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/config/environment`, { headers: getDefaultHeaders() });
             if (response.ok) {
                 const data = await response.json();
-                const env = data.environment === 'MJL2' ? 'MJL2' : data.environment === 'MJL' ? 'MJL' : 'CLN';
+                const raw = data.environment;
+                const env: BackendEnvironment =
+                    raw === 'GCC' || raw === 'gcc'
+                        ? 'GCC'
+                        : raw === 'MJL2'
+                          ? 'MJL2'
+                          : raw === 'MJL'
+                            ? 'MJL'
+                            : 'CLN';
                 setBackendEnvironment(env);
                 return env;
             }
@@ -216,14 +236,14 @@ export interface SupervisorDataPayload {
     targets?: Record<string, number>;
 }
 
-const supervisorDataCache: Partial<Record<'CLN' | 'MJL' | 'MJL2', SupervisorDataPayload>> = {};
-const supervisorDataPromise: Partial<Record<'CLN' | 'MJL' | 'MJL2', Promise<SupervisorDataPayload | null>>> = {};
+const supervisorDataCache: Partial<Record<BackendEnvironment, SupervisorDataPayload>> = {};
+const supervisorDataPromise: Partial<Record<BackendEnvironment, Promise<SupervisorDataPayload | null>>> = {};
 
 /**
  * Ambil supervisor data dari API. Satu request per environment; pemanggil berikutnya dapat cache/promise yang sama.
  * Panggil invalidateSupervisorDataCache(env) setelah POST update agar data segar.
  */
-export async function getSupervisorDataFromAPI(environment: 'CLN' | 'MJL' | 'MJL2'): Promise<SupervisorDataPayload | null> {
+export async function getSupervisorDataFromAPI(environment: BackendEnvironment): Promise<SupervisorDataPayload | null> {
     if (supervisorDataCache[environment]) return supervisorDataCache[environment];
     if (supervisorDataPromise[environment]) return supervisorDataPromise[environment]!;
     const prom = (async (): Promise<SupervisorDataPayload | null> => {
@@ -257,7 +277,7 @@ export async function getSupervisorDataFromAPI(environment: 'CLN' | 'MJL' | 'MJL
 }
 
 /** Invalidasi cache supervisor data (panggil setelah simpan/edit) agar refetch berikutnya dapat data terbaru. */
-export function invalidateSupervisorDataCache(environment: 'CLN' | 'MJL' | 'MJL2'): void {
+export function invalidateSupervisorDataCache(environment: BackendEnvironment): void {
     delete supervisorDataCache[environment];
     delete supervisorDataPromise[environment];
 }

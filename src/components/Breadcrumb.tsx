@@ -1,8 +1,8 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, Settings, X, Target } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { API_BASE_URL, getDefaultHeaders, getInitialEnvironment, getEnvironmentFromAPI, getSupervisorDataFromAPI, invalidateSupervisorDataCache } from '../config/api';
-import { productionLinesCLN, productionLinesMJL, productionLinesMJL2 } from '../data/production_line';
+import { API_BASE_URL, getDefaultHeaders, getInitialEnvironment, getEnvironmentFromAPI, getSupervisorDataFromAPI, invalidateSupervisorDataCache, type BackendEnvironment } from '../config/api';
+import { productionLinesCLN, productionLinesMJL, productionLinesMJL2, productionLinesGCC } from '../data/production_line';
 
 interface BreadcrumbItem {
     label: string;
@@ -22,7 +22,7 @@ export default function Breadcrumb() {
     const [editingStartTime, setEditingStartTime] = useState<string>('07:30');
     const [editingTarget, setEditingTarget] = useState<number>(0);
     const [isLoading, setIsLoading] = useState(false);
-    const [environment, setEnvironment] = useState<'CLN' | 'MJL' | 'MJL2'>(getInitialEnvironment);
+    const [environment, setEnvironment] = useState<BackendEnvironment>(getInitialEnvironment);
 
     // Fetch environment (1x shared request)
     useEffect(() => {
@@ -367,11 +367,13 @@ export default function Breadcrumb() {
             lines = productionLinesMJL2;
         } else if (environment === 'MJL') {
             lines = productionLinesMJL;
+        } else if (environment === 'GCC') {
+            lines = productionLinesGCC;
         } else {
             lines = productionLinesCLN;
         }
-        // Filter out "All Production Line" (id 0 untuk CLN, id 111 untuk MJL, id 112 untuk MJL2)
-        return lines.filter(line => line.id !== 0 && line.id !== 111 && line.id !== 112);
+        // Filter out "All Production Line" (id 0 untuk CLN, id 111 untuk MJL, id 112 untuk MJL2, id 113 untuk GCC)
+        return lines.filter(line => line.id !== 0 && line.id !== 111 && line.id !== 112 && line.id !== 113);
     };
 
     // Jangan tampilkan breadcrumb di Home dan Dashboard RFID

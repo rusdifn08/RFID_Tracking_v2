@@ -5,7 +5,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, LineChart, Lin
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { useSidebar } from '../context/SidebarContext';
-import { API_BASE_URL, getDefaultHeaders, getBackendEnvironment } from '../config/api';
+import { API_BASE_URL, getDefaultHeaders, getBackendEnvironment, type BackendEnvironment } from '../config/api';
 import ExportModal from '../components/ExportModal';
 import type { ExportType } from '../components/ExportModal';
 import { exportToExcel } from '../utils/exportToExcel';
@@ -327,7 +327,7 @@ export default function DashboardRFID() {
     }, [detailDataQuery.isLoading]);
 
     // Target output: dari production line sesuai line & environment (card production line)
-    const environment = (typeof window !== 'undefined' && (localStorage.getItem('backend_environment') as 'CLN' | 'MJL' | 'MJL2')) || getBackendEnvironment() || 'CLN';
+    const environment = (typeof window !== 'undefined' && (localStorage.getItem('backend_environment') as BackendEnvironment)) || getBackendEnvironment() || 'CLN';
     const targetDataQuery = useQuery({
         queryKey: ['target-data', environment],
         queryFn: async () => {

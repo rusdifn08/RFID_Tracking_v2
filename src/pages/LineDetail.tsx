@@ -8,8 +8,8 @@ import { useSidebar } from '../context/SidebarContext';
 import backgroundImage from '../assets/background.jpg';
 import LineDetailHeader from '../components/line/LineDetailHeader';
 import LineDetailCardsGrid from '../components/line/LineDetailCardsGrid';
-import { getInitialEnvironment, getEnvironmentFromAPI, getSupervisorDataFromAPI } from '../config/api';
-import { productionLinesCLN, productionLinesMJL, productionLinesMJL2 } from '../data/production_line';
+import { getInitialEnvironment, getEnvironmentFromAPI, getSupervisorDataFromAPI, type BackendEnvironment } from '../config/api';
+import { productionLinesCLN, productionLinesMJL, productionLinesMJL2, productionLinesGCC } from '../data/production_line';
 import daftarRfidIcon from '../assets/daftarrfid.webp';
 import dashboardRfidIcon from '../assets/dashboardrfid.webp';
 import listRfidIcon from '../assets/listrfid.webp';
@@ -18,7 +18,7 @@ const LineDetail = memo(() => {
     const { id } = useParams<{ id: string }>();
     const location = useLocation();
     const { isOpen } = useSidebar();
-    const [environment, setEnvironment] = useState<'CLN' | 'MJL' | 'MJL2'>(getInitialEnvironment);
+    const [environment, setEnvironment] = useState<BackendEnvironment>(getInitialEnvironment);
     const [supervisorFromAPI, setSupervisorFromAPI] = useState<string | null>(null);
 
     // Fetch environment (1x shared request via getEnvironmentFromAPI)
@@ -63,16 +63,23 @@ const LineDetail = memo(() => {
         []
     );
 
+    const filteredProductionLinesGCC = useMemo(() =>
+        productionLinesGCC.filter(line => line.id !== 113),
+        []
+    );
+
     // Pilih data berdasarkan environment
     const productionLines = useMemo(() => {
         if (environment === 'MJL2') {
             return filteredProductionLinesMJL2;
         } else if (environment === 'MJL') {
             return filteredProductionLinesMJL;
+        } else if (environment === 'GCC') {
+            return filteredProductionLinesGCC;
         } else {
             return filteredProductionLinesCLN;
         }
-    }, [environment, filteredProductionLinesCLN, filteredProductionLinesMJL, filteredProductionLinesMJL2]);
+    }, [environment, filteredProductionLinesCLN, filteredProductionLinesMJL, filteredProductionLinesMJL2, filteredProductionLinesGCC]);
 
     // Cari currentLine berdasarkan line.line atau line.id yang sesuai dengan parameter URL
     const currentLine = useMemo(() => {
