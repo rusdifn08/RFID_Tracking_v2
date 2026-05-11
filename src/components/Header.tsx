@@ -17,12 +17,37 @@ const ENV_LABEL: Record<BackendEnvironment, string> = {
     GCC: 'GCC',
 };
 
+const RFID_AREA_PATH_PREFIXES = [
+    '/rfid-tracking',
+    '/monitoring-rfid',
+    '/line/',
+    '/dashboard-rfid/',
+    '/checking-rfid',
+    '/status-rfid',
+    '/daftar-rfid',
+    '/list-rfid',
+    '/data-rfid',
+    '/cutting',
+    '/dashboard-cutting',
+    '/sewing',
+    '/reject-room',
+    '/dashboard-rfid-reject',
+    '/list-rfid-reject',
+    '/finishing',
+    '/dashboard-rfid-finishing',
+    '/dashboard-detail-finishing',
+    '/dashboard-dryroom',
+    '/dashboard-folding',
+    '/all-production-line',
+    '/production-tracking-time',
+];
+
 const Header = memo(() => {
     const { isOpen, toggleSidebar } = useSidebar();
     const { user } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const hideCheckingRfid = location.pathname === '/dashboard-cutting';
+    const shouldShowCheckingRfid = RFID_AREA_PATH_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [environment, setEnvironment] = useState<BackendEnvironment>(getInitialEnvironment);
 
@@ -148,8 +173,8 @@ const Header = memo(() => {
             {/* --- RIGHT SECTION: Checking RFID Button, User, Notification --- */}
             <div className="flex items-center gap-1.5 xs:gap-2 sm:gap-2.5 md:gap-3 lg:gap-4">
 
-                {/* Checking RFID — disembunyikan di Dashboard Cutting agar fokus proses & grafik */}
-                {!hideCheckingRfid && (
+                {/* Checking RFID hanya muncul di area RFID Tracking dan turunannya */}
+                {shouldShowCheckingRfid && (
                     <button
                         onClick={() => navigate('/checking-rfid')}
                         className="flex items-center gap-2 xs:gap-2.5 sm:gap-3 px-4 xs:px-4.5 sm:px-5 md:px-6 py-1.5 xs:py-2 sm:py-2.5 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 text-blue-700 hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 hover:text-blue-800 font-semibold rounded-lg shadow-sm hover:shadow-md transition-all duration-300 ease-in-out group text-xs sm:text-sm relative overflow-hidden"

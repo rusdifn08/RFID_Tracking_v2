@@ -1209,7 +1209,7 @@ export default function ScanningFinishingModal({
             >
                 <div
                     ref={containerRef}
-                    className={`bg-white rounded-xl xs:rounded-2xl sm:rounded-3xl shadow-2xl w-[95%] max-h-[95vh] flex flex-col min-h-0 ${isDryroomDashboardLayout ? 'max-w-[min(96vw,1120px)]' : 'max-w-[900px]'}`}
+                    className={`bg-white rounded-xl xs:rounded-2xl sm:rounded-3xl shadow-2xl w-[95%] max-h-[95vh] flex flex-col min-h-0 ${isDryroomDashboardLayout ? 'max-w-[min(76.8vw,896px)]' : 'max-w-[720px]'}`}
                     style={{
                         background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(148, 163, 184, 0.1), 0 8px 16px -8px rgba(59, 130, 246, 0.1)',

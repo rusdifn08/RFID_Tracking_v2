@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
     PackagePlus,
@@ -10,27 +11,33 @@ import {
     User,
     ClipboardList,
     Hash,
-    Tags,
     Tag,
     Box,
     Users,
     Palette,
     Ruler,
+    Minus,
+    Plus,
 } from 'lucide-react';
 import {
     getWOBreakdown,
     inputRfidCuttingBundle,
     getCuttingScanState,
+    getGccCuttingQcQty,
     postCuttingQcScan,
     postCuttingStoreScan,
     postCuttingSupplySewingScan,
 } from '../../../config/api';
+import { SUPPLY_SOON } from '../../../config/comingsoon';
 import { buildWorkOrderMap, type WorkOrderMapEntry } from '../../../utils/workOrderFromBreakdown';
 import ChartCard from '../ChartCard';
 import CuttingScanStationModal, { type CuttingScanSessionRow } from './CuttingScanStationModal';
 
 const QUERY_WO = ['cutting-wo-breakdown'] as const;
 const QUERY_SCAN = ['cutting-scan-state'] as const;
+
+const STORE_FORM_FS = 'clamp(0.65rem, 0.52rem + 0.38vmin, 0.82rem)' as const;
+const STORE_FORM_LABEL_FS = 'clamp(0.58rem, 0.48rem + 0.28vmin, 0.72rem)' as const;
 
 function formatDateYmd(d: Date): string {
     const y = d.getFullYear();
@@ -104,7 +111,11 @@ function ScanningButton({
     return (
         <button
             type="button"
-            onClick={onClick}
+            onClick={(e) => {
+                // Mencegah klik tombol Scan memicu onClick kartu parent (navigasi dashboard QC).
+                e.stopPropagation();
+                onClick();
+            }}
             className={`inline-flex items-center gap-1.5 font-semibold tracking-wide px-2.5 py-1 rounded-md border shadow-[0_1px_3px_rgba(2,6,23,0.08)] shrink-0 transition-all duration-300 hover:-translate-y-[1px] ${cls}`}
             style={{
                 fontFamily: 'Poppins, sans-serif',
@@ -131,7 +142,16 @@ function WireTable({
     onRowClick?: (row: CuttingTableRow) => void;
 }) {
     return (
-        <div className="flex-1 min-h-0 overflow-auto rounded-b-xl">
+        <div
+            className="flex-1 min-h-0 overflow-auto rounded-b-xl"
+            onClickCapture={(e) => {
+                // Hanya blok klik pada elemen tabel (kolom/baris), bukan area kosong kartu.
+                const target = e.target as HTMLElement | null;
+                if (target?.closest('table, thead, tbody, tr, th, td')) {
+                    e.stopPropagation();
+                }
+            }}
+        >
             <table className="w-full text-left border-collapse text-[10px] bg-white">
                 <thead className="bg-gradient-to-r from-sky-50/70 to-white sticky top-0 z-[1] backdrop-blur-sm">
                     <tr className="border-b border-sky-100">
@@ -194,6 +214,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     /** Untuk grafik distribusi: jumlah baris bundle tersimpan */
     onBundleMetrics?: (bundleTableRows: number) => void;
 }) {
+    const navigate = useNavigate();
     const queryClient = useQueryClient();
     const successAudioRef = useRef<HTMLAudioElement | null>(null);
     const errorAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -265,8 +286,12 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         reject: '0',
     });
     const [modalStoreRfid, setModalStoreRfid] = useState('');
+    const [modalStoreMode, setModalStoreMode] = useState<'checkin' | 'checkout' | 'urgent'>('checkin');
+    const [modalStoreUrgentLine, setModalStoreUrgentLine] = useState(1);
+    const [modalStoreUrgentLocation, setModalStoreUrgentLocation] = useState<'GM 1' | 'GM 2'>('GM 1');
     const [modalSupplyRfid, setModalSupplyRfid] = useState('');
-    const [modalSupplyLine, setModalSupplyLine] = useState('');
+    const [modalSupplyLineNum, setModalSupplyLineNum] = useState(1);
+    const [modalSupplyLocation, setModalSupplyLocation] = useState<'GM 1' | 'GM 2'>('GM 1');
     const [tableDetail, setTableDetail] = useState<{ open: boolean; title: string; fields: { label: string; value: string }[] }>({
         open: false,
         title: '',
@@ -305,6 +330,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 { label: 'Repair', value: formatFieldValue(row.repair) },
                 { label: 'Reject', value: formatFieldValue(row.reject) },
                 { label: 'Line', value: formatFieldValue(row.line) },
+                { label: 'Location (GM)', value: formatFieldValue(row.gm) },
                 { label: 'Lokasi', value: formatFieldValue(row.location) },
                 { label: 'Scanning At', value: timestampDisplay },
             ].filter((f) => f.value !== '—');
@@ -328,8 +354,16 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     useEffect(() => {
         if (scanningModal === 'bundle') setBundleSessionLog([]);
         else if (scanningModal === 'qc') setQcSessionLog([]);
-        else if (scanningModal === 'store') setStoreSessionLog([]);
-        else if (scanningModal === 'supply') setSupplySessionLog([]);
+        else if (scanningModal === 'store') {
+            setStoreSessionLog([]);
+            setModalStoreUrgentLine(1);
+            setModalStoreUrgentLocation('GM 1');
+            setModalStoreMode('checkin');
+        } else if (scanningModal === 'supply') {
+            setSupplySessionLog([]);
+            setModalSupplyLineNum(1);
+            setModalSupplyLocation('GM 1');
+        }
     }, [scanningModal]);
 
     const onWoChange = (wo: string) => {
@@ -348,29 +382,39 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         async (
             rfid: string,
             qtyArg?: number
-        ): Promise<{ ok: true; qty: number } | { ok: false; error: string }> => {
-            if (!form.workOrder || !form.style || !form.buyer || !form.item || !form.color || !form.size) {
-                return { ok: false, error: 'Lengkapi Branch, WO, Style, Buyer, Item, Color, dan Size.' };
-            }
+        ): Promise<{ ok: true; qty: number; wo: string } | { ok: false; error: string }> => {
             const q =
                 qtyArg != null
                     ? Math.max(1, qtyArg)
                     : Math.max(1, parseInt(String(qtyNext).replace(/\D/g, ''), 10) || 1);
             setBusyB(true);
             try {
+                const nikOperator = operator.nik && operator.nik !== '—' ? operator.nik : '';
                 const res = await inputRfidCuttingBundle({
                     rfid_garment: rfid,
-                    wo: form.workOrder,
-                    style: form.style,
-                    buyer: form.buyer,
-                    item: form.item,
-                    color: form.color,
-                    size: form.size,
+                    rfid_bundles: rfid,
+                    nik: nikOperator,
+                    wo: form.workOrder || '-',
+                    style: form.style || '-',
+                    buyer: form.buyer || '-',
+                    item: form.item || '-',
+                    color: form.color || '-',
+                    size: form.size || '-',
                     qty: q,
                 });
                 if (res.success) {
+                    const outputData = (res.data as { data?: Record<string, unknown> } | undefined)?.data;
+                    const qtyFromOutputRaw = outputData?.qty_bundles ?? outputData?.qty_output;
+                    const qtyFromOutput =
+                        qtyFromOutputRaw != null && !Number.isNaN(Number(qtyFromOutputRaw))
+                            ? Number(qtyFromOutputRaw)
+                            : q;
+                    const woFromOutput =
+                        outputData?.wo != null && String(outputData.wo).trim() !== ''
+                            ? String(outputData.wo).trim()
+                            : form.workOrder || '-';
                     void queryClient.invalidateQueries({ queryKey: QUERY_SCAN });
-                    return { ok: true, qty: q };
+                    return { ok: true, qty: qtyFromOutput, wo: woFromOutput };
                 }
                 return { ok: false, error: (res as { error?: string }).error || 'Gagal' };
             } catch (e) {
@@ -379,7 +423,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 setBusyB(false);
             }
         },
-        [form, qtyNext, queryClient]
+        [form, qtyNext, queryClient, operator.nik]
     );
 
     const runBundleSubmit = useCallback(async () => {
@@ -399,7 +443,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     rfid,
                     time: new Date(),
                     ok: true,
-                    message: `Qty ${res.qty} · WO ${form.workOrder}`,
+                    message: `Qty ${res.qty} · WO ${res.wo}`,
                 },
                 ...prev,
             ]);
@@ -417,7 +461,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 ...prev,
             ]);
         }
-    }, [modalBundleRfid, modalBundleScanningQty, submitBundle, form.workOrder, playSound]);
+    }, [modalBundleRfid, modalBundleScanningQty, submitBundle, playSound]);
 
     const [busyQ, setBusyQ] = useState(false);
 
@@ -470,16 +514,16 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         }
         setBusyQ(true);
         try {
-            const res = await postCuttingQcScan({ rfid_garment: v });
-            if (!res.success) {
+            const qtyRes = await getGccCuttingQcQty(v);
+            if (!qtyRes.success) {
                 playSound('error');
                 setQcSessionLog((prev) => [
-                    { id: newCuttingScanRowId(), rfid: v, time: new Date(), ok: false, message: res.error || 'Gagal scan QC' },
+                    { id: newCuttingScanRowId(), rfid: v, time: new Date(), ok: false, message: qtyRes.error || 'Gagal ambil qty QC' },
                     ...prev,
                 ]);
                 return;
             }
-            const qty = Math.max(1, Number(res.data?.qty ?? 1));
+            const qty = Math.max(1, Number(qtyRes.data?.data?.qty_output ?? 1));
             const presetGood = String(qty);
             setQcPrompt({
                 open: true,
@@ -512,7 +556,8 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         }
         setBusyQ(true);
         try {
-            const res = await postCuttingQcScan({ rfid_garment: rid, good, repair, reject });
+            const nikOperator = operator.nik && operator.nik !== '—' ? operator.nik : '';
+            const res = await postCuttingQcScan({ rfid_garment: rid, good, repair, reject, nik: nikOperator });
             if (!res.success) {
                 playSound('error');
                 setQcSessionLog((prev) => [
@@ -541,14 +586,23 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         } finally {
             setBusyQ(false);
         }
-    }, [qcPrompt, queryClient, playSound]);
+    }, [qcPrompt, queryClient, playSound, operator.nik]);
 
     const [busySt, setBusySt] = useState(false);
     const submitStore = useCallback(
-        async (rfid: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+        async (
+            rfid: string,
+            mode: 'checkin' | 'checkout' | 'urgent',
+            meta?: { line: number; location: 'GM 1' | 'GM 2' }
+        ): Promise<{ ok: true } | { ok: false; error: string }> => {
             setBusySt(true);
             try {
-                const res = await postCuttingStoreScan({ rfid_garment: rfid });
+                const body: Parameters<typeof postCuttingStoreScan>[0] = { rfid_garment: rfid, mode };
+                if ((mode === 'urgent' || mode === 'checkout') && meta) {
+                    body.line = meta.line;
+                    body.location = meta.location;
+                }
+                const res = await postCuttingStoreScan(body);
                 if (!res.success) return { ok: false, error: res.error || 'Gagal' };
                 void queryClient.invalidateQueries({ queryKey: QUERY_SCAN });
                 return { ok: true };
@@ -567,11 +621,35 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             alert('Scan atau ketik RFID lalu tekan Enter.');
             return;
         }
-        const res = await submitStore(v);
+        let res: { ok: true } | { ok: false; error: string };
+        let modeLabel: string;
+        if (modalStoreMode === 'urgent' || modalStoreMode === 'checkout') {
+            const loc = modalStoreUrgentLocation;
+            if (loc !== 'GM 1' && loc !== 'GM 2') {
+                alert('Pilih Location GM 1 atau GM 2.');
+                return;
+            }
+            const lineNum = Math.max(1, Math.min(999, Math.floor(Number(modalStoreUrgentLine))));
+            if (!Number.isFinite(lineNum) || lineNum < 1) {
+                alert('Line minimal 1.');
+                return;
+            }
+            const meta = { line: lineNum, location: loc };
+            if (modalStoreMode === 'urgent') {
+                modeLabel = `Supply Urgent · Line ${lineNum} · ${loc}`;
+                res = await submitStore(v, 'urgent', meta);
+            } else {
+                modeLabel = `Check Out · Line ${lineNum} · ${loc}`;
+                res = await submitStore(v, 'checkout', meta);
+            }
+        } else {
+            modeLabel = 'Check In';
+            res = await submitStore(v, 'checkin');
+        }
         const id = newCuttingScanRowId();
         if (res.ok) {
             playSound('success');
-            setStoreSessionLog((prev) => [{ id, rfid: v, time: new Date(), ok: true }, ...prev]);
+            setStoreSessionLog((prev) => [{ id, rfid: v, time: new Date(), ok: true, message: modeLabel }, ...prev]);
             setModalStoreRfid('');
         } else {
             playSound('error');
@@ -586,14 +664,18 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 ...prev,
             ]);
         }
-    }, [modalStoreRfid, submitStore, playSound]);
+    }, [modalStoreRfid, modalStoreMode, modalStoreUrgentLine, modalStoreUrgentLocation, submitStore, playSound]);
 
     const [busySu, setBusySu] = useState(false);
     const submitSupply = useCallback(
-        async (rfid: string, line: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+        async (
+            rfid: string,
+            line: string,
+            location: 'GM 1' | 'GM 2'
+        ): Promise<{ ok: true } | { ok: false; error: string }> => {
             setBusySu(true);
             try {
-                const res = await postCuttingSupplySewingScan({ rfid_garment: rfid, line });
+                const res = await postCuttingSupplySewingScan({ rfid_garment: rfid, line, location });
                 if (!res.success) return { ok: false, error: res.error || 'Gagal' };
                 void queryClient.invalidateQueries({ queryKey: QUERY_SCAN });
                 return { ok: true };
@@ -612,12 +694,18 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             alert('Scan atau ketik RFID lalu tekan Enter.');
             return;
         }
-        const lineNote = modalSupplyLine.trim();
-        if (!lineNote) {
-            alert('Line wajib diisi untuk Supply Sewing.');
+        const loc = modalSupplyLocation;
+        if (loc !== 'GM 1' && loc !== 'GM 2') {
+            alert('Pilih Location GM 1 atau GM 2.');
             return;
         }
-        const res = await submitSupply(v, lineNote);
+        const lineNum = Math.max(1, Math.min(999, Math.floor(Number(modalSupplyLineNum))));
+        if (!Number.isFinite(lineNum) || lineNum < 1) {
+            alert('Line minimal 1.');
+            return;
+        }
+        const lineStr = String(lineNum);
+        const res = await submitSupply(v, lineStr, loc);
         const id = newCuttingScanRowId();
         if (res.ok) {
             playSound('success');
@@ -627,12 +715,11 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     rfid: v,
                     time: new Date(),
                     ok: true,
-                    message: `Line: ${lineNote}`,
+                    message: `Line ${lineStr} · ${loc}`,
                 },
                 ...prev,
             ]);
             setModalSupplyRfid('');
-            setModalSupplyLine('');
         } else {
             playSound('error');
             setSupplySessionLog((prev) => [
@@ -646,7 +733,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 ...prev,
             ]);
         }
-    }, [modalSupplyRfid, modalSupplyLine, submitSupply, playSound]);
+    }, [modalSupplyRfid, modalSupplyLineNum, modalSupplyLocation, submitSupply, playSound]);
 
     const qcRows = useMemo(() => {
         return (doc?.qc.history ?? []).slice(0, 24).map((h) => ({
@@ -686,18 +773,32 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     }, [bundleRows.length, onBundleMetrics]);
 
     const storeRows = useMemo(() => {
-        return (doc?.store.history ?? []).slice(0, 24).map((h) => ({
-            rfid: h.rfid_garment,
-            wo: h.wo ?? '—',
-            qty: Math.max(1, Number(h.qty ?? 1)),
-            style: h.style ?? '—',
-            buyer: h.buyer ?? '—',
-            item: h.item ?? '—',
-            color: h.color ?? '—',
-            size: h.size ?? '—',
-            location: h.location ?? 'supermarket',
-            timestamp: h.at ?? '—',
-        }));
+        return (doc?.store.history ?? []).slice(0, 24).map((h) => {
+            const locRaw = (h.location ?? '').trim();
+            const isCheckout = h.checkout === true || locRaw === 'checkout';
+            const lokasi = isCheckout
+                ? locRaw === 'checkout' || !locRaw
+                    ? 'Check-out'
+                    : `Check-out · ${locRaw}`
+                : locRaw === 'supermarket' || locRaw === ''
+                  ? 'Supermarket'
+                  : locRaw;
+            const lineStr = h.line != null && String(h.line).trim() !== '' ? String(h.line) : '—';
+            return {
+                rfid: h.rfid_garment,
+                wo: h.wo ?? '—',
+                qty: Math.max(1, Number(h.qty ?? 1)),
+                line: lineStr,
+                lokasi,
+                style: h.style ?? '—',
+                buyer: h.buyer ?? '—',
+                item: h.item ?? '—',
+                color: h.color ?? '—',
+                size: h.size ?? '—',
+                location: h.location ?? 'supermarket',
+                timestamp: h.at ?? '—',
+            };
+        });
     }, [doc]);
 
     const supplyRows = useMemo(() => {
@@ -705,6 +806,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             rfid: h.rfid_garment,
             wo: h.wo ?? '—',
             line: h.line ?? '—',
+            gm: h.gm ?? '—',
             qty: Math.max(1, Number(h.qty ?? 1)),
             style: h.style ?? '—',
             buyer: h.buyer ?? '—',
@@ -722,8 +824,22 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
 
     const bundleLeftColumn = useMemo(() => {
         const lastOk = bundleSessionLog.find((s) => s.ok);
+        const latestBundleRow = bundleRows[0];
         const rfidShow = lastOk?.rfid ?? bundleRows[0]?.rfid ?? '—';
-        const t = bundleSessionLog.find((s) => s.ok)?.time ?? bundleSessionLog[0]?.time;
+        const ridB = lastOk?.rfid ?? bundleRows[0]?.rfid ?? '';
+        const bundleRowForWo = bundleRows.find((r) => r.rfid === ridB) ?? bundleRows[0];
+        const woShow =
+            bundleRowForWo?.wo != null && String(bundleRowForWo.wo).trim() !== '' ? String(bundleRowForWo.wo) : '—';
+        const styleShow = latestBundleRow?.style ?? '—';
+        const itemShow = latestBundleRow?.item ?? '—';
+        const buyerShow = latestBundleRow?.buyer ?? '—';
+        const colorShow = latestBundleRow?.color ?? '—';
+        const sizeShow = latestBundleRow?.size ?? '—';
+        const rowTimestamp =
+            latestBundleRow?.timestamp && !Number.isNaN(Date.parse(String(latestBundleRow.timestamp)))
+                ? new Date(String(latestBundleRow.timestamp))
+                : null;
+        const t = bundleSessionLog.find((s) => s.ok)?.time ?? bundleSessionLog[0]?.time ?? rowTimestamp;
         const timeStr = t
             ? t.toLocaleString('id-ID', {
                   day: '2-digit',
@@ -754,8 +870,8 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     <div className="text-[10px] font-bold uppercase tracking-wider text-sky-600 mb-1">Ringkasan</div>
                     <div className="text-2xl font-extrabold text-slate-900 leading-none tabular-nums">{bundleRows.length}</div>
                     <div className="text-[10px] text-slate-500 mt-1">Total {bundleRows.length} bundle tersimpan</div>
-                    <div className="text-[11px] font-bold text-sky-700 mt-2 truncate" title={form.workOrder || undefined}>
-                        WO: {form.workOrder || '—'}
+                    <div className="text-[11px] font-bold text-sky-700 mt-2 truncate" title={woShow || undefined}>
+                        WO: {woShow}
                     </div>
                 </div>
 
@@ -769,23 +885,25 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     </div>
                     <div className="p-2.5">
                         <LeftDetailRow icon={Hash} label="# RFID" value={rfidShow} />
-                        <LeftDetailRow icon={Tags} label="Branch (CJL)" value={branch} />
-                        <LeftDetailRow icon={Tag} label="WO" value={form.workOrder || '—'} />
-                        <LeftDetailRow icon={Box} label="STYLE" value={form.style || '—'} />
-                        <LeftDetailRow icon={PackagePlus} label="ITEM" value={form.item || '—'} />
-                        <LeftDetailRow icon={Users} label="BUYER" value={form.buyer || '—'} />
-                        <LeftDetailRow icon={Palette} label="COLOR" value={form.color || '—'} />
-                        <LeftDetailRow icon={Ruler} label="SIZE" value={form.size || '—'} />
+                        <LeftDetailRow icon={Tag} label="WO" value={woShow} />
+                        <LeftDetailRow icon={Box} label="STYLE" value={styleShow} />
+                        <LeftDetailRow icon={PackagePlus} label="ITEM" value={itemShow} />
+                        <LeftDetailRow icon={Users} label="BUYER" value={buyerShow} />
+                        <LeftDetailRow icon={Palette} label="COLOR" value={colorShow} />
+                        <LeftDetailRow icon={Ruler} label="SIZE" value={sizeShow} />
                     </div>
                 </div>
             </>
         );
-    }, [operator, branch, bundleRows, bundleSessionLog, form]);
+    }, [operator, bundleRows, bundleSessionLog]);
 
     const qcLeftColumn = useMemo(() => {
         const lastOk = qcSessionLog.find((s) => s.ok);
         const parsed = lastOk?.message?.match(/Good\s+(\d+)\s*·\s*Repair\s+(\d+)\s*·\s*Reject\s+(\d+)/);
         const rfidShow = lastOk?.rfid ?? qcRows[0]?.rfid ?? '—';
+        const ridQc = lastOk?.rfid ?? qcRows[0]?.rfid ?? '';
+        const qcRowForDetail = qcRows.find((r) => r.rfid === ridQc) ?? qcRows[0];
+        const woShowQc = qcRowForDetail?.wo != null && String(qcRowForDetail.wo).trim() !== '' ? String(qcRowForDetail.wo) : '—';
         const goodShow = parsed ? parsed[1] : qcRows[0] != null ? String(qcRows[0].good) : '—';
         const repairShow = parsed ? parsed[2] : qcRows[0] != null ? String(qcRows[0].repair) : '—';
         const rejectShow = parsed ? parsed[3] : qcRows[0] != null ? String(qcRows[0].reject) : '—';
@@ -831,6 +949,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     </div>
                     <div className="p-2.5">
                         <LeftDetailRow icon={Hash} label="# RFID" value={rfidShow} />
+                        <LeftDetailRow icon={Tag} label="WO" value={woShowQc} />
                         <LeftDetailRow icon={ClipboardCheck} label="GOOD" value={goodShow} />
                         <LeftDetailRow icon={ClipboardCheck} label="REPAIR" value={repairShow} />
                         <LeftDetailRow icon={ClipboardCheck} label="REJECT" value={rejectShow} />
@@ -845,6 +964,10 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     const storeLeftColumn = useMemo(() => {
         const lastOk = storeSessionLog.find((s) => s.ok);
         const rfidShow = lastOk?.rfid ?? storeRows[0]?.rfid ?? '—';
+        const ridSt = lastOk?.rfid ?? storeRows[0]?.rfid ?? '';
+        const storeRowForDetail = storeRows.find((r) => r.rfid === ridSt) ?? storeRows[0];
+        const woShowSt =
+            storeRowForDetail?.wo != null && String(storeRowForDetail.wo).trim() !== '' ? String(storeRowForDetail.wo) : '—';
         const t = storeSessionLog.find((s) => s.ok)?.time ?? storeSessionLog[0]?.time;
         const timeStr = t
             ? t.toLocaleString('id-ID', {
@@ -887,6 +1010,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     </div>
                     <div className="p-2.5">
                         <LeftDetailRow icon={Hash} label="# RFID" value={rfidShow} />
+                        <LeftDetailRow icon={Tag} label="WO" value={woShowSt} />
                         <LeftDetailRow icon={Warehouse} label="STATUS" value="Check-in Supermarket" />
                     </div>
                 </div>
@@ -897,7 +1021,18 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     const supplyLeftColumn = useMemo(() => {
         const lastOk = supplySessionLog.find((s) => s.ok);
         const rfidShow = lastOk?.rfid ?? supplyRows[0]?.rfid ?? '—';
-        const lineShow = supplyRows[0]?.line ?? '—';
+        const ridSu = lastOk?.rfid ?? supplyRows[0]?.rfid ?? '';
+        const supplyRowForDetail = supplyRows.find((r) => r.rfid === ridSu) ?? supplyRows[0];
+        const woShowSu =
+            supplyRowForDetail?.wo != null && String(supplyRowForDetail.wo).trim() !== ''
+                ? String(supplyRowForDetail.wo)
+                : '—';
+        const lineShow =
+            supplyRowForDetail?.line != null && String(supplyRowForDetail.line).trim() !== ''
+                ? String(supplyRowForDetail.line)
+                : '—';
+        const gmShow =
+            supplyRowForDetail?.gm != null && String(supplyRowForDetail.gm).trim() !== '' ? String(supplyRowForDetail.gm) : '—';
         const t = supplySessionLog.find((s) => s.ok)?.time ?? supplySessionLog[0]?.time;
         const timeStr = t
             ? t.toLocaleString('id-ID', {
@@ -940,163 +1075,16 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     </div>
                     <div className="p-2.5">
                         <LeftDetailRow icon={Hash} label="# RFID" value={rfidShow} />
+                        <LeftDetailRow icon={Tag} label="WO" value={woShowSu} />
                         <LeftDetailRow icon={Truck} label="LINE (REF)" value={lineShow} />
+                        <LeftDetailRow icon={Warehouse} label="LOCATION" value={gmShow} />
                     </div>
                 </div>
             </>
         );
     }, [operator, supplySessionLog, supplyRows, doc?.supply.history?.length]);
 
-    const bundleFormSection = (
-        <div className="space-y-2 text-[11px]">
-            <div className="flex flex-wrap gap-2 items-end">
-                <div className="min-w-[4.5rem]">
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Branch</label>
-                    <select
-                        value={branch}
-                        onChange={(e) => setBranch(e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white"
-                    >
-                        {BRANCH_OPTIONS.map((b) => (
-                            <option key={b} value={b}>
-                                {b}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div className="flex-1 min-w-[8rem]">
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">WO</label>
-                    <select
-                        value={form.workOrder}
-                        onChange={(e) => onWoChange(e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white"
-                    >
-                        <option value="">Pilih WO</option>
-                        {woKeys.map((w) => (
-                            <option key={w} value={w}>
-                                {w}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div className="w-20">
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Qty</label>
-                    <input
-                        type="number"
-                        min={1}
-                        value={qtyNext}
-                        onChange={(e) => {
-                            const v = e.target.value;
-                            setQtyNext(v);
-                            setModalBundleScanningQty(v);
-                        }}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
-                        title="Default qty bundle"
-                    />
-                </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Style</label>
-                    <select
-                        value={form.style}
-                        onChange={(e) => setForm((p) => ({ ...p, style: e.target.value }))}
-                        disabled={!form.workOrder}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white"
-                    >
-                        <option value="">Style</option>
-                        {(woMap[form.workOrder]?.styles ?? []).map((s) => (
-                            <option key={s} value={s}>
-                                {s}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Buyer</label>
-                    <select
-                        value={form.buyer}
-                        onChange={(e) => setForm((p) => ({ ...p, buyer: e.target.value }))}
-                        disabled={!form.workOrder}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white"
-                    >
-                        <option value="">Buyer</option>
-                        {(woMap[form.workOrder]?.buyers ?? []).map((s) => (
-                            <option key={s} value={s}>
-                                {s}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Item</label>
-                    <select
-                        value={form.item}
-                        onChange={(e) => setForm((p) => ({ ...p, item: e.target.value }))}
-                        disabled={!form.workOrder}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white"
-                    >
-                        <option value="">Item</option>
-                        {(woMap[form.workOrder]?.items ?? []).map((s) => (
-                            <option key={s} value={s}>
-                                {s}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Scanning Qty</label>
-                    <input
-                        type="number"
-                        min={1}
-                        value={modalBundleScanningQty}
-                        onChange={(e) => {
-                            const v = e.target.value;
-                            setModalBundleScanningQty(v);
-                            setQtyNext(v);
-                        }}
-                        className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs"
-                        title="Qty per scan"
-                    />
-                </div>
-                <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Color</label>
-                    <select
-                        value={form.color}
-                        onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
-                        disabled={!form.workOrder}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white"
-                    >
-                        <option value="">Pilih color</option>
-                        {(woMap[form.workOrder]?.colors ?? []).map((s) => (
-                            <option key={s} value={s}>
-                                {s}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Size</label>
-                    <select
-                        value={form.size}
-                        onChange={(e) => setForm((p) => ({ ...p, size: e.target.value }))}
-                        disabled={!form.workOrder}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white"
-                    >
-                        <option value="">Pilih size</option>
-                        {(woMap[form.workOrder]?.sizes ?? []).map((s) => (
-                            <option key={s} value={s}>
-                                {s}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-            <p className="text-[9px] text-slate-500">Tekan Enter pada area scan setelah RFID terbaca.</p>
-        </div>
-    );
+    // Form metadata Bundle disembunyikan sesuai permintaan UI.
 
     const qcFormSection = (
         <div className="text-[10px] text-slate-600 rounded-lg border border-sky-100 bg-sky-50/50 px-2.5 py-2">
@@ -1105,18 +1093,172 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     );
 
     const supplyFormSection = (
-        <div className="space-y-1 text-[11px]">
-            <div>
-                <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Line (wajib)</label>
-                <input
-                    type="text"
-                    value={modalSupplyLine}
-                    onChange={(e) => setModalSupplyLine(e.target.value)}
-                    placeholder="Contoh: L1"
-                    className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs"
-                />
+        <div
+            className="rounded-lg border border-violet-200 bg-violet-50/60 px-2.5 py-2 space-y-2.5 min-w-0"
+            style={{ fontSize: STORE_FORM_FS }}
+        >
+            <div className="font-semibold text-violet-900" style={{ fontSize: STORE_FORM_LABEL_FS }}>
+                Supply Sewing — isi sebelum scan
             </div>
-            <p className="text-[9px] text-slate-500">Line wajib diisi dan akan tersimpan di dummy untuk tracking Supply Sewing.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
+                <div className="min-w-0">
+                    <span className="block font-semibold text-slate-700 mb-1" style={{ fontSize: STORE_FORM_LABEL_FS }}>
+                        Location
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                        {(['GM 1', 'GM 2'] as const).map((opt) => (
+                            <button
+                                key={opt}
+                                type="button"
+                                onClick={() => setModalSupplyLocation(opt)}
+                                className={`flex-1 min-w-[5.5rem] rounded-lg border px-2 py-1.5 font-semibold transition-colors ${
+                                    modalSupplyLocation === opt
+                                        ? 'border-violet-500 bg-violet-200 text-violet-950'
+                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                }`}
+                            >
+                                {opt}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="min-w-0">
+                    <span className="block font-semibold text-slate-700 mb-1" style={{ fontSize: STORE_FORM_LABEL_FS }}>
+                        Line
+                    </span>
+                    <div className="flex items-center justify-center gap-1.5 max-w-[14rem]">
+                        <button
+                            type="button"
+                            aria-label="Kurangi line"
+                            onClick={() => setModalSupplyLineNum((n) => Math.max(1, n - 1))}
+                            className="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg border-2 border-violet-300 bg-white text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+                            disabled={modalSupplyLineNum <= 1}
+                        >
+                            <Minus className="h-4 w-4" strokeWidth={2.5} />
+                        </button>
+                        <div
+                            className="min-w-[3rem] flex-1 text-center tabular-nums font-extrabold text-slate-900 rounded-lg border border-violet-200 bg-white py-1.5 px-2"
+                            style={{ fontSize: 'clamp(1rem, 0.85rem + 0.55vmin, 1.35rem)' }}
+                        >
+                            {modalSupplyLineNum}
+                        </div>
+                        <button
+                            type="button"
+                            aria-label="Tambah line"
+                            onClick={() => setModalSupplyLineNum((n) => Math.min(999, n + 1))}
+                            className="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg border-2 border-violet-300 bg-white text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+                            disabled={modalSupplyLineNum >= 999}
+                        >
+                            <Plus className="h-4 w-4" strokeWidth={2.5} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    const storeFormSection = (
+        <div className="space-y-2 min-w-0" style={{ fontSize: STORE_FORM_FS }}>
+            <div className="grid grid-cols-1 min-[400px]:grid-cols-3 gap-1.5 min-w-0">
+                <button
+                    type="button"
+                    onClick={() => setModalStoreMode('checkin')}
+                    className={`rounded-lg border px-2 py-1.5 font-semibold transition-colors min-w-0 ${
+                        modalStoreMode === 'checkin'
+                            ? 'border-amber-400 bg-amber-100 text-amber-900'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                >
+                    Check In
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setModalStoreMode('checkout')}
+                    className={`rounded-lg border px-2 py-1.5 font-semibold transition-colors min-w-0 ${
+                        modalStoreMode === 'checkout'
+                            ? 'border-amber-400 bg-amber-100 text-amber-900'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                >
+                    Check Out
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setModalStoreMode('urgent')}
+                    className={`rounded-lg border px-2 py-1.5 font-semibold transition-colors min-w-0 ${
+                        modalStoreMode === 'urgent'
+                            ? 'border-amber-400 bg-amber-100 text-amber-900'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                >
+                    Supply Urgent
+                </button>
+            </div>
+
+            {modalStoreMode === 'urgent' || modalStoreMode === 'checkout' ? (
+                <div
+                    className="rounded-lg border border-amber-200 bg-amber-50/60 px-2.5 py-2 space-y-2.5 min-w-0"
+                    style={{ fontSize: STORE_FORM_FS }}
+                >
+                    <div className="font-semibold text-amber-900" style={{ fontSize: STORE_FORM_LABEL_FS }}>
+                        {modalStoreMode === 'checkout' ? 'Check Out — isi sebelum scan' : 'Supply Urgent — isi sebelum scan'}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
+                        <div className="min-w-0">
+                            <span className="block font-semibold text-slate-700 mb-1" style={{ fontSize: STORE_FORM_LABEL_FS }}>
+                                Location
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                                {(['GM 1', 'GM 2'] as const).map((opt) => (
+                                    <button
+                                        key={opt}
+                                        type="button"
+                                        onClick={() => setModalStoreUrgentLocation(opt)}
+                                        className={`flex-1 min-w-[5.5rem] rounded-lg border px-2 py-1.5 font-semibold transition-colors ${
+                                            modalStoreUrgentLocation === opt
+                                                ? 'border-amber-500 bg-amber-200 text-amber-950'
+                                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        {opt}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="min-w-0">
+                            <span className="block font-semibold text-slate-700 mb-1" style={{ fontSize: STORE_FORM_LABEL_FS }}>
+                                Line
+                            </span>
+                            <div className="flex items-center justify-center gap-1.5 max-w-[14rem]">
+                                <button
+                                    type="button"
+                                    aria-label="Kurangi line"
+                                    onClick={() => setModalStoreUrgentLine((n) => Math.max(1, n - 1))}
+                                    className="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg border-2 border-amber-300 bg-white text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                                    disabled={modalStoreUrgentLine <= 1}
+                                >
+                                    <Minus className="h-4 w-4" strokeWidth={2.5} />
+                                </button>
+                                <div
+                                    className="min-w-[3rem] flex-1 text-center tabular-nums font-extrabold text-slate-900 rounded-lg border border-amber-200 bg-white py-1.5 px-2"
+                                    style={{ fontSize: 'clamp(1rem, 0.85rem + 0.55vmin, 1.35rem)' }}
+                                >
+                                    {modalStoreUrgentLine}
+                                </div>
+                                <button
+                                    type="button"
+                                    aria-label="Tambah line"
+                                    onClick={() => setModalStoreUrgentLine((n) => Math.min(999, n + 1))}
+                                    className="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg border-2 border-amber-300 bg-white text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                                    disabled={modalStoreUrgentLine >= 999}
+                                >
+                                    <Plus className="h-4 w-4" strokeWidth={2.5} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 
@@ -1159,6 +1301,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 icon={ClipboardCheck}
                 iconColor="#0369a1"
                 iconBgColor="#e0f2fe"
+                onClick={() => navigate('/dashboard-qc-cutting')}
                 headerAction={<ScanningButton accent="sky" onClick={() => setScanningModal('qc')} />}
                 className={CUTTING_STAGE_CHART_CARD_CLASS}
             >
@@ -1195,6 +1338,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 icon={Warehouse}
                 iconColor="#b45309"
                 iconBgColor="#fef3c7"
+                onClick={() => navigate('/dashboard-supermarket-cutting')}
                 headerAction={<ScanningButton accent="amber" onClick={() => setScanningModal('store')} />}
                 className={CUTTING_STAGE_CHART_CARD_CLASS}
             >
@@ -1203,6 +1347,8 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                         { key: 'rfid', label: 'RFID Bundle' },
                         { key: 'wo', label: 'Work Order' },
                         { key: 'qty', label: 'QTY' },
+                        { key: 'line', label: 'Line' },
+                        { key: 'lokasi', label: 'Lokasi' },
                     ]}
                     rows={storeRows.map((r) => ({ ...r, qty: String(r.qty) }))}
                     emptyText="Belum ada data"
@@ -1215,18 +1361,27 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 icon={Truck}
                 iconColor="#5b21b6"
                 iconBgColor="#ede9fe"
-                headerAction={<ScanningButton accent="violet" onClick={() => setScanningModal('supply')} />}
-                className={CUTTING_STAGE_CHART_CARD_CLASS}
+                headerAction={
+                    SUPPLY_SOON ? (
+                        <ScanningButton accent="violet" onClick={() => setScanningModal('supply')} />
+                    ) : (
+                        <span className="text-[9px] px-2 py-1 rounded-md border border-slate-300 text-slate-500 bg-slate-100/90 font-semibold">
+                            Soon
+                        </span>
+                    )
+                }
+                className={`${CUTTING_STAGE_CHART_CARD_CLASS} relative group ${SUPPLY_SOON ? '' : 'grayscale saturate-0 !border-slate-300 !from-slate-100 !via-slate-100 !to-slate-200/60 shadow-[0_8px_18px_rgba(15,23,42,0.06)]'}`}
             >
                 <WireTable
                     columns={[
                         { key: 'rfid', label: 'RFID Bundle' },
                         { key: 'wo', label: 'Work Order' },
                         { key: 'line', label: 'Line' },
+                        { key: 'gm', label: 'Location' },
                     ]}
                     rows={supplyRows}
                     emptyText="Belum ada data"
-                    onRowClick={(row) => openDetailFromRow('Supply Sewing', row)}
+                    onRowClick={SUPPLY_SOON ? (row) => openDetailFromRow('Supply Sewing', row) : undefined}
                 />
                 <div className="px-1.5 py-0.5 border-t border-gray-50 shrink-0 flex justify-end bg-white/90">
                     <button
@@ -1241,6 +1396,13 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                         ↻ Refresh
                     </button>
                 </div>
+                {!SUPPLY_SOON ? (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-900/0 group-hover:bg-slate-900/35 transition-colors pointer-events-none">
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 px-3 py-1.5 rounded-lg bg-slate-900/85 text-white text-sm font-bold tracking-wide">
+                            Coming Soon
+                        </span>
+                    </div>
+                ) : null}
             </ChartCard>
 
             {tableDetail.open ? (
@@ -1379,7 +1541,6 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 stageBadge="Bundle"
                 busy={busyB}
                 leftColumn={bundleLeftColumn}
-                formSection={bundleFormSection}
                 rfidValue={modalBundleRfid}
                 onRfidChange={setModalBundleRfid}
                 onRfidSubmit={() => void runBundleSubmit()}
@@ -1411,6 +1572,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 stageBadge="Supermarket"
                 busy={busySt}
                 leftColumn={storeLeftColumn}
+                formSection={storeFormSection}
                 rfidValue={modalStoreRfid}
                 onRfidChange={setModalStoreRfid}
                 onRfidSubmit={() => void runStoreSubmit()}

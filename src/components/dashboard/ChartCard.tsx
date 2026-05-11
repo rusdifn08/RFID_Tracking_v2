@@ -5,17 +5,33 @@ interface ChartCardProps {
     children: ReactNode;
     title: string | ReactNode;
     icon?: LucideIcon;
+    iconImageSrc?: string;
+    iconImageAlt?: string;
     headerAction?: ReactNode;
+    onClick?: () => void;
     className?: string;
     style?: React.CSSProperties;
     iconColor?: string;
     iconBgColor?: string;
 }
 
-const ChartCard = memo(forwardRef<HTMLDivElement, ChartCardProps>(({ children, title, icon: Icon, headerAction, className, style, iconColor = '#0284C7', iconBgColor = '#e0f2fe' }, ref) => (
+const ChartCard = memo(forwardRef<HTMLDivElement, ChartCardProps>(({ children, title, icon: Icon, iconImageSrc, iconImageAlt, headerAction, onClick, className, style, iconColor = '#0284C7', iconBgColor = '#e0f2fe' }, ref) => (
     <div
         ref={ref}
-        className={`bg-white rounded-md sm:rounded-lg md:rounded-xl lg:rounded-2xl flex flex-col shadow-sm relative overflow-hidden transition-all duration-300 hover:shadow-lg group border border-blue-500 h-full ${className || ''}`}
+        className={`bg-white rounded-md sm:rounded-lg md:rounded-xl lg:rounded-2xl flex flex-col shadow-sm relative overflow-hidden transition-all duration-300 hover:shadow-lg group border border-blue-500 h-full ${onClick ? 'cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2' : ''} ${className || ''}`}
+        role={onClick ? 'button' : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onClick={onClick}
+        onKeyDown={
+            onClick
+                ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onClick();
+                      }
+                  }
+                : undefined
+        }
         style={{
             ...style,
             padding: 'clamp(0.25rem, 0.6vw + 0.15rem, 0.75rem)'
@@ -38,7 +54,7 @@ const ChartCard = memo(forwardRef<HTMLDivElement, ChartCardProps>(({ children, t
                     gap: 'clamp(0.375rem, 0.8vw + 0.2rem, 0.75rem)'
                 }}
             >
-                {Icon && (
+                {(Icon || iconImageSrc) && (
                     <div
                         className="rounded-md sm:rounded-lg transition-all duration-300 shadow-sm group-hover:shadow-md flex-shrink-0 flex items-center justify-center"
                         style={{
@@ -55,7 +71,16 @@ const ChartCard = memo(forwardRef<HTMLDivElement, ChartCardProps>(({ children, t
                             e.currentTarget.style.color = iconColor;
                         }}
                     >
-                        <Icon style={{ width: 'clamp(12px, 1.5vh, 18px)', height: 'clamp(12px, 1.5vh, 18px)' }} strokeWidth={2.5} />
+                        {iconImageSrc ? (
+                            <img
+                                src={iconImageSrc}
+                                alt={iconImageAlt || 'icon'}
+                                className="object-contain"
+                                style={{ width: 'clamp(12px, 1.5vh, 18px)', height: 'clamp(12px, 1.5vh, 18px)' }}
+                            />
+                        ) : Icon ? (
+                            <Icon style={{ width: 'clamp(12px, 1.5vh, 18px)', height: 'clamp(12px, 1.5vh, 18px)' }} strokeWidth={2.5} />
+                        ) : null}
                     </div>
                 )}
                 {typeof title === 'string' ? (

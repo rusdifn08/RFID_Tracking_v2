@@ -14,12 +14,21 @@ import {
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import Breadcrumb from '../components/Breadcrumb';
 import { useSidebar } from '../context/SidebarContext';
 import backgroundImage from '../assets/background.jpg';
 import { apiGet, getBackendEnvironment } from '../config/api';
+import {
+  HIDE_FORM_EXPORT_CARD_DONE,
+  HIDE_FORM_EXPORT_CARD_PROGRESS,
+  HIDE_FORM_EXPORT_CARD_WAITING,
+  HIDE_FORM_EXPORT_TRACKING_JOIN,
+  HIDE_FORM_EXPORT_WIP_ALL_LINES,
+} from '../config/hide';
 import { exportGenericReportToExcel } from '../utils/exportGenericReportToExcel.ts';
 import { exportDailyOutputExcel } from '../utils/exportDailyOutputExcel.ts';
+import { exportDailyOutputByLineExcel } from '../utils/exportDailyOutputByLineExcel';
+import { exportFinishingSummaryExcel } from '../utils/exportFinishingSummaryExcel';
+import { exportTotalPerWoExcel } from '../utils/exportTotalPerWoExcel';
 
 type ReportCard = {
   id: string;
@@ -78,11 +87,11 @@ const extractOutputPerJamRows = (payload: any): Record<string, unknown>[] => {
   }
   if (payload && typeof payload === 'object') {
     const p = payload as Record<string, any>;
-    if (Array.isArray(p.raw_data)) return p.raw_data;
     if (Array.isArray(p.summary_per_jam)) return p.summary_per_jam;
+    if (Array.isArray(p.raw_data)) return p.raw_data;
     if (p.data && typeof p.data === 'object') {
-      if (Array.isArray(p.data.raw_data)) return p.data.raw_data;
       if (Array.isArray(p.data.summary_per_jam)) return p.data.summary_per_jam;
+      if (Array.isArray(p.data.raw_data)) return p.data.raw_data;
     }
   }
   return [];
@@ -144,6 +153,34 @@ const REPORT_CARDS: ReportCard[] = [
       button: 'from-sky-600 to-indigo-600',
       buttonHover: 'hover:from-sky-500 hover:to-indigo-500',
       glow: 'group-hover:shadow-sky-100/80',
+    },
+  },
+  {
+    id: 'daily-output-line',
+    title: 'Daily Output Line',
+    subtitle: 'Data /daily-output (GCC), diurut per tanggal lalu Line 1 → terbesar',
+    endpoint: '/daily-output',
+    paramsBuilder: (from, to) => ({ ...(from ? { tanggalfrom: from } : {}), ...(to ? { tanggalto: to } : {}) }),
+    tone: {
+      accent: 'from-blue-500 via-indigo-500 to-violet-600',
+      chip: 'bg-blue-50 text-blue-800 border-blue-200',
+      button: 'from-blue-600 to-violet-600',
+      buttonHover: 'hover:from-blue-500 hover:to-violet-500',
+      glow: 'group-hover:shadow-blue-100/80',
+    },
+  },
+  {
+    id: 'total-per-wo',
+    title: 'Total Per WO',
+    subtitle: 'Rekap total per work order (sewing → folding)',
+    endpoint: '/total-per-wo',
+    paramsBuilder: (from, to) => ({ ...(from ? { tanggalfrom: from } : {}), ...(to ? { tanggalto: to } : {}) }),
+    tone: {
+      accent: 'from-teal-500 via-emerald-500 to-green-600',
+      chip: 'bg-teal-50 text-teal-800 border-teal-200',
+      button: 'from-teal-600 to-emerald-600',
+      buttonHover: 'hover:from-teal-500 hover:to-emerald-500',
+      glow: 'group-hover:shadow-teal-100/80',
     },
   },
   {
@@ -253,6 +290,23 @@ const REPORT_CARDS: ReportCard[] = [
   },
 ];
 
+function isFormExportCardHidden(cardId: string): boolean {
+  switch (cardId) {
+    case 'wip-all-lines':
+      return HIDE_FORM_EXPORT_WIP_ALL_LINES;
+    case 'card-progress':
+      return HIDE_FORM_EXPORT_CARD_PROGRESS;
+    case 'card-done':
+      return HIDE_FORM_EXPORT_CARD_DONE;
+    case 'card-waiting':
+      return HIDE_FORM_EXPORT_CARD_WAITING;
+    case 'tracking-join':
+      return HIDE_FORM_EXPORT_TRACKING_JOIN;
+    default:
+      return false;
+  }
+}
+
 export default function FormData() {
   const { isOpen } = useSidebar();
   const [dateFrom, setDateFrom] = useState(getTodayIso());
@@ -267,6 +321,17 @@ export default function FormData() {
       width: isOpen ? 'calc(100% - 18%)' : 'calc(100% - 5rem)',
     }),
     [isOpen]
+  );
+
+  const reportCardsVisible = useMemo(
+    () => REPORT_CARDS.filter((card) => !isFormExportCardHidden(card.id)),
+    [
+      HIDE_FORM_EXPORT_WIP_ALL_LINES,
+      HIDE_FORM_EXPORT_CARD_PROGRESS,
+      HIDE_FORM_EXPORT_CARD_DONE,
+      HIDE_FORM_EXPORT_CARD_WAITING,
+      HIDE_FORM_EXPORT_TRACKING_JOIN,
+    ]
   );
 
   const handleExport = async (card: ReportCard) => {
@@ -329,6 +394,27 @@ export default function FormData() {
         if (payload && typeof payload === 'object' && !Array.isArray(payload) && (payload as any).data && typeof (payload as any).data === 'object') {
           payload = (payload as any).data;
         }
+
+        if (card.id === 'finishing-summary') {
+          await exportFinishingSummaryExcel({
+            payload,
+            filterDateFrom: dateFrom || undefined,
+            filterDateTo: dateTo || undefined,
+          });
+          setMetrics((prev) => ({
+            ...prev,
+            [card.id]: {
+              totalRows: 3,
+              fetchedAt: new Date().toISOString(),
+            },
+          }));
+          setMessage({
+            type: 'ok',
+            text: `Export ${card.title} berhasil (matriks Waiting / Check In / Check Out per area).`,
+          });
+          return;
+        }
+
         rows = extractRowsFromPayload(payload);
       }
 
@@ -338,6 +424,18 @@ export default function FormData() {
 
       if (card.id === 'daily-output-wo') {
         await exportDailyOutputExcel({
+          rows,
+          filterDateFrom: dateFrom || undefined,
+          filterDateTo: dateTo || undefined,
+        });
+      } else if (card.id === 'daily-output-line') {
+        await exportDailyOutputByLineExcel({
+          rows,
+          filterDateFrom: dateFrom || undefined,
+          filterDateTo: dateTo || undefined,
+        });
+      } else if (card.id === 'total-per-wo') {
+        await exportTotalPerWoExcel({
           rows,
           filterDateFrom: dateFrom || undefined,
           filterDateTo: dateTo || undefined,
@@ -383,16 +481,16 @@ export default function FormData() {
       <Sidebar />
       <div className="flex flex-col w-full min-h-screen transition-all duration-300 ease-in-out relative" style={containerStyle}>
         <Header />
-        <Breadcrumb />
         <main
           className="flex-1 w-full overflow-y-auto relative"
           style={{
-            padding: 'clamp(0.5rem, 2vw, 2rem) clamp(0.5rem, 3vw, 1rem)',
-            paddingTop: 'clamp(3.2rem, 7vh, 5rem)',
+            padding: 'clamp(0.5rem, 1.6vw, 1rem)',
+            paddingTop: 'clamp(0.5rem, 1.6vw, 1rem)',
             paddingBottom: '5rem',
+            marginTop: 'clamp(3rem, 6vh, 4rem)',
           }}
         >
-          <div className="w-full max-w-7xl mx-auto space-y-4">
+          <div className="w-full space-y-4">
             <div className="relative overflow-hidden bg-white/95 border border-slate-200 rounded-2xl p-4 shadow-sm">
               <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(99,102,241,0.08),transparent_40%)]" />
               <div className="relative flex items-center justify-between gap-3 mb-3">
@@ -411,7 +509,7 @@ export default function FormData() {
                 </span>
               </div>
               <p className="relative text-sm text-slate-600 mb-3">
-                Pilih report lalu export ke Excel sesuai format data API. Daftar report bisa ditambah terus sesuai kebutuhan.
+                Pilih report yang sudah siap lalu export ke Excel sesuai format data API.
               </p>
               <div className="relative grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="rounded-xl border border-slate-200 bg-white/80 p-3">
@@ -466,7 +564,7 @@ export default function FormData() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
-              {REPORT_CARDS.map((card) => {
+              {reportCardsVisible.map((card) => {
                 const isLoading = loadingId === card.id;
                 const metric = metrics[card.id];
                 return (

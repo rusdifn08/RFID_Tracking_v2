@@ -41,24 +41,24 @@ export default function Breadcrumb() {
         });
 
         // Mapping untuk berbagai route
-        if (path === '/needel-manager' || path === '/needel-manager/') {
+        if (path === '/needle-manager' || path === '/needle-manager/') {
             breadcrumbs.push({
-                label: 'Needel Manager',
+                label: 'Needle Manager',
                 isActive: true,
             });
-        } else if (path.startsWith('/needel-manager/monitoring')) {
+        } else if (path.startsWith('/needle-manager/monitoring')) {
             breadcrumbs.push({
-                label: 'Needel Manager',
-                path: '/needel-manager',
+                label: 'Needle Manager',
+                path: '/needle-manager',
             });
             breadcrumbs.push({
                 label: 'Monitoring needle',
                 isActive: true,
             });
-        } else if (path.startsWith('/needel-manager/mesin-kolam')) {
+        } else if (path.startsWith('/needle-manager/mesin-kolam')) {
             breadcrumbs.push({
-                label: 'Needel Manager',
-                path: '/needel-manager',
+                label: 'Needle Manager',
+                path: '/needle-manager',
             });
             breadcrumbs.push({
                 label: 'Dashboard Mesin Kolam',
@@ -216,6 +216,19 @@ export default function Breadcrumb() {
         } else if (path.startsWith('/status-rfid')) {
             breadcrumbs.push({
                 label: 'Status RFID',
+                isActive: true,
+            });
+        } else if (path.startsWith('/daftar-rfid-cutting')) {
+            breadcrumbs.push({
+                label: 'RFID Tracking',
+                path: '/rfid-tracking',
+            });
+            breadcrumbs.push({
+                label: 'Cutting Proses',
+                path: '/cutting',
+            });
+            breadcrumbs.push({
+                label: 'Daftar RFID Cutting',
                 isActive: true,
             });
         } else if (path.startsWith('/daftar-rfid')) {

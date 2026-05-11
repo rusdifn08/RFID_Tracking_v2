@@ -64,7 +64,8 @@ if (args.includes('cln')) {
     BACKEND_IP = '10.5.0.99';
     CURRENT_ENV = 'MJL2';
 } else if (args.includes('gcc')) {
-    BACKEND_IP = '10.5.0.201';
+    // Route /gcc/* (daily-output, dll.) di lab: sama dengan host MJL; override dengan BACKEND_IP jika backend GCC terpisah.
+    BACKEND_IP = '10.5.0.106';
     CURRENT_ENV = 'GCC';
 } else if (ENV_OVERRIDE === 'MJL' || ENV_OVERRIDE === 'MJL2' || ENV_OVERRIDE === 'CLN' || ENV_OVERRIDE === 'GCC') {
     CURRENT_ENV = ENV_OVERRIDE;
@@ -95,7 +96,7 @@ const BACKEND_PORT = 7000;
 // Backend API URL - menggunakan IP yang sudah dikonfigurasi dengan port yang sesuai
 const BACKEND_API_URL = process.env.BACKEND_API_URL || `http://${BACKEND_IP}:${BACKEND_PORT}`;
 // Backend khusus Needle Manager (dipisah dari backend environment utama agar tidak mengubah flow existing).
-const NEEDLE_BACKEND_BASE_URL = process.env.NEEDLE_BACKEND_BASE_URL || 'http://10.5.0.8:8080';
+const NEEDLE_BACKEND_BASE_URL = process.env.NEEDLE_BACKEND_BASE_URL || 'http://10.5.0.3:8080';
 
 // MQTT Broker - sama untuk semua environment (MJL, MJL2, CLN)
 const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://10.5.0.106:1883';
@@ -978,8 +979,9 @@ async function proxyRequest(endpoint, req, res, options = {}) {
         let data;
         try {
             const textData = await response.text();
-            if (textData) {
-                data = JSON.parse(textData);
+            const trimmed = textData.replace(/^\uFEFF/, '').trim();
+            if (trimmed) {
+                data = JSON.parse(trimmed);
             }
         } catch (parseError) {
             console.error(`❌ [PROXY] JSON parse error for ${endpoint}:`, parseError);
@@ -1345,20 +1347,110 @@ app.post('/api/cutting/store-scan', (req, res) => {
     try {
         const rid = String(req.body?.rfid_garment || '').trim();
         if (!rid) return res.status(400).json({ success: false, message: 'rfid_garment wajib diisi' });
+        const modeRaw = String(req.body?.mode || 'checkin').toLowerCase();
+        const mode = modeRaw === 'checkout' ? 'checkout' : modeRaw === 'urgent' ? 'urgent' : 'checkin';
+
         const doc = loadCuttingScanDoc();
         const row = doc.rfid_index[rid];
         if (!row) return res.status(404).json({ success: false, message: 'RFID tidak ditemukan di dummy_cutting.json' });
+
+        const now = new Date().toISOString();
+
+        if (mode === 'checkout') {
+            if (row.current_location !== 'supermarket') {
+                return res.status(400).json({
+                    success: false,
+                    message: `Urutan scan tidak valid. RFID ${rid} harus berada di Supermarket untuk Check Out.`,
+                });
+            }
+            const lineNum = parseInt(String(req.body?.line ?? '').replace(/\D/g, ''), 10);
+            if (!Number.isFinite(lineNum) || lineNum < 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Line wajib diisi (angka minimal 1) untuk Check Out.',
+                });
+            }
+            const loc = String(req.body?.location || '').trim();
+            if (loc !== 'GM 1' && loc !== 'GM 2') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Location wajib GM 1 atau GM 2 untuk Check Out.',
+                });
+            }
+            row.updated_at = now;
+            row.timeline = Array.isArray(row.timeline) ? row.timeline : [];
+            row.timeline.push({
+                location: 'supermarket',
+                action: 'checkout',
+                line: String(lineNum),
+                urgent_location: loc,
+                at: now,
+            });
+            doc.supermarket.count += 1;
+            pushCuttingHistory(doc.supermarket.history, {
+                rfid_garment: rid,
+                wo: row.wo || null,
+                qty: row.qty || 1,
+                style: row.style || null,
+                buyer: row.buyer || null,
+                item: row.item || null,
+                color: row.color || null,
+                size: row.size || null,
+                location: loc,
+                line: String(lineNum),
+                checkout: true,
+                at: now,
+            });
+            saveCuttingScanDoc(doc);
+            return res.json({
+                success: true,
+                message: 'Check-out Supermarket tercatat',
+                data: { rfid_garment: rid, location: row.current_location, mode: 'checkout', line: lineNum, gm: loc },
+                timestamp: now,
+            });
+        }
+
         if (row.current_location !== 'quality_control') {
             return res.status(400).json({
                 success: false,
                 message: `Urutan scan tidak valid. RFID ${rid} harus dari Quality Control sebelum Supermarket.`,
             });
         }
-        const now = new Date().toISOString();
+
+        let historyLine = null;
+        let historyLocation = 'supermarket';
+        if (mode === 'urgent') {
+            const lineNum = parseInt(String(req.body?.line ?? '').replace(/\D/g, ''), 10);
+            if (!Number.isFinite(lineNum) || lineNum < 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Line wajib diisi (angka minimal 1) untuk Supply Urgent.',
+                });
+            }
+            const loc = String(req.body?.location || '').trim();
+            if (loc !== 'GM 1' && loc !== 'GM 2') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Location wajib GM 1 atau GM 2 untuk Supply Urgent.',
+                });
+            }
+            historyLine = String(lineNum);
+            historyLocation = loc;
+            row.supermarket_urgent_line = lineNum;
+            row.supermarket_urgent_location = loc;
+        } else {
+            delete row.supermarket_urgent_line;
+            delete row.supermarket_urgent_location;
+        }
+
         row.current_location = 'supermarket';
         row.updated_at = now;
         row.timeline = Array.isArray(row.timeline) ? row.timeline : [];
-        row.timeline.push({ location: 'supermarket', at: now });
+        row.timeline.push({
+            location: 'supermarket',
+            at: now,
+            ...(mode === 'urgent' ? { store_mode: 'urgent', line: historyLine, urgent_location: historyLocation } : {}),
+        });
         doc.supermarket.count += 1;
         pushCuttingHistory(doc.supermarket.history, {
             rfid_garment: rid,
@@ -1369,14 +1461,15 @@ app.post('/api/cutting/store-scan', (req, res) => {
             item: row.item || null,
             color: row.color || null,
             size: row.size || null,
-            location: 'supermarket',
+            location: historyLocation,
+            ...(historyLine ? { line: historyLine } : {}),
             at: now,
         });
         saveCuttingScanDoc(doc);
         return res.json({
             success: true,
-            message: 'RFID masuk Supermarket',
-            data: { rfid_garment: rid, location: row.current_location },
+            message: mode === 'urgent' ? 'Supply Urgent tercatat (masuk Supermarket)' : 'RFID masuk Supermarket',
+            data: { rfid_garment: rid, location: row.current_location, mode },
             timestamp: now,
         });
     } catch (error) {
@@ -1388,9 +1481,16 @@ app.post('/api/cutting/store-scan', (req, res) => {
 app.post('/api/cutting/supply-sewing-scan', (req, res) => {
     try {
         const rid = String(req.body?.rfid_garment || '').trim();
-        const line = String(req.body?.line || '').trim();
+        const lineNum = parseInt(String(req.body?.line ?? '').replace(/\D/g, ''), 10);
+        const loc = String(req.body?.location || '').trim();
         if (!rid) return res.status(400).json({ success: false, message: 'rfid_garment wajib diisi' });
-        if (!line) return res.status(400).json({ success: false, message: 'line wajib diisi untuk Supply Sewing' });
+        if (!Number.isFinite(lineNum) || lineNum < 1) {
+            return res.status(400).json({ success: false, message: 'Line wajib berupa angka minimal 1 untuk Supply Sewing.' });
+        }
+        if (loc !== 'GM 1' && loc !== 'GM 2') {
+            return res.status(400).json({ success: false, message: 'Location wajib GM 1 atau GM 2 untuk Supply Sewing.' });
+        }
+        const line = String(lineNum);
         const doc = loadCuttingScanDoc();
         const row = doc.rfid_index[rid];
         if (!row) return res.status(404).json({ success: false, message: 'RFID tidak ditemukan di dummy_cutting.json' });
@@ -1404,8 +1504,9 @@ app.post('/api/cutting/supply-sewing-scan', (req, res) => {
         row.current_location = 'supply_sewing';
         row.updated_at = now;
         row.line = line;
+        row.supply_gm = loc;
         row.timeline = Array.isArray(row.timeline) ? row.timeline : [];
-        row.timeline.push({ location: 'supply_sewing', line, at: now });
+        row.timeline.push({ location: 'supply_sewing', line, gm: loc, at: now });
         doc.supply_sewing.count += 1;
         pushCuttingHistory(doc.supply_sewing.history, {
             rfid_garment: rid,
@@ -1418,13 +1519,14 @@ app.post('/api/cutting/supply-sewing-scan', (req, res) => {
             size: row.size || null,
             line,
             location: 'supply_sewing',
+            gm: loc,
             at: now,
         });
         saveCuttingScanDoc(doc);
         return res.json({
             success: true,
             message: 'RFID masuk Supply Sewing',
-            data: { rfid_garment: rid, location: row.current_location, line },
+            data: { rfid_garment: rid, location: row.current_location, line, gm: loc },
             timestamp: now,
         });
     } catch (error) {
@@ -2966,6 +3068,13 @@ app.get('/output/gcc', async (req, res) => {
 });
 
 /**
+ * GET /api/gcc/cutting/list?barcode= — data label cutting (backend GCC / Django).
+ */
+app.get('/api/gcc/cutting/list', async (req, res) => {
+    return await proxyRequest('/api/gcc/cutting/list', req, res);
+});
+
+/**
  * GET /wira/detail?line=1&wo=185759&tipe=qc&kategori=wira - Detail WIRA/REWORK data
  */
 app.get('/wira/detail', async (req, res) => {
@@ -2982,14 +3091,26 @@ app.get('/report/wira', async (req, res) => {
 /**
  * GET /daily-output?tanggalfrom=YYYY-M-D&tanggalto=YYYY-M-D
  * Proxy ke backend daily output report.
+ * Upstream: GET /gcc/daily-output pada host yang memakai prefix Django /gcc (mis. 10.5.0.106:7000),
+ * bukan GET /daily-output tanpa prefix.
  */
 app.get('/daily-output', async (req, res) => {
-    return await proxyRequest('/daily-output', req, res);
+    const useGccDailyOutput = CURRENT_ENV === 'GCC' || BACKEND_IP === '10.5.0.106';
+    const backendPath = useGccDailyOutput ? '/gcc/daily-output' : '/daily-output';
+    return await proxyRequest(backendPath, req, res);
+});
+
+/**
+ * GET /total-per-wo?tanggalfrom=YYYY-M-D&tanggalto=YYYY-M-D
+ * Rekap total per WO — backend Django: GET /total-per-wo (bukan /gcc/total-per-wo), contoh 10.5.0.106:7000.
+ */
+app.get('/total-per-wo', async (req, res) => {
+    return await proxyRequest('/total-per-wo', req, res);
 });
 
 /**
  * GET /api/needle/pickings?tanggalfrom=YYYY-MM-DD&tanggalto=YYYY-MM-DD
- * Proxy ke backend Needle Manager terpisah (10.5.0.8:8080).
+ * Proxy ke backend Needle Manager terpisah (10.5.0.3:8080).
  * Tidak mempengaruhi backend utama per environment (MJL/MJL2/CLN/GCC).
  */
 app.get('/api/needle/pickings', async (req, res) => {

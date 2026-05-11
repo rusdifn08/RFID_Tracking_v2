@@ -22,7 +22,7 @@ export default function HomeContent() {
         },
         {
             id: 2,
-            title: 'Needel Manager',
+            title: 'Needle Manager',
             subtitle: 'Monitoring picking and putting needle',
             location: 'Needle Module',
             icon: needleIcon,
@@ -37,7 +37,7 @@ export default function HomeContent() {
 
     const handleModuleClick = (moduleId: number) => {
         if (moduleId === 1) navigate('/rfid-tracking');
-        if (moduleId === 2) navigate('/needel-manager');
+        if (moduleId === 2) navigate('/needle-manager');
     };
 
     return (

@@ -31,6 +31,25 @@ interface LineData {
     wira: number;
 }
 
+function getSupervisorByLine(
+    supervisors: Record<string, string> | undefined,
+    lineNumberRaw: string,
+    fallback: string
+): string {
+    if (!supervisors) return fallback;
+    const lineNumber = String(lineNumberRaw || '').trim();
+    const lineAsNumber = String(parseInt(lineNumber, 10));
+    const normalized = lineNumber.toUpperCase().replace(/^LINE\s*/i, '');
+    return (
+        supervisors[lineNumber] ??
+        supervisors[lineAsNumber] ??
+        supervisors[`LINE ${lineNumber}`] ??
+        supervisors[`LINE ${lineAsNumber}`] ??
+        supervisors[normalized] ??
+        fallback
+    );
+}
+
 export default function AllProductionLineDashboard() {
     const { isOpen } = useSidebar();
     const [lineData, setLineData] = useState<Record<string, LineData>>({});
@@ -157,7 +176,7 @@ export default function AllProductionLineDashboard() {
                 const lineNumber = line.title.match(/\d+/)?.[0] || line.id.toString();
                 dataMap[line.id.toString()] = {
                     line: lineNumber,
-                    supervisor: supervisorData?.supervisors[lineNumber] || line.supervisor,
+                    supervisor: getSupervisorByLine(supervisorData?.supervisors, lineNumber, line.supervisor),
                     startTime: supervisorData?.startTimes[lineNumber] || '07:30',
                     good: 0,
                     rework: 0,
@@ -179,7 +198,7 @@ export default function AllProductionLineDashboard() {
                     if (matchingLine) {
                         dataMap[matchingLine.id.toString()] = {
                             line: itemLineNumber,
-                            supervisor: supervisorData?.supervisors[itemLineNumber] || matchingLine.supervisor,
+                            supervisor: getSupervisorByLine(supervisorData?.supervisors, itemLineNumber, matchingLine.supervisor),
                             startTime: supervisorData?.startTimes[itemLineNumber] || '07:30',
                             good: Number(item['PQC Good'] ?? item?.pqc_good ?? item?.pqcGood ?? 0),
                             rework: Number(item['PQC Rework'] ?? item?.pqc_rework ?? item?.pqcRework ?? 0),

@@ -1,6 +1,7 @@
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import ProtectedRoute from '../components/ProtectedRoute';
+import DashboardQualityControlCutting from '../pages/DashboardQualityControlCutting.tsx';
 
 // Lazy load semua pages untuk code splitting
 const Login = lazy(() => import('../pages/Login.tsx'));
@@ -28,11 +29,13 @@ const ListRFIDReject = lazy(() => import('../pages/ListRFIDReject.tsx'));
 const AllProductionLineDashboard = lazy(() => import('../pages/AllProductionLineDashboard.tsx'));
 const ProductionTrackingTime = lazy(() => import('../pages/ProductionTrackingTime.tsx'));
 const FormData = lazy(() => import('../pages/FormData.tsx'));
-const NeedelManagerHub = lazy(() => import('../pages/NeedelManagerHub.tsx'));
-const NeedelManager = lazy(() => import('../pages/NeedelManager.tsx'));
+const NeedleManagerHub = lazy(() => import('../pages/NeedelManagerHub.tsx'));
+const NeedleManager = lazy(() => import('../pages/NeedelManager.tsx'));
 const DashboardMesinKolam = lazy(() => import('../pages/DashboardMesinKolam.tsx'));
 const Cutting = lazy(() => import('../pages/Cutting.tsx'));
 const DashboardCutting = lazy(() => import('../pages/DashboardCutting.tsx'));
+const DashboardSupermarketCutting = lazy(() => import('../pages/DashboardSupermarketCutting.tsx'));
+const DaftarRFIDCutting = lazy(() => import('../pages/DaftarRFIDCutting.tsx'));
 const SewingLine = lazy(() => import('../pages/SewingLine.tsx'));
 const DashboardSewingLine = lazy(() => import('../pages/DashboardSewingLine.tsx'));
 
@@ -130,6 +133,36 @@ const router = createBrowserRouter([
             <ProtectedRoute>
                 <LazyWrapper>
                     <DashboardCutting />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/dashboard-supermarket-cutting',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <DashboardSupermarketCutting />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/daftar-rfid-cutting',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <DaftarRFIDCutting />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/dashboard-qc-cutting',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <DashboardQualityControlCutting />
                 </LazyWrapper>
             </ProtectedRoute>
         ),
@@ -385,27 +418,27 @@ const router = createBrowserRouter([
         ),
     },
     {
-        path: '/needel-manager',
+        path: '/needle-manager',
         element: (
             <ProtectedRoute>
                 <LazyWrapper>
-                    <NeedelManagerHub />
+                    <NeedleManagerHub />
                 </LazyWrapper>
             </ProtectedRoute>
         ),
     },
     {
-        path: '/needel-manager/monitoring',
+        path: '/needle-manager/monitoring',
         element: (
             <ProtectedRoute>
                 <LazyWrapper>
-                    <NeedelManager />
+                    <NeedleManager />
                 </LazyWrapper>
             </ProtectedRoute>
         ),
     },
     {
-        path: '/needel-manager/mesin-kolam',
+        path: '/needle-manager/mesin-kolam',
         element: (
             <ProtectedRoute>
                 <LazyWrapper>

@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
+import { writeExportTitleBlock } from './exportExcelBanner';
 
-const DAILY_OUTPUT_HEADERS: string[] = [
+export const DAILY_OUTPUT_HEADERS: string[] = [
   'tanggal',
   'wo',
   'line',
@@ -40,11 +41,23 @@ const toDateToken = (date?: string): string => {
   return `${dd}-${mm}-${yy}`;
 };
 
+function pickDailyCell(row: Record<string, unknown>, header: string): unknown {
+  let v = row[header];
+  if (v != null && v !== '') return v;
+  if (header.startsWith('PIC -')) {
+    const alt = header.replace(/^PIC -/, 'SPV -');
+    v = row[alt];
+    if (v != null && v !== '') return v;
+  }
+  return '';
+}
+
 const normalizeDailyRows = (rows: any[]): Record<string, unknown>[] => {
   return rows.map((row) => {
+    const r = row && typeof row === 'object' && !Array.isArray(row) ? (row as Record<string, unknown>) : {};
     const normalized: Record<string, unknown> = {};
     DAILY_OUTPUT_HEADERS.forEach((header) => {
-      const value = row?.[header];
+      const value = pickDailyCell(r, header);
       normalized[header] = value == null ? '' : value;
     });
     return normalized;
@@ -53,21 +66,12 @@ const normalizeDailyRows = (rows: any[]): Record<string, unknown>[] => {
 
 const isCenterAlignedDataColumn = (header: string): boolean => {
   const h = header.toLowerCase();
-
-  // Kolom identitas singkat + metrik proses ditengah
   if (
-    ['tanggal', 'wo', 'line', 'style', 'output sewing', 'qc', 'pqc good', 'dryroom_in', 'dryroom_out', 'folding_in', 'folding_out'].includes(
-      h
-    )
+    ['tanggal', 'wo', 'line', 'style', 'output sewing', 'qc', 'pqc good', 'dryroom_in', 'dryroom_out', 'folding_in', 'folding_out'].includes(h)
   ) {
     return true;
   }
-
-  // Semua kolom NIK ditengah
-  if (h.includes('nik')) {
-    return true;
-  }
-
+  if (h.includes('nik')) return true;
   return false;
 };
 
@@ -86,26 +90,22 @@ export const exportDailyOutputExcel = async ({
 
   const normalizedRows = normalizeDailyRows(rows);
   const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'RFID Tracking';
   const worksheet = workbook.addWorksheet('Daily Output');
 
-  worksheet.views = [{ state: 'frozen', ySplit: 1 }];
-  worksheet.autoFilter = {
-    from: { row: 1, column: 1 },
-    to: { row: 1, column: DAILY_OUTPUT_HEADERS.length },
-  };
+  const ncol = DAILY_OUTPUT_HEADERS.length;
+  const headerRowNum = writeExportTitleBlock(worksheet, ncol, {
+    title: 'Daily Output Per WO',
+    filterDateFrom,
+    filterDateTo,
+  });
 
-  worksheet.columns = DAILY_OUTPUT_HEADERS.map((header) => {
+  DAILY_OUTPUT_HEADERS.forEach((header, i) => {
     const isTextLong = ['item', 'buyer'].includes(header.toLowerCase());
     const isPic = header.toLowerCase().includes('pic');
     const isNik = header.toLowerCase().includes('nik');
-    return {
-      header: header.replace(/_/g, ' '),
-      key: header,
-      width: isTextLong ? 28 : isPic ? 20 : isNik ? 14 : 12,
-    };
+    worksheet.getColumn(i + 1).width = isTextLong ? 30 : isPic ? 22 : isNik ? 15 : 13;
   });
-
-  normalizedRows.forEach((row) => worksheet.addRow(row));
 
   const defaultBorder = {
     top: { style: 'thin' as const, color: { argb: 'FFD9D9D9' } },
@@ -116,20 +116,19 @@ export const exportDailyOutputExcel = async ({
 
   const headerFillByGroup = (header: string): string => {
     const h = header.toLowerCase();
-    if (['tanggal', 'wo', 'line', 'style', 'item', 'buyer'].includes(h)) return 'FF1F4E78'; // master data
-    if (['output sewing', 'qc', 'pqc good', 'dryroom_in', 'dryroom_out', 'folding_in', 'folding_out'].includes(h)) return 'FF0B6FA4'; // qty
-    if (h.includes('pic')) return 'FF2E8B57'; // PIC
-    if (h.includes('nik')) return 'FF5E35B1'; // NIK
+    if (['tanggal', 'wo', 'line', 'style', 'item', 'buyer'].includes(h)) return 'FF1F4E78';
+    if (['output sewing', 'qc', 'pqc good', 'dryroom_in', 'dryroom_out', 'folding_in', 'folding_out'].includes(h)) return 'FF0B6FA4';
+    if (h.includes('pic')) return 'FF2E8B57';
+    if (h.includes('nik')) return 'FF5E35B1';
     return 'FF334155';
   };
 
-  const headerRow = worksheet.getRow(1);
-  // Header dibuat 2x tinggi baris data agar lebih menonjol
-  const dataRowHeight = 20;
-  headerRow.height = dataRowHeight * 2;
+  const headerRow = worksheet.getRow(headerRowNum);
+  headerRow.height = 32;
   headerRow.eachCell((cell, colNumber) => {
     const header = DAILY_OUTPUT_HEADERS[colNumber - 1] ?? '';
-    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Calibri' };
+    cell.value = header.replace(/_/g, ' ');
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12, name: 'Calibri' };
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
     cell.fill = {
       type: 'pattern',
@@ -139,14 +138,22 @@ export const exportDailyOutputExcel = async ({
     cell.border = defaultBorder;
   });
 
-  worksheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return;
-    row.height = dataRowHeight;
-    const isEven = rowNumber % 2 === 0;
-    row.eachCell((cell, colNumber) => {
-      const header = DAILY_OUTPUT_HEADERS[colNumber - 1] ?? '';
+  let rowNum = headerRowNum + 1;
+  normalizedRows.forEach((rowObj) => {
+    const row = worksheet.getRow(rowNum);
+    row.height = 22;
+    const isEven = rowNum % 2 === 0;
+    DAILY_OUTPUT_HEADERS.forEach((header, colNumber) => {
+      const cell = row.getCell(colNumber);
+      const val = rowObj[header];
+      cell.value =
+        val == null
+          ? ''
+          : typeof val === 'object' && !(val instanceof Date)
+            ? JSON.stringify(val)
+            : (val as import('exceljs').CellValue);
       const centered = isCenterAlignedDataColumn(header);
-      cell.font = { size: 10, color: { argb: 'FF1F2937' }, name: 'Calibri' };
+      cell.font = { size: 11, color: { argb: 'FF1F2937' }, name: 'Calibri' };
       cell.alignment = { vertical: 'middle', horizontal: centered ? 'center' : 'left' };
       cell.fill = {
         type: 'pattern',
@@ -155,7 +162,14 @@ export const exportDailyOutputExcel = async ({
       };
       cell.border = defaultBorder;
     });
+    rowNum += 1;
   });
+
+  worksheet.autoFilter = {
+    from: { row: headerRowNum, column: 1 },
+    to: { row: headerRowNum, column: DAILY_OUTPUT_HEADERS.length },
+  };
+  worksheet.views = [{ state: 'frozen', ySplit: headerRowNum }];
 
   const today = toDateToken(new Date().toISOString());
   const from = toDateToken(filterDateFrom) || today;
@@ -170,4 +184,3 @@ export const exportDailyOutputExcel = async ({
   link.click();
   URL.revokeObjectURL(link.href);
 };
-

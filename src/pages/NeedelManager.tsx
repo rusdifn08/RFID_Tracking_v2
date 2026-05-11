@@ -27,15 +27,15 @@ const normalizeNeedleParameter = (value: string): string =>
 const toProxyNeedleImageUrl = (url: string): string =>
   `${API_BASE_URL}/api/needle/image-proxy?url=${encodeURIComponent(url)}`;
 
-const arrayBufferToBase64 = (arrayBuffer: ArrayBuffer): string => {
-  const bytes = new Uint8Array(arrayBuffer);
-  const chunkSize = 0x8000;
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode(...chunk);
+const resolveNeedleImageCandidates = (url?: string): string[] => {
+  if (!url) return [];
+  const clean = url.trim();
+  if (!clean) return [];
+  // Utamakan proxy internal agar stabil terhadap CORS/hotlink.
+  if (clean.startsWith('http')) {
+    return [toProxyNeedleImageUrl(clean), clean];
   }
-  return btoa(binary);
+  return [clean];
 };
 
 const getTodayIso = (): string => {
@@ -71,21 +71,34 @@ const NeedlePhotoThumb = memo(function NeedlePhotoThumb({
   alt: string;
   className: string;
   emptyClassName: string;
-  onPreview: () => void;
+  onPreview: (url: string) => void;
 }) {
-  if (!src) {
+  const candidates = useMemo(() => resolveNeedleImageCandidates(src), [src]);
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    setIdx(0);
+  }, [src]);
+
+  const activeSrc = candidates[idx];
+
+  if (!activeSrc) {
     return <div className={emptyClassName} />;
   }
 
   return (
     <img
-      src={src}
+      src={activeSrc}
       alt={alt}
       className={className}
       loading="lazy"
       referrerPolicy="no-referrer"
-      onClick={onPreview}
+      onClick={() => onPreview(activeSrc)}
       onError={(e) => {
+        if (idx < candidates.length - 1) {
+          setIdx((prev) => prev + 1);
+          return;
+        }
         e.currentTarget.style.display = 'none';
       }}
     />
@@ -114,7 +127,7 @@ const NeedleTableRow = memo(function NeedleTableRow({
           alt={row.nama_operator ? `Foto ${row.nama_operator}` : 'Foto operator'}
           className="mx-auto h-[84px] w-[84px] rounded-lg object-cover border border-slate-200 bg-slate-100 cursor-zoom-in"
           emptyClassName="mx-auto h-[84px] w-[84px] rounded-lg border border-dashed border-slate-300 bg-slate-50"
-          onPreview={() => onPreview(row.operator_picture_url || '', row.nama_operator || 'Operator')}
+          onPreview={(resolvedUrl) => onPreview(resolvedUrl, row.nama_operator || 'Operator')}
         />
       </td>
       <td className="w-[120px] px-2 py-1 text-center align-middle">
@@ -123,7 +136,7 @@ const NeedleTableRow = memo(function NeedleTableRow({
           alt={row.model ? `Mesin ${row.model}` : 'Foto mesin'}
           className="mx-auto h-[84px] w-[108px] rounded-lg object-contain border border-slate-200 bg-slate-100 p-1 cursor-zoom-in"
           emptyClassName="mx-auto h-[84px] w-[108px] rounded-lg border border-dashed border-slate-300 bg-slate-50"
-          onPreview={() => onPreview(machineImg || '', row.model ? `Mesin ${row.model}` : row.needle_parameter || 'Foto mesin')}
+          onPreview={(resolvedUrl) => onPreview(resolvedUrl, row.model ? `Mesin ${row.model}` : row.needle_parameter || 'Foto mesin')}
         />
       </td>
       <td className="px-4 py-2.5 text-center">{row.tanggal || '-'}</td>
@@ -139,7 +152,7 @@ const NeedleTableRow = memo(function NeedleTableRow({
   );
 });
 
-export default function NeedelManager() {
+export default function NeedleManager() {
   const { isOpen } = useSidebar();
   const [dateFrom, setDateFrom] = useState(getTodayIso());
   const [dateTo, setDateTo] = useState(getTodayIso());
@@ -293,7 +306,7 @@ export default function NeedelManager() {
     setExportLoading(true);
     setExportProgress(1);
     setExportStageText('Menyiapkan workbook export...');
-    setMessage({ type: 'ok', text: 'Memulai proses export. Mengunduh dan mengonversi gambar...' });
+    setMessage({ type: 'ok', text: 'Memulai proses export data needle...' });
 
     try {
       const workbook = new ExcelJS.Workbook();
@@ -301,8 +314,6 @@ export default function NeedelManager() {
       const sheet = workbook.addWorksheet(sheetName);
 
       const headers = [
-        'Foto',
-        'Foto Mesin',
         'Tanggal',
         needleMode === 'putting' ? 'Waktu Simpan' : 'Waktu Ambil',
         'Operator',
@@ -316,34 +327,43 @@ export default function NeedelManager() {
 
       sheet.addRow(headers);
       const headerRow = sheet.getRow(1);
-      headerRow.font = { bold: true };
+      headerRow.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' }, name: 'Calibri' };
       headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-      headerRow.height = 30;
-      headerRow.eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      headerRow.height = 34;
+      const headerFillByIndex = (idx: number): string => {
+        if (idx <= 2) return 'FF2563EB'; // Tanggal + Waktu
+        if (idx <= 5) return 'FF0F766E'; // Operator + NIK + Line
+        if (idx <= 7) return 'FF7C3AED'; // Parameter + Model
+        return 'FFEA580C'; // Qty + Location
+      };
+      headerRow.eachCell((cell, colNumber) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerFillByIndex(colNumber) } };
         cell.border = {
-          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-          right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
         };
       });
 
-      headerRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
-      headerRow.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
-
-      type ExportRow = {
-        rowNumber: number;
-        operatorImageUrl?: string;
-        machineImageUrl?: string;
+      const getLineOrder = (lineValue?: string): number => {
+        const lineText = (lineValue || '').toUpperCase();
+        const m = lineText.match(/\d+/);
+        return m ? Number(m[0]) : Number.POSITIVE_INFINITY;
       };
-      const exportRows: ExportRow[] = [];
 
-      filteredRows.forEach((row) => {
-        const machineImageUrl = stockImageByParameter.get(normalizeNeedleParameter(row.needle_parameter || ''));
+      const exportRows = [...filteredRows].sort((a, b) => {
+        const lineCmp = getLineOrder(a.line) - getLineOrder(b.line);
+        if (lineCmp !== 0) return lineCmp;
+        const lineTextCmp = (a.line || '').localeCompare(b.line || '', undefined, { sensitivity: 'base' });
+        if (lineTextCmp !== 0) return lineTextCmp;
+        const dateCmp = (a.tanggal || '').localeCompare(b.tanggal || '');
+        if (dateCmp !== 0) return dateCmp;
+        return getNeedleTime(a, needleMode).localeCompare(getNeedleTime(b, needleMode));
+      });
+
+      exportRows.forEach((row) => {
         const excelRow = sheet.addRow([
-          '',
-          '',
           row.tanggal || '',
           getNeedleTime(row, needleMode) || '',
           row.nama_operator || '',
@@ -354,19 +374,23 @@ export default function NeedelManager() {
           typeof row.qty === 'number' ? row.qty : '',
           row.location || '',
         ]);
-        excelRow.height = 40;
+        excelRow.height = 22;
         excelRow.alignment = { vertical: 'middle', horizontal: 'center' };
-        exportRows.push({
-          rowNumber: excelRow.number,
-          operatorImageUrl: row.operator_picture_url || undefined,
-          machineImageUrl: machineImageUrl || undefined,
+        excelRow.eachCell((cell) => {
+          cell.font = { size: 12, color: { argb: 'FF1F2937' }, name: 'Calibri' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          };
         });
       });
 
       setExportProgress(10);
       setExportStageText('Mengatur lebar kolom dan format tabel...');
 
-      const textCols = [3, 4, 5, 6, 7, 8, 9, 10, 11];
+      const textCols = [1, 2, 3, 4, 5, 6, 7, 8, 9];
       textCols.forEach((colIndex) => {
         let maxLen = headers[colIndex - 1].length;
         for (let i = 2; i <= sheet.rowCount; i += 1) {
@@ -374,91 +398,8 @@ export default function NeedelManager() {
           const len = String(v ?? '').length;
           if (len > maxLen) maxLen = len;
         }
-        sheet.getColumn(colIndex).width = Math.min(Math.max(maxLen + 2, 12), 48);
+        sheet.getColumn(colIndex).width = Math.min(Math.max(maxLen + 4, 14), 56);
       });
-
-      sheet.getColumn(1).width = 12;
-      sheet.getColumn(2).width = 15;
-
-      const getImageData = async (sourceUrl?: string): Promise<{ base64: string; extension: 'png' | 'jpeg' | 'gif' } | null> => {
-        if (!sourceUrl) return null;
-
-        const readImageAsBase64 = async (url: string): Promise<any> => {
-          // --- PERBAIKAN UTAMA DI SINI ---
-          // Menambahkan cache-buster (?cb=timestamp) agar browser mengabaikan Opaque Cache 
-          // yang tersimpan dari tag <img> di halaman web UI.
-          const cacheBusterUrl = url + (url.includes('?') ? '&' : '?') + 'cb=' + new Date().getTime();
-
-          try {
-            // Menambahkan cache: 'no-cache' untuk memaksa request ke jaringan
-            const res = await fetch(cacheBusterUrl, {
-              mode: 'cors',
-              cache: 'no-cache'
-            });
-
-            if (!res.ok) return null;
-
-            const contentType = res.headers.get('content-type') || '';
-
-            if (!contentType.toLowerCase().startsWith('image/')) return null;
-
-            const lowerType = contentType.toLowerCase();
-            const ext: 'png' | 'jpeg' | 'gif' = lowerType.includes('png') ? 'png' : lowerType.includes('gif') ? 'gif' : 'jpeg';
-
-            const arrayBuffer = await res.arrayBuffer();
-            if (!arrayBuffer || arrayBuffer.byteLength === 0) return null;
-
-            const base64Body = arrayBufferToBase64(arrayBuffer);
-            return { base64: base64Body, extension: ext };
-          } catch {
-            return null;
-          }
-        };
-
-        const direct = await readImageAsBase64(sourceUrl);
-        if (direct) return direct;
-
-        const proxied = await readImageAsBase64(toProxyNeedleImageUrl(sourceUrl));
-        if (proxied) return proxied;
-
-        return null;
-      };
-
-      // Proses gambar secara berurutan
-      const totalRows = exportRows.length;
-      for (let i = 0; i < exportRows.length; i++) {
-        const row = exportRows[i];
-        const excelRowIdx = row.rowNumber;
-        const rowProgress = Math.min(85, 10 + Math.round(((i + 1) / Math.max(totalRows, 1)) * 75));
-        setExportProgress(rowProgress);
-        setExportStageText(`Memproses gambar baris ${i + 1} dari ${totalRows}...`);
-
-        const operatorImg = await getImageData(row.operatorImageUrl);
-        if (operatorImg) {
-          const imgId = workbook.addImage({
-            base64: operatorImg.base64,
-            extension: operatorImg.extension,
-          });
-          sheet.addImage(imgId, {
-            tl: { col: 0.2, row: (excelRowIdx - 1) + 0.2 },
-            ext: { width: 34, height: 34 },
-            editAs: 'oneCell',
-          });
-        }
-
-        const machineImg = await getImageData(row.machineImageUrl);
-        if (machineImg) {
-          const imgId = workbook.addImage({
-            base64: machineImg.base64,
-            extension: machineImg.extension,
-          });
-          sheet.addImage(imgId, {
-            tl: { col: 1.25, row: (excelRowIdx - 1) + 0.2 },
-            ext: { width: 44, height: 34 },
-            editAs: 'oneCell',
-          });
-        }
-      }
 
       setExportProgress(92);
       setExportStageText('Menyusun file Excel...');
@@ -492,7 +433,7 @@ export default function NeedelManager() {
 
   return (
     <div
-      className="flex min-h-screen w-full h-screen fixed inset-0 m-0 p-0 font-poppins text-slate-800 selection:bg-violet-100 selection:text-violet-900"
+      className="flex min-h-screen w-full font-poppins text-slate-800 selection:bg-violet-100 selection:text-violet-900"
       style={{
         backgroundImage: `url(${backgroundImage})`,
         backgroundSize: '100% 100%',
@@ -512,13 +453,13 @@ export default function NeedelManager() {
         <Header />
         <Breadcrumb />
         <main
-          className="flex-1 w-full overflow-hidden relative min-h-0"
+          className="flex-1 w-full relative"
           style={{
             padding: '0.5rem',
             paddingTop: '0.75rem',
           }}
         >
-          <div className="w-full h-full min-h-0 flex flex-col gap-3">
+          <div className="w-full flex flex-col gap-3">
             <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm">
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_260px] gap-4 items-stretch">
                 <div className="relative overflow-hidden rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50/60 via-indigo-50/30 to-white p-5">
@@ -527,7 +468,7 @@ export default function NeedelManager() {
                       <img src={needleIcon} alt="" className="h-12 w-12 object-contain" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[clamp(0.62rem,0.72vw,0.72rem)] font-semibold uppercase tracking-wider text-violet-600">Needel Manager</p>
+                      <p className="text-[clamp(0.62rem,0.72vw,0.72rem)] font-semibold uppercase tracking-wider text-violet-600">Needle Manager</p>
                       <h1 className="mt-0.5 text-[clamp(1.15rem,2vw,1.85rem)] font-extrabold tracking-tight text-slate-900">Monitoring picking and putting needle</h1>
                     </div>
                   </div>
@@ -544,8 +485,8 @@ export default function NeedelManager() {
                       type="button"
                       onClick={() => setNeedleMode('picking')}
                       className={`rounded-lg px-4 py-2 text-[clamp(0.74rem,0.95vw,0.9rem)] font-semibold transition ${needleMode === 'picking'
-                          ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-100'
-                          : 'text-emerald-700/80 hover:text-emerald-900'
+                        ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-100'
+                        : 'text-emerald-700/80 hover:text-emerald-900'
                         }`}
                     >
                       Picking
@@ -554,8 +495,8 @@ export default function NeedelManager() {
                       type="button"
                       onClick={() => setNeedleMode('putting')}
                       className={`rounded-lg px-4 py-2 text-[clamp(0.74rem,0.95vw,0.9rem)] font-semibold transition ${needleMode === 'putting'
-                          ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-100'
-                          : 'text-emerald-700/80 hover:text-emerald-900'
+                        ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-100'
+                        : 'text-emerald-700/80 hover:text-emerald-900'
                         }`}
                     >
                       Putting
@@ -598,8 +539,8 @@ export default function NeedelManager() {
                   onClick={() => fetchNeedleData(dateFrom, dateTo, needleMode)}
                   disabled={loading || exportLoading}
                   className={`w-full rounded-lg px-3 py-2 text-[clamp(0.74rem,0.95vw,0.9rem)] font-semibold text-white transition ${loading || exportLoading
-                      ? 'bg-slate-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500'
+                    ? 'bg-slate-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500'
                     }`}
                 >
                   {loading ? (
@@ -630,8 +571,8 @@ export default function NeedelManager() {
                   onClick={handleExportExcel}
                   disabled={exportLoading}
                   className={`w-full rounded-lg border px-3 py-2 text-[clamp(0.74rem,0.95vw,0.9rem)] font-semibold transition ${exportLoading
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-400 cursor-not-allowed'
-                      : 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-400 cursor-not-allowed'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                     }`}
                 >
                   {exportLoading ? (
@@ -661,18 +602,19 @@ export default function NeedelManager() {
               {message && (
                 <div
                   className={`rounded-lg px-3 py-2 text-[clamp(0.74rem,0.95vw,0.9rem)] ${message.type === 'ok'
-                      ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : 'border border-red-200 bg-red-50 text-red-700'
+                    ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border border-red-200 bg-red-50 text-red-700'
                     }`}
                 >
                   {message.text}
                 </div>
               )}
 
-              <div className="mt-3 flex-1 min-h-0 max-h-full overflow-auto rounded-xl border border-slate-200 overscroll-contain">
+              <div className="mt-3 w-full overflow-auto rounded-xl border border-slate-200 overscroll-contain" style={{ maxHeight: '65vh', minHeight: '200px' }}>
                 <table className="min-w-full border-collapse text-[clamp(0.7rem,0.82vw,0.84rem)]">
                   <thead className="text-slate-700">
                     <tr>
+
                       <th className="sticky top-0 z-20 w-[56px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-center font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgb(226,232,240)]">No</th>
                       <th className="sticky top-0 z-20 w-[92px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-center font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgb(226,232,240)]">Foto</th>
                       <th className="sticky top-0 z-20 w-[120px] border-b border-slate-200 bg-slate-50 px-2 py-3 text-center font-semibold whitespace-nowrap shadow-[0_1px_0_0_rgb(226,232,240)]">Foto Mesin</th>

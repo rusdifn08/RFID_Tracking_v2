@@ -6,18 +6,17 @@ import Footer from '../components/Footer';
 import { useSidebar } from '../context/SidebarContext';
 import backgroundImage from '../assets/background.jpg';
 import LineDetailCardsGrid from '../components/line/LineDetailCardsGrid';
-import daftarRfidIcon from '../assets/daftarrfid.webp';
 import dashboardRfidIcon from '../assets/dashboardrfid.webp';
 import listRfidIcon from '../assets/listrfid.webp';
 
 const cards = [
     {
         id: 1,
-        title: 'Daftar RFID',
-        subtitle: 'Registrasi Tag RFID Baru',
+        title: 'Daftar RFID Cutting',
+        subtitle: 'Data cutting & scan barcode kamera',
         icon: null,
-        iconImage: daftarRfidIcon,
-        path: '/daftar-rfid',
+        iconImage: listRfidIcon,
+        path: '/daftar-rfid-cutting',
     },
     {
         id: 2,
@@ -79,7 +78,7 @@ const Cutting = memo(() => {
                         scrollbarColor: '#cbd5e1 #f1f5f9',
                     }}
                 >
-                    <LineDetailCardsGrid cards={cards} gridColsClass="md:grid-cols-3" />
+                    <LineDetailCardsGrid cards={cards} gridColsClass="md:grid-cols-2 xl:grid-cols-3" />
                 </main>
 
                 <Footer />

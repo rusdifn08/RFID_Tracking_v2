@@ -14,6 +14,26 @@ import daftarRfidIcon from '../assets/daftarrfid.webp';
 import dashboardRfidIcon from '../assets/dashboardrfid.webp';
 import listRfidIcon from '../assets/listrfid.webp';
 
+function getSupervisorByLine(
+    supervisors: Record<string, string> | undefined,
+    lineNumberRaw: string,
+    fallback: string | null
+): string | null {
+    if (!supervisors) return fallback ?? null;
+    const lineNumber = String(lineNumberRaw || '').trim();
+    const lineAsNumber = String(parseInt(lineNumber, 10));
+    const normalized = lineNumber.toUpperCase().replace(/^LINE\s*/i, '');
+    return (
+        supervisors[lineNumber] ??
+        supervisors[lineAsNumber] ??
+        supervisors[`LINE ${lineNumber}`] ??
+        supervisors[`LINE ${lineAsNumber}`] ??
+        supervisors[normalized] ??
+        fallback ??
+        null
+    );
+}
+
 const LineDetail = memo(() => {
     const { id } = useParams<{ id: string }>();
     const location = useLocation();
@@ -33,8 +53,7 @@ const LineDetail = memo(() => {
             const data = await getSupervisorDataFromAPI(environment);
             if (data?.supervisors) {
                 const lineKey = id.trim();
-                const num = parseInt(lineKey, 10);
-                const name = data.supervisors[lineKey] ?? data.supervisors[String(num)] ?? null;
+                const name = getSupervisorByLine(data.supervisors, lineKey, null);
                 setSupervisorFromAPI(name ?? null);
             } else {
                 setSupervisorFromAPI(null);

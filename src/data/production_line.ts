@@ -208,7 +208,7 @@ export const productionLinesMJL: ProductionLine[] = [
  },
 ];
 
-// Data Production Lines untuk MJL2 (10 cards: All + Line 1 sampai 9)
+// Data Production Lines untuk MJL2 (11 cards: All + Line 1 sampai 10)
 export const productionLinesMJL2: ProductionLine[] = [
  {
   id: 112,
@@ -290,6 +290,14 @@ export const productionLinesMJL2: ProductionLine[] = [
   accentColor: 'text-teal-600',
   line: '9'
  },
+{
+  id: 10,
+  title: 'Production Line 10',
+  supervisor: 'Not Assigned',
+  borderColor: 'border-purple-500',
+  accentColor: 'text-purple-600',
+  line: '10'
+},
 ];
 
 // GCC: Line 1–21 (All + 21 line) — supervisor sesuai mapping GCC

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { X, Package, CheckCircle2 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
@@ -98,6 +98,7 @@ export default function CuttingScanStationModal({
 }: CuttingScanStationModalProps) {
     const theme = getCuttingStationTheme(accent);
     const inputRef = useRef<HTMLInputElement>(null);
+    const sessionSuccessCount = useMemo(() => sessionItems.filter((s) => s.ok).length, [sessionItems]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -117,35 +118,38 @@ export default function CuttingScanStationModal({
     return (
         <>
             <div
-                className="fixed inset-0 z-[1000] flex items-center justify-center p-2 sm:p-3"
+                className="fixed inset-0 z-[1000] flex items-start justify-center sm:items-center p-1.5 xs:p-2 sm:p-3 md:p-4 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain"
                 style={{
                     background: 'rgba(15, 23, 42, 0.85)',
                     backdropFilter: 'blur(8px)',
                     animation: 'fadeIn 0.3s ease',
+                    paddingTop: 'max(0.375rem, env(safe-area-inset-top))',
+                    paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))',
                 }}
                 onMouseDown={(e) => {
                     if (e.target === e.currentTarget && !busy) onClose();
                 }}
             >
                 <div
-                    className="bg-white rounded-xl xs:rounded-2xl sm:rounded-3xl shadow-2xl w-[95%] max-h-[95vh] flex flex-col min-h-0 max-w-[min(96vw,1120px)]"
+                    className="bg-white rounded-lg xs:rounded-xl sm:rounded-2xl md:rounded-3xl shadow-2xl w-full max-h-[min(100dvh,100svh)] sm:max-h-[95vh] flex flex-col min-h-0 min-w-0 mx-auto max-sm:max-w-[calc(100vw-0.5rem)] sm:max-w-[min(784px,calc(0.82*(100vw-1rem)))] lg:max-w-[min(784px,calc(0.8*(100vw-1rem)))]"
                     style={{
+                        width: '100%',
                         background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
                         boxShadow:
                             '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(148, 163, 184, 0.1), 0 8px 16px -8px rgba(59, 130, 246, 0.1)',
                         animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
                         border: `1px solid ${theme.borderColor}40`,
-                        padding: '0.75rem',
+                        padding: 'clamp(0.5rem, 2vw, 0.75rem)',
                         overflow: 'hidden',
                         display: 'flex',
                         flexDirection: 'column',
                     }}
                     onMouseDown={(e) => e.stopPropagation()}
                 >
-                    <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
-                        <div className="text-center flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-1.5 sm:mb-2 flex-shrink-0 gap-2">
+                        <div className="text-center flex-1 min-w-0 px-1">
                             <h2
-                                className="text-base xs:text-lg sm:text-xl font-extrabold mb-0.5 xs:mb-1"
+                                className="text-sm xs:text-base sm:text-lg md:text-xl font-extrabold mb-0.5 xs:mb-1 leading-snug line-clamp-2"
                                 style={{
                                     background: theme.headerGradient,
                                     WebkitBackgroundClip: 'text',
@@ -156,7 +160,7 @@ export default function CuttingScanStationModal({
                             >
                                 {title}
                             </h2>
-                            <p className="text-xs xs:text-sm font-medium" style={{ color: '#475569' }}>
+                            <p className="text-[11px] xs:text-xs sm:text-sm font-medium leading-snug line-clamp-2" style={{ color: '#475569' }}>
                                 {subtitle}
                             </p>
                         </div>
@@ -164,31 +168,38 @@ export default function CuttingScanStationModal({
                             type="button"
                             onClick={() => !busy && onClose()}
                             disabled={busy}
-                            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 shrink-0 disabled:opacity-50"
+                            className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 shrink-0 disabled:opacity-50 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
                             aria-label="Tutup"
                         >
-                            <X className="w-5 h-5" strokeWidth={2} />
+                            <X className="w-5 h-5 sm:w-5 sm:h-5" strokeWidth={2} />
                         </button>
                     </div>
 
-                    <div className="flex flex-col md:flex-row gap-3 flex-1 min-h-0 overflow-hidden">
-                        <div className="flex flex-col gap-3 w-full md:w-[min(40%,380px)] shrink-0 min-h-0 md:max-h-full overflow-y-auto pr-0.5">
+                    <div className="flex flex-col lg:flex-row gap-2 sm:gap-3 flex-1 min-h-0 overflow-hidden min-w-0 min-h-[min(320px,45vh)] lg:min-h-0">
+                        <div
+                            className="flex flex-col gap-2 sm:gap-3 w-full min-w-0 max-w-full lg:w-[min(38%,360px)] shrink-0 max-h-[min(42vh,280px)] lg:max-h-full overflow-y-auto overflow-x-hidden pr-0.5 overscroll-contain"
+                            style={{ WebkitOverflowScrolling: 'touch' }}
+                        >
                             {leftColumn}
                         </div>
 
-                        <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
-                            {formSection ? <div className="mb-2 shrink-0 max-h-[38vh] overflow-y-auto">{formSection}</div> : null}
+                        <div className="relative flex-1 min-w-0 max-w-full flex flex-col min-h-0 overflow-hidden min-h-[min(240px,50vh)] lg:min-h-0">
+                            {formSection ? (
+                                <div className="mb-1.5 sm:mb-2 shrink-0 max-h-[min(32vh,220px)] sm:max-h-[38vh] overflow-y-auto overscroll-contain">
+                                    {formSection}
+                                </div>
+                            ) : null}
 
                             <div
-                                className={`mb-2 relative shrink-0 ${busy ? 'cursor-not-allowed' : 'cursor-text'}`}
+                                className={`mb-1.5 sm:mb-2 relative shrink-0 ${busy ? 'cursor-not-allowed' : 'cursor-text'}`}
                                 onClick={() => {
                                     if (inputRef.current && !busy) inputRef.current.focus();
                                 }}
                                 style={{
                                     background: theme.bgGradient,
                                     borderRadius: '6px',
-                                    padding: '0.4rem',
-                                    minHeight: '130px',
+                                    padding: 'clamp(0.25rem, 1.5vw, 0.4rem)',
+                                    minHeight: 'clamp(96px, 22vh, 130px)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -198,10 +209,10 @@ export default function CuttingScanStationModal({
                             >
                                 <div className="relative" style={{ filter: `drop-shadow(0 6px 12px ${theme.primaryColor}25)` }}>
                                     <div
-                                        className="relative"
+                                        className="relative max-[380px]:scale-[0.85] max-[380px]:origin-center"
                                         style={{
-                                            width: '160px',
-                                            height: '88px',
+                                            width: 'clamp(120px, 42vw, 160px)',
+                                            height: 'clamp(66px, 23vw, 88px)',
                                             background: theme.primaryGradient,
                                             borderRadius: '8px',
                                             boxShadow: `0 8px 16px ${theme.primaryColor}40, inset 0 1px 0 rgba(255, 255, 255, 0.2)`,
@@ -231,14 +242,14 @@ export default function CuttingScanStationModal({
                                     </div>
                                 </div>
 
-                                <div className="absolute bottom-4 left-0 right-0 text-center px-2">
+                                <div className="absolute bottom-2 sm:bottom-4 left-0 right-0 text-center px-1 sm:px-2">
                                     {rfidValue.length > 0 ? (
                                         <div>
                                             <p className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color: theme.primaryColor }}>
                                                 📝 Sedang membaca...
                                             </p>
                                             <p
-                                                className="font-extrabold text-sm sm:text-lg font-mono tracking-wide px-2 py-1.5 rounded-md inline-block max-w-full truncate"
+                                                className="font-extrabold text-xs xs:text-sm sm:text-lg font-mono tracking-wide px-2 py-1.5 rounded-md inline-block max-w-full truncate"
                                                 style={{
                                                     color: '#0F172A',
                                                     background: theme.bgGradient,
@@ -299,18 +310,18 @@ export default function CuttingScanStationModal({
                                     display: 'flex',
                                     flexDirection: 'column',
                                     flex: 1,
-                                    minHeight: 0,
+                                    minHeight: 'min(36vh, 220px)',
                                 }}
                             >
                                 <div
-                                    className="px-3 py-2 flex justify-between items-center border-b-2 border-gray-200 flex-shrink-0"
+                                    className="px-2 sm:px-3 py-1.5 sm:py-2 flex justify-between items-center gap-2 border-b-2 border-gray-200 flex-shrink-0"
                                     style={{ background: theme.bgGradient }}
                                 >
-                                    <h3 className="text-sm font-bold" style={{ color: '#0F172A', letterSpacing: '-0.25px' }}>
+                                    <h3 className="text-xs sm:text-sm font-bold text-left leading-tight" style={{ color: '#0F172A', letterSpacing: '-0.25px' }}>
                                         📋 RFID yang Sudah di-Scan
                                     </h3>
                                     <span
-                                        className="px-3 py-1.5 rounded-full font-extrabold text-sm text-white text-center min-w-[35px]"
+                                        className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-extrabold text-xs sm:text-sm text-white text-center min-w-[32px] shrink-0"
                                         style={{
                                             background: theme.primaryGradient,
                                             boxShadow: `0 2px 8px ${theme.primaryColor}30`,
@@ -329,7 +340,7 @@ export default function CuttingScanStationModal({
                                     </div>
                                 ) : (
                                     <div
-                                        className="overflow-y-auto p-1.5 flex-1 min-h-0"
+                                        className="overflow-y-auto p-1 sm:p-1.5 flex-1 min-h-0 overscroll-contain touch-pan-y"
                                         style={{
                                             background: '#FAFBFC',
                                             scrollbarWidth: 'thin',
@@ -350,7 +361,7 @@ export default function CuttingScanStationModal({
                                                 >
                                                     <div className="flex-1 min-w-0">
                                                         <div
-                                                            className="font-semibold font-mono text-xs sm:text-sm tracking-wide truncate"
+                                                            className="font-semibold font-mono text-[11px] xs:text-xs sm:text-sm tracking-wide break-all sm:truncate"
                                                             style={{ color: isError ? '#DC2626' : '#0F172A' }}
                                                         >
                                                             {item.rfid}
@@ -370,7 +381,7 @@ export default function CuttingScanStationModal({
                                                             </span>
                                                         </div>
                                                         {item.message ? (
-                                                            <div className={`text-[10px] font-medium mt-0.5 ${isError ? 'text-red-700' : 'text-slate-600'}`}>
+                                                            <div className={`text-[10px] sm:text-[11px] font-medium mt-0.5 break-words ${isError ? 'text-red-700' : 'text-slate-600'}`}>
                                                                 {item.message}
                                                             </div>
                                                         ) : null}
@@ -389,12 +400,12 @@ export default function CuttingScanStationModal({
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2 xs:gap-3 mt-3 flex-shrink-0 pt-1 border-t border-slate-100">
+                    <div className="flex flex-col xs:flex-row flex-wrap gap-2 xs:gap-3 mt-2 sm:mt-3 flex-shrink-0 pt-1 border-t border-slate-100 pb-[env(safe-area-inset-bottom,0px)]">
                         <button
                             type="button"
                             onClick={onClose}
                             disabled={busy}
-                            className="flex-1 min-w-[120px] py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all"
+                            className="flex-1 min-h-[48px] min-w-0 xs:min-w-[120px] py-3 xs:py-2.5 px-4 rounded-xl font-bold text-sm sm:text-sm transition-all touch-manipulation"
                             style={{
                                 background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
                                 color: '#dc2626',
@@ -409,7 +420,7 @@ export default function CuttingScanStationModal({
                             type="button"
                             onClick={onClose}
                             disabled={busy}
-                            className="flex-1 min-w-[120px] py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm text-white transition-all inline-flex items-center justify-center gap-2"
+                            className="flex-1 min-h-[48px] min-w-0 xs:min-w-[120px] py-3 xs:py-2.5 px-4 rounded-xl font-bold text-sm sm:text-sm text-white transition-all inline-flex items-center justify-center gap-2 touch-manipulation"
                             style={{
                                 background: theme.primaryGradient,
                                 boxShadow: `0 4px 12px ${theme.primaryColor}35`,
@@ -417,7 +428,7 @@ export default function CuttingScanStationModal({
                             }}
                         >
                             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
-                            Selesai ({sessionItems.length})
+                            Selesai ({sessionSuccessCount})
                         </button>
                     </div>
                 </div>

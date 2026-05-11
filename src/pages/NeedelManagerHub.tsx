@@ -6,7 +6,7 @@ import Breadcrumb from '../components/Breadcrumb';
 import Footer from '../components/Footer';
 import { useSidebar } from '../context/SidebarContext';
 import backgroundImage from '../assets/background.jpg';
-import cardNeedel from '../assets/card_needel.webp';
+import cardNeedle from '../assets/card_needel.webp';
 import cardKolam from '../assets/card_kolam.webp';
 import { LayoutGrid } from 'lucide-react';
 
@@ -24,10 +24,10 @@ type HubCard = {
 const cards: HubCard[] = [
   {
     id: 1,
-    title: 'Needel Manager',
+    title: 'Needle Manager',
     subtitle: 'Monitoring picking and putting needle',
-    to: '/needel-manager/monitoring',
-    artSrc: cardNeedel,
+    to: '/needle-manager/monitoring',
+    artSrc: cardNeedle,
     artAlt: 'Needle Manager',
     gradient: 'from-violet-400 to-purple-700',
     bar: 'from-violet-400 to-purple-700',
@@ -35,8 +35,8 @@ const cards: HubCard[] = [
   {
     id: 2,
     title: 'Dashboard Mesin Kolam',
-    subtitle: 'Cek stok mesin & quantity (stock needle)',
-    to: '/needel-manager/mesin-kolam',
+    subtitle: 'Dashboard Realtime Stock Needle Machine',
+    to: '/needle-manager/mesin-kolam',
     artSrc: cardKolam,
     artAlt: 'Dashboard Kolam',
     gradient: 'from-sky-400 to-indigo-700',
@@ -44,7 +44,7 @@ const cards: HubCard[] = [
   },
 ];
 
-export default function NeedelManagerHub() {
+export default function NeedleManagerHub() {
   const { isOpen } = useSidebar();
   const navigate = useNavigate();
   const [hovered, setHovered] = useState<number | null>(null);

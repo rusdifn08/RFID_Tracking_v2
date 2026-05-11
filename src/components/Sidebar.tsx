@@ -46,8 +46,10 @@ const Sidebar = memo(() => {
         const listRfidMatch = decodedPath.match(/\/list-rfid\/(\d+)/);
         if (listRfidMatch) return listRfidMatch[1];
 
-        // Default ke line 1 untuk daftar-rfid, data-rfid, dan list-rfid
-        if (decodedPath.startsWith('/daftar-rfid') || decodedPath.startsWith('/data-rfid') || decodedPath.startsWith('/list-rfid')) {
+        // Default ke line 1 untuk daftar-rfid, data-rfid, dan list-rfid (bukan /daftar-rfid-cutting)
+        const isDaftarRfidRegistrasi =
+            decodedPath.startsWith('/daftar-rfid') && !decodedPath.startsWith('/daftar-rfid-cutting');
+        if (isDaftarRfidRegistrasi || decodedPath.startsWith('/data-rfid') || decodedPath.startsWith('/list-rfid')) {
             return '1';
         }
 

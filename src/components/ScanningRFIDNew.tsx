@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { X, CheckCircle2, Loader2 } from 'lucide-react';
 import { API_BASE_URL, getDefaultHeaders } from '../config/api';
 
@@ -32,6 +32,10 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
     const containerRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const rfidInputRef = useRef<string>(''); // Ref untuk menyimpan nilai rfidInput terbaru
+    const successfulCount = useMemo(
+        () => scannedItems.filter((item) => item.status === 'success').length,
+        [scannedItems]
+    );
 
     // Check server status saat modal dibuka
     useEffect(() => {
@@ -864,17 +868,9 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
                         <button
                             onClick={async () => {
                                 // Selesai - eksekusi query untuk semua scanned items yang berhasil
-                                if (isProcessing || scannedItems.length === 0) return;
+                                if (isProcessing || successfulCount === 0) return;
                                 
                                 // Filter hanya item yang berhasil (status: 'success')
-                                const successfulItems = scannedItems.filter(item => item.status === 'success');
-                                
-                                if (successfulItems.length === 0) {
-                                    // Tidak ada item yang berhasil, tutup saja
-                                    onClose();
-                                    return;
-                                }
-                                
                                 // Semua item sudah di-insert ke database saat scanning
                                 // Jadi tidak perlu insert lagi, hanya tutup modal
                                 // (Data sudah tersimpan di database saat handleRfidSubmit)
@@ -882,24 +878,24 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
                                 // Tutup modal
                                 onClose();
                             }}
-                            disabled={isProcessing || scannedItems.length === 0}
+                            disabled={isProcessing || successfulCount === 0}
                             className="flex-1 py-3 px-5 rounded-lg font-bold text-sm text-white transition-all relative overflow-hidden"
                             style={{
                                 background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
                                 boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35), 0 2px 4px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
                                 letterSpacing: '0.25px',
-                                opacity: (isProcessing || scannedItems.length === 0) ? 0.5 : 1,
-                                cursor: (isProcessing || scannedItems.length === 0) ? 'not-allowed' : 'pointer'
+                                opacity: (isProcessing || successfulCount === 0) ? 0.5 : 1,
+                                cursor: (isProcessing || successfulCount === 0) ? 'not-allowed' : 'pointer'
                             }}
                             onMouseEnter={(e) => {
-                                if (!isProcessing && scannedItems.length > 0) {
+                                if (!isProcessing && successfulCount > 0) {
                                     e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
                                     e.currentTarget.style.boxShadow = '0 12px 24px rgba(16, 185, 129, 0.45), 0 6px 12px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3)';
                                     e.currentTarget.style.background = 'linear-gradient(135deg, #10B981 0%, #047857 100%)';
                                 }
                             }}
                             onMouseLeave={(e) => {
-                                if (!isProcessing && scannedItems.length > 0) {
+                                if (!isProcessing && successfulCount > 0) {
                                     e.currentTarget.style.transform = 'translateY(0) scale(1)';
                                     e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.35), 0 2px 4px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
                                     e.currentTarget.style.background = 'linear-gradient(135deg, #10B981 0%, #059669 100%)';
@@ -913,7 +909,7 @@ export default function ScanningRFIDNew({ isOpen, onClose, workOrderData }: Scan
                                     Menyimpan...
                                 </>
                             ) : (
-                                `💾 Selesai (${scannedItems.length})`
+                                `💾 Selesai (${successfulCount})`
                             )}
                         </button>
                     </div>

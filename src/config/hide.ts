@@ -16,6 +16,24 @@ export const HIDE_CARD_SEWING_PROSES = true;
 /** Ikon shift (matahari/bulan) di kartu Production Line dan Sewing Line. true = disembunyikan, false = ditampilkan */
 export const HIDE_SHIFT_ICON = false;
 
+// --- Form Report Export (halaman FormData / Gistex Command Center) ---
+/** true = kartu tidak di-render (tanpa request); ubah ke false untuk menampilkan lagi */
+
+/** WIP All Lines — Rekap WIP semua line (`/line`) */
+export const HIDE_FORM_EXPORT_WIP_ALL_LINES = true;
+
+/** Card Progress — List card status progress (`/card/progress`) */
+export const HIDE_FORM_EXPORT_CARD_PROGRESS = true;
+
+/** Card Done — List card status done (`/card/done`) */
+export const HIDE_FORM_EXPORT_CARD_DONE = true;
+
+/** Card Waiting — List card status waiting (`/card/waiting`) */
+export const HIDE_FORM_EXPORT_CARD_WAITING = true;
+
+/** Tracking Join — Data tracking gabungan (`/tracking/join`) */
+export const HIDE_FORM_EXPORT_TRACKING_JOIN = true;
+
 /**
  * Kotak kiri atas di kartu Production Line / Sewing Line:
  * - "brand" atau 0 = tampilkan nama brand (style dari API) + ikon brand dari assets

@@ -45,13 +45,7 @@ export const getNodeProxyBaseUrl = (): string => {
     if (fromEnv != null && String(fromEnv).trim() !== '') {
         return String(fromEnv).replace(/\/$/, '');
     }
-    const port = getProxyPort();
-    if (typeof window === 'undefined') {
-        return getApiBaseUrl(port);
-    }
-    const hostname = window.location.hostname;
-    const host = hostname === '127.0.0.1' ? 'localhost' : hostname;
-    return `http://${host}:${port}`;
+    return getApiBaseUrl(getProxyPort());
 };
 
 // Base URL untuk API Server (Proxy Server)
@@ -85,7 +79,7 @@ const getBackendIP = (): string => {
         } else if (storedEnv === 'MJL2') {
             return '10.5.0.99';
         } else if (storedEnv === 'GCC') {
-            return '10.5.0.201';
+            return '10.5.0.106';
         }
     }
     // Default: CLN
@@ -311,6 +305,240 @@ export const getDefaultHeaders = (): HeadersInit => {
     return headers;
 };
 
+/** Path proxy → backend GET label cutting GCC (query `barcode`). */
+export const GCC_CUTTING_LIST_PATH = '/api/gcc/cutting/list';
+
+export interface GccCuttingFormFields {
+    barcode: string;
+    workOrder: string;
+    style: string;
+    buyer: string;
+    item: string;
+    color: string;
+    size: string;
+    bagian: string;
+    noIkat: string;
+    placing: string;
+    season: string;
+    country: string;
+}
+
+function extractFirstCuttingRow(payload: unknown): Record<string, unknown> | null {
+    if (payload == null || typeof payload !== 'object') return null;
+    const p = payload as Record<string, unknown>;
+    if (Array.isArray(payload)) {
+        const first = (payload as unknown[])[0];
+        return first && typeof first === 'object' ? (first as Record<string, unknown>) : null;
+    }
+    const data = p.data;
+    if (Array.isArray(data)) {
+        const first = data[0];
+        return first && typeof first === 'object' ? (first as Record<string, unknown>) : null;
+    }
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+        return data as Record<string, unknown>;
+    }
+    const results = p.results;
+    if (Array.isArray(results)) {
+        const first = results[0];
+        return first && typeof first === 'object' ? (first as Record<string, unknown>) : null;
+    }
+    return p;
+}
+
+function pickStr(row: Record<string, unknown> | null, keys: string[]): string {
+    if (!row) return '';
+    for (const k of keys) {
+        const v = row[k];
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+            return String(v).trim();
+        }
+    }
+    return '';
+}
+
+/** Normalisasi respons API cutting list ke field tampilan (toleran variasi nama key backend). */
+export function mapGccCuttingPayloadToForm(barcode: string, payload: unknown): GccCuttingFormFields {
+    const row = extractFirstCuttingRow(payload);
+    return {
+        barcode: barcode.trim(),
+        workOrder: pickStr(row, ['wo', 'WO', 'wo_no', 'nomor_wo', 'work_order', 'no_wo']),
+        style: pickStr(row, ['style', 'style_no', 'Style No', 'styleNo']),
+        buyer: pickStr(row, ['buyer', 'Buyer']),
+        item: pickStr(row, ['item', 'Item', 'deskripsi', 'description']),
+        color: pickStr(row, ['color', 'Color', 'warna', 'Warna']),
+        size: pickStr(row, ['size', 'Size']),
+        bagian: pickStr(row, ['bagian', 'Bagian', 'section']),
+        noIkat: pickStr(row, ['no_ikat', 'noIkat', 'No. Ikat', 'bundle', 'no_bundle']),
+        placing: pickStr(row, ['placing', 'Placing', 'meja', 'Meja']),
+        season: pickStr(row, ['season', 'Season']),
+        country: pickStr(row, ['country', 'Country', 'negara']),
+    };
+}
+
+/** Default URL daftar bundle (service cutting). Override: VITE_GCC_CUTTING_LIST_URL (base atau path penuh). */
+const DEFAULT_GCC_CUTTING_FULL_LIST_URL = 'http://10.5.0.201:9000/api/gcc/cutting/list';
+
+/** Header API service cutting (:9000). Override: VITE_GCC_CUTTING_RFID_KEY_HEADER, VITE_GCC_CUTTING_RFID_KEY */
+const GCC_CUTTING_RFID_KEY_HEADER_DEFAULT = 'rfid-key';
+const GCC_CUTTING_RFID_KEY_DEFAULT = '0011779933';
+
+function getGccCuttingBundlesRequestHeaders(): HeadersInit {
+    const name =
+        (import.meta.env.VITE_GCC_CUTTING_RFID_KEY_HEADER as string | undefined)?.trim() ||
+        GCC_CUTTING_RFID_KEY_HEADER_DEFAULT;
+    const value =
+        (import.meta.env.VITE_GCC_CUTTING_RFID_KEY as string | undefined)?.trim() ||
+        GCC_CUTTING_RFID_KEY_DEFAULT;
+    return {
+        Accept: 'application/json',
+        [name]: value,
+    };
+}
+
+/** Resolves URL GET daftar bundle: env → dev proxy Vite `/__gcc_cutting/...` → default langsung ke :9000. */
+export function resolveGccCuttingBundlesListUrl(): string {
+    const fromEnv = (import.meta.env.VITE_GCC_CUTTING_LIST_URL as string | undefined)?.trim();
+    if (fromEnv) {
+        const t = fromEnv.replace(/\/$/, '');
+        return t.includes('/api/gcc/cutting/list') ? t : `${t}/api/gcc/cutting/list`;
+    }
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+        return `${window.location.origin}/__gcc_cutting/api/gcc/cutting/list`;
+    }
+    return DEFAULT_GCC_CUTTING_FULL_LIST_URL;
+}
+
+/** Satu baris bundle dari GET …/api/gcc/cutting/list (service :9000). */
+export interface GccCuttingBundleRow {
+    idBundles?: number;
+    cuttingOrderBreakdownBundleId?: number;
+    barcode?: string;
+    rfidBundles?: string;
+    wo?: string;
+    style?: string;
+    meja?: string | number;
+    warna?: string;
+    size?: string;
+    noIkat?: number | string;
+    placing?: string;
+    season?: string;
+    country?: string;
+    createdAt?: string;
+    [key: string]: unknown;
+}
+
+/** Map satu baris bundle API (GET …/api/gcc/cutting/list) ke form tampilan. */
+export function mapGccCuttingBundleRowToForm(row: Record<string, unknown>): GccCuttingFormFields {
+    const pl = pickStr(row, ['placing']);
+    const meja = pickStr(row, ['meja']);
+    const placingParts = [pl, meja ? `Meja ${meja}` : ''].filter(Boolean);
+    const placingCombined = placingParts.join(' · ');
+    return {
+        barcode: pickStr(row, ['barcode']),
+        workOrder: pickStr(row, ['wo', 'WO']),
+        style: pickStr(row, ['style']),
+        buyer: pickStr(row, ['country', 'buyer', 'Buyer']),
+        item: pl || pickStr(row, ['item', 'Item']),
+        color: pickStr(row, ['warna', 'color', 'Color']),
+        size: pickStr(row, ['size', 'Size']),
+        bagian: pickStr(row, ['bagian', 'Bagian']),
+        noIkat: pickStr(row, ['noIkat', 'no_ikat']),
+        placing: placingCombined,
+        season: pickStr(row, ['season', 'Season']),
+        country: pickStr(row, ['country', 'Country']),
+    };
+}
+
+function isSameLocalCalendarDay(iso: string, ref: Date): boolean {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return false;
+    return (
+        d.getFullYear() === ref.getFullYear() &&
+        d.getMonth() === ref.getMonth() &&
+        d.getDate() === ref.getDate()
+    );
+}
+
+/** Hanya bundle yang `createdAt` jatuh pada hari yang sama dengan `dateRef` (timezone lokal browser). */
+export function filterGccBundlesByCreatedLocalDate(
+    rows: GccCuttingBundleRow[],
+    dateRef: Date = new Date()
+): GccCuttingBundleRow[] {
+    return rows.filter((r) => r.createdAt != null && isSameLocalCalendarDay(String(r.createdAt), dateRef));
+}
+
+/** Ambil array `data` dari body { code, data: [...] }. */
+export function extractGccCuttingBundlesData(payload: unknown): GccCuttingBundleRow[] {
+    if (payload == null || typeof payload !== 'object') return [];
+    const p = payload as Record<string, unknown>;
+    const data = p.data;
+    if (!Array.isArray(data)) return [];
+    return data.filter((x): x is GccCuttingBundleRow => x != null && typeof x === 'object');
+}
+
+/**
+ * GET — daftar bundle penuh dari service cutting (`/api/gcc/cutting/list`).
+ * Dev: lewat proxy Vite `/__gcc_cutting` (hindari CORS). Prod: URL langsung atau VITE_GCC_CUTTING_LIST_URL.
+ */
+export async function fetchGccCuttingBundlesList(): Promise<unknown> {
+    const url = resolveGccCuttingBundlesListUrl();
+    const res = await fetch(url, {
+        method: 'GET',
+        headers: getGccCuttingBundlesRequestHeaders(),
+    });
+    const text = await res.text();
+    let data: unknown = null;
+    try {
+        data = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+    } catch {
+        throw new Error('Respons server bukan JSON');
+    }
+    if (!res.ok) {
+        const msg =
+            (data as { message?: string })?.message ||
+            (data as { status?: string })?.status ||
+            `HTTP ${res.status}`;
+        throw new Error(typeof msg === 'string' ? msg : 'Gagal memuat daftar bundle');
+    }
+    const code = (data as { code?: number })?.code;
+    if (code != null && code !== 200) {
+        const st = (data as { status?: string })?.status;
+        throw new Error(typeof st === 'string' ? st : `API code ${code}`);
+    }
+    return data;
+}
+
+/** GET — memuat data label cutting berdasarkan kode barcode/QR (mis. BD20260504-566275). */
+export async function fetchGccCuttingListByBarcode(barcode: string): Promise<unknown> {
+    const b = barcode.trim();
+    if (!b) {
+        throw new Error('Barcode kosong');
+    }
+    const listBaseUrl = resolveGccCuttingBundlesListUrl();
+    const requestUrl = new URL(listBaseUrl, typeof window !== 'undefined' ? window.location.origin : undefined);
+    requestUrl.searchParams.set('barcode', b);
+    const res = await fetch(requestUrl.toString(), {
+        method: 'GET',
+        headers: getGccCuttingBundlesRequestHeaders(),
+    });
+    const text = await res.text();
+    let data: unknown = null;
+    try {
+        data = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+    } catch {
+        throw new Error('Respons server bukan JSON');
+    }
+    if (!res.ok) {
+        const msg =
+            (data as { message?: string })?.message ||
+            (data as { error?: string })?.error ||
+            `Gagal memuat data (${res.status})`;
+        throw new Error(msg);
+    }
+    return data;
+}
+
 // ============================================
 // TYPES
 // ============================================
@@ -529,7 +757,24 @@ export const apiRequest = async <T = any>(
         // Hanya ambil data.data jika endpoint bukan tracking/line
         // Tracking/line perlu seluruh object { success, line, data }
         if (!endpoint.includes('/tracking/line')) {
-            responseData = data.data || data;
+            const nested = (data as Record<string, unknown> | null)?.data;
+            const nestedIsObject =
+                nested != null && typeof nested === 'object' && !Array.isArray(nested);
+            // GET /user sering mengembalikan password_hash di root tapi user di data.data —
+            // jangan pakai `data.data || data` saja atau hash hilang dan login selalu gagal.
+            if (nestedIsObject) {
+                const n = nested as Record<string, unknown>;
+                const root = data as Record<string, unknown>;
+                responseData = {
+                    ...n,
+                    ...root,
+                    user: (root.user ?? n.user) as unknown,
+                    password_hash: (root.password_hash ?? n.password_hash) as unknown,
+                    pwd_md5: (root.pwd_md5 ?? n.pwd_md5) as unknown,
+                } as typeof data;
+            } else {
+                responseData = (data as { data?: unknown }).data ?? data;
+            }
         }
 
 
@@ -1052,7 +1297,7 @@ export interface NeedleStockResponse {
 
 /**
  * Needle Manager - daftar pengambilan needle.
- * Proxy path: /api/needle/pickings (server.js -> http://10.5.0.8:8080).
+ * Proxy path: /api/needle/pickings (server.js -> http://10.5.0.3:8080).
  * Query backend memakai tanggalfrom & tanggalto.
  */
 export const getNeedlePickings = async (params: {
@@ -1485,6 +1730,8 @@ export const getWOBreakdown = async (
 
 export interface InputRfidCuttingBody {
     rfid_garment: string;
+    /** Alias eksplisit untuk payload API GCC output */
+    rfid_bundles?: string;
     item: string;
     buyer: string;
     style: string;
@@ -1494,16 +1741,348 @@ export interface InputRfidCuttingBody {
     /** Jumlah pcs per bundle (opsional; dikirim juga sebagai `wty` untuk kompatibilitas backend) */
     qty?: number;
     wty?: number;
+    /** Field opsional untuk endpoint GCC output */
+    barcode?: string;
+    placing?: string;
+    season?: string;
+    country?: string;
+    meja?: string;
+    warna?: string;
+    no_ikat?: string | number;
+    no_urut?: string | number;
+    id_bundles?: string | number;
+    id_user?: string | number;
+    nik?: string;
+    qty_output?: number;
+    last_status?: string;
+    output_time?: string;
+}
+
+function getLoggedNik(): string {
+    if (typeof window === 'undefined') return '';
+    try {
+        const raw = localStorage.getItem('user');
+        if (!raw) return '';
+        const u = JSON.parse(raw) as { nik?: string };
+        return typeof u.nik === 'string' ? u.nik : '';
+    } catch {
+        return '';
+    }
+}
+
+/** Resolve URL POST bundle GCC reg (`/api/gcc/cutting/reg`) untuk fitur Input Register. */
+function resolveGccCuttingRegUrl(): string {
+    const fromEnv = (import.meta.env.VITE_GCC_CUTTING_REG_URL as string | undefined)?.trim();
+    if (fromEnv) {
+        const t = fromEnv.replace(/\/$/, '');
+        return t.includes('/api/gcc/cutting/reg') ? t : `${t}/api/gcc/cutting/reg`;
+    }
+    const listEnv = (import.meta.env.VITE_GCC_CUTTING_LIST_URL as string | undefined)?.trim();
+    if (listEnv) {
+        const t = listEnv.replace(/\/$/, '');
+        if (t.includes('/api/gcc/cutting/list')) return t.replace('/api/gcc/cutting/list', '/api/gcc/cutting/reg');
+        return `${t}/api/gcc/cutting/reg`;
+    }
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+        return `${window.location.origin}/__gcc_cutting/api/gcc/cutting/reg`;
+    }
+    return 'http://10.5.0.201:9000/api/gcc/cutting/reg';
+}
+
+/** Resolve URL POST bundle GCC output (`/api/gcc/cutting/output`) untuk Scanning Station Bundle. */
+function resolveGccCuttingOutputUrl(): string {
+    const fromEnv = (import.meta.env.VITE_GCC_CUTTING_OUTPUT_URL as string | undefined)?.trim();
+    if (fromEnv) {
+        const t = fromEnv.replace(/\/$/, '');
+        return t.includes('/api/gcc/cutting/output') ? t : `${t}/api/gcc/cutting/output`;
+    }
+    const listEnv = (import.meta.env.VITE_GCC_CUTTING_LIST_URL as string | undefined)?.trim();
+    if (listEnv) {
+        const t = listEnv.replace(/\/$/, '');
+        if (t.includes('/api/gcc/cutting/list')) return t.replace('/api/gcc/cutting/list', '/api/gcc/cutting/output');
+        return `${t}/api/gcc/cutting/output`;
+    }
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+        return `${window.location.origin}/__gcc_cutting/api/gcc/cutting/output`;
+    }
+    return 'http://10.5.0.201:9000/api/gcc/cutting/output';
+}
+
+/** Resolve URL POST QC bundle GCC (`/api/gcc/cutting/qc`) untuk Scanning Station Quality Control. */
+function resolveGccCuttingQcUrl(): string {
+    const fromEnv = (import.meta.env.VITE_GCC_CUTTING_QC_URL as string | undefined)?.trim();
+    if (fromEnv) {
+        const t = fromEnv.replace(/\/$/, '');
+        return t.includes('/api/gcc/cutting/qc') ? t : `${t}/api/gcc/cutting/qc`;
+    }
+    const listEnv = (import.meta.env.VITE_GCC_CUTTING_LIST_URL as string | undefined)?.trim();
+    if (listEnv) {
+        const t = listEnv.replace(/\/$/, '');
+        if (t.includes('/api/gcc/cutting/list')) return t.replace('/api/gcc/cutting/list', '/api/gcc/cutting/qc');
+        return `${t}/api/gcc/cutting/qc`;
+    }
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+        return `${window.location.origin}/__gcc_cutting/api/gcc/cutting/qc`;
+    }
+    return 'http://10.5.0.201:9000/api/gcc/cutting/qc';
+}
+
+/** Resolve URL GET GCC qty QC (`/api/gcc/cutting/qc/qty`) untuk pre-check RFID QC. */
+function resolveGccCuttingQcQtyUrl(): string {
+    const fromEnv = (import.meta.env.VITE_GCC_CUTTING_QC_QTY_URL as string | undefined)?.trim();
+    if (fromEnv) {
+        const t = fromEnv.replace(/\/$/, '');
+        return t.includes('/api/gcc/cutting/qc/qty') ? t : `${t}/api/gcc/cutting/qc/qty`;
+    }
+    const qcEnv = (import.meta.env.VITE_GCC_CUTTING_QC_URL as string | undefined)?.trim();
+    if (qcEnv) {
+        const t = qcEnv.replace(/\/$/, '');
+        if (t.includes('/api/gcc/cutting/qc')) return t.replace('/api/gcc/cutting/qc', '/api/gcc/cutting/qc/qty');
+        return `${t}/api/gcc/cutting/qc/qty`;
+    }
+    const listEnv = (import.meta.env.VITE_GCC_CUTTING_LIST_URL as string | undefined)?.trim();
+    if (listEnv) {
+        const t = listEnv.replace(/\/$/, '');
+        if (t.includes('/api/gcc/cutting/list')) return t.replace('/api/gcc/cutting/list', '/api/gcc/cutting/qc/qty');
+        return `${t}/api/gcc/cutting/qc/qty`;
+    }
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+        return `${window.location.origin}/__gcc_cutting/api/gcc/cutting/qc/qty`;
+    }
+    return 'http://10.5.0.201:9000/api/gcc/cutting/qc/qty';
+}
+
+/** Resolve URL POST GCC supermarket (`/api/gcc/cutting/smarket`). */
+function resolveGccCuttingSmarketUrl(): string {
+    const fromEnv = (import.meta.env.VITE_GCC_CUTTING_SMARKET_URL as string | undefined)?.trim();
+    if (fromEnv) {
+        const t = fromEnv.replace(/\/$/, '');
+        return t.includes('/api/gcc/cutting/smarket') ? t : `${t}/api/gcc/cutting/smarket`;
+    }
+    const listEnv = (import.meta.env.VITE_GCC_CUTTING_LIST_URL as string | undefined)?.trim();
+    if (listEnv) {
+        const t = listEnv.replace(/\/$/, '');
+        if (t.includes('/api/gcc/cutting/list')) return t.replace('/api/gcc/cutting/list', '/api/gcc/cutting/smarket');
+        return `${t}/api/gcc/cutting/smarket`;
+    }
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+        return `${window.location.origin}/__gcc_cutting/api/gcc/cutting/smarket`;
+    }
+    return 'http://10.5.0.201:9000/api/gcc/cutting/smarket';
+}
+
+/** Resolve URL GET dashboard Supermarket (`/api/gcc/cutting/smarket/data`). */
+function resolveGccCuttingSmarketDataUrl(): string {
+    const fromEnv = (import.meta.env.VITE_GCC_CUTTING_SMARKET_DATA_URL as string | undefined)?.trim();
+    if (fromEnv) {
+        const t = fromEnv.replace(/\/$/, '');
+        return t.includes('/api/gcc/cutting/smarket/data') ? t : `${t}/api/gcc/cutting/smarket/data`;
+    }
+    const smarketEnv = (import.meta.env.VITE_GCC_CUTTING_SMARKET_URL as string | undefined)?.trim();
+    if (smarketEnv) {
+        const t = smarketEnv.replace(/\/$/, '');
+        if (t.includes('/api/gcc/cutting/smarket')) return t.replace('/api/gcc/cutting/smarket', '/api/gcc/cutting/smarket/data');
+        return `${t}/api/gcc/cutting/smarket/data`;
+    }
+    const listEnv = (import.meta.env.VITE_GCC_CUTTING_LIST_URL as string | undefined)?.trim();
+    if (listEnv) {
+        const t = listEnv.replace(/\/$/, '');
+        if (t.includes('/api/gcc/cutting/list')) return t.replace('/api/gcc/cutting/list', '/api/gcc/cutting/smarket/data');
+        return `${t}/api/gcc/cutting/smarket/data`;
+    }
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+        return `${window.location.origin}/__gcc_cutting/api/gcc/cutting/smarket/data`;
+    }
+    return 'http://10.5.0.201:9000/api/gcc/cutting/smarket/data';
+}
+
+/** Resolve URL GET dashboard QC (`/api/gcc/cutting/qc/data`). */
+function resolveGccCuttingQcDataUrl(): string {
+    const fromEnv = (import.meta.env.VITE_GCC_CUTTING_QC_DATA_URL as string | undefined)?.trim();
+    if (fromEnv) {
+        const t = fromEnv.replace(/\/$/, '');
+        return t.includes('/api/gcc/cutting/qc/data') ? t : `${t}/api/gcc/cutting/qc/data`;
+    }
+    const qcEnv = (import.meta.env.VITE_GCC_CUTTING_QC_URL as string | undefined)?.trim();
+    if (qcEnv) {
+        const t = qcEnv.replace(/\/$/, '');
+        if (t.includes('/api/gcc/cutting/qc')) return t.replace('/api/gcc/cutting/qc', '/api/gcc/cutting/qc/data');
+        return `${t}/api/gcc/cutting/qc/data`;
+    }
+    const listEnv = (import.meta.env.VITE_GCC_CUTTING_LIST_URL as string | undefined)?.trim();
+    if (listEnv) {
+        const t = listEnv.replace(/\/$/, '');
+        if (t.includes('/api/gcc/cutting/list')) return t.replace('/api/gcc/cutting/list', '/api/gcc/cutting/qc/data');
+        return `${t}/api/gcc/cutting/qc/data`;
+    }
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+        return `${window.location.origin}/__gcc_cutting/api/gcc/cutting/qc/data`;
+    }
+    return 'http://10.5.0.201:9000/api/gcc/cutting/qc/data';
+}
+
+/** Builder payload umum untuk endpoint GCC reg/output. */
+function buildGccCuttingBundlePayload(body: InputRfidCuttingBody): Record<string, unknown> {
+    const q = body.qty != null && !Number.isNaN(Number(body.qty)) ? Number(body.qty) : undefined;
+    return {
+        id_bundles: body.id_bundles ?? '',
+        rfid_bundles: body.rfid_bundles ?? body.rfid_garment ?? '',
+        barcode: body.barcode ?? '',
+        wo: body.wo ?? '',
+        style: body.style ?? '',
+        size: body.size ?? '',
+        meja: body.meja ?? '',
+        warna: body.warna ?? body.color ?? '',
+        no_ikat: body.no_ikat ?? '',
+        no_urut: body.no_urut ?? '',
+        season: body.season ?? '',
+        country: body.country ?? '',
+        qty_bundles: q ?? '',
+        placing: body.placing ?? '',
+        id_user: body.id_user ?? '',
+        nik: body.nik ?? getLoggedNik(),
+        qty_output: body.qty_output ?? q ?? '',
+        last_status: body.last_status ?? 'bundle',
+        output_time: body.output_time ?? new Date().toISOString(),
+    };
+}
+
+/** Builder payload khusus endpoint GCC output (minimal sesuai kontrak API). */
+function buildGccCuttingOutputPayload(body: InputRfidCuttingBody): Record<string, unknown> {
+    return {
+        rfid_bundles: body.rfid_bundles ?? body.rfid_garment ?? '',
+        nik: body.nik ?? getLoggedNik(),
+    };
+}
+
+/** POST register bundle ke service GCC (`/api/gcc/cutting/reg`). */
+export async function postGccCuttingBundleRegister(body: InputRfidCuttingBody): Promise<ApiResponse<unknown>> {
+    const payload = buildGccCuttingBundlePayload(body);
+    const url = resolveGccCuttingRegUrl();
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                ...getGccCuttingBundlesRequestHeaders(),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        const text = await res.text();
+        let data: unknown = null;
+        try {
+            data = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+        } catch {
+            return { success: false, error: 'Respons POST output bundle bukan JSON', status: 502 };
+        }
+        const code = (data as { code?: number })?.code;
+        const okByBody = code == null || code === 200;
+        if (!res.ok || !okByBody) {
+            const msg =
+                (data as { message?: string })?.message ||
+                (data as { status?: string })?.status ||
+                `HTTP ${res.status}`;
+            return { success: false, error: String(msg), data, status: res.status };
+        }
+        return { success: true, data, status: res.status };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Gagal POST output bundle',
+            status: 500,
+        };
+    }
+}
+
+/** POST output bundle ke service GCC (`/api/gcc/cutting/output`). */
+export async function postGccCuttingBundleOutput(body: InputRfidCuttingBody): Promise<ApiResponse<unknown>> {
+    const payload = buildGccCuttingOutputPayload(body);
+    const url = resolveGccCuttingOutputUrl();
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                ...getGccCuttingBundlesRequestHeaders(),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        const text = await res.text();
+        let data: unknown = null;
+        try {
+            data = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+        } catch {
+            return { success: false, error: 'Respons POST output bundle bukan JSON', status: 502 };
+        }
+        const code = (data as { code?: number })?.code;
+        const okByBody = code == null || code === 200;
+        if (!res.ok || !okByBody) {
+            const msg =
+                (data as { message?: string })?.message ||
+                (data as { status?: string })?.status ||
+                `HTTP ${res.status}`;
+            return { success: false, error: String(msg), data, status: res.status };
+        }
+        return { success: true, data, status: res.status };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Gagal POST output bundle',
+            status: 500,
+        };
+    }
 }
 
 export const inputRfidCuttingBundle = async (body: InputRfidCuttingBody): Promise<ApiResponse<unknown>> => {
     const q = body.qty != null && !Number.isNaN(Number(body.qty)) ? Number(body.qty) : undefined;
-    const payload: Record<string, unknown> = { ...body };
-    if (q != null) {
-        payload.qty = q;
-        payload.wty = q;
+    const outputRes = await postGccCuttingBundleOutput(body);
+    if (!outputRes.success) {
+        return outputRes;
     }
-    return await apiPost('/api/cutting/bundle-scan', payload);
+    const outputData = (outputRes.data as { data?: Record<string, unknown> } | undefined)?.data;
+    const qtyFromOutputRaw = outputData?.qty_bundles ?? outputData?.qty_output;
+    const qtyFromOutput =
+        qtyFromOutputRaw != null && !Number.isNaN(Number(qtyFromOutputRaw)) ? Number(qtyFromOutputRaw) : undefined;
+    const woFromOutput =
+        outputData?.wo != null && String(outputData.wo).trim() !== '' ? String(outputData.wo).trim() : undefined;
+    const styleFromOutput =
+        outputData?.style != null && String(outputData.style).trim() !== '' ? String(outputData.style).trim() : undefined;
+    const buyerFromOutput =
+        outputData?.country != null && String(outputData.country).trim() !== '' ? String(outputData.country).trim() : undefined;
+    const itemFromOutput =
+        outputData?.placing != null && String(outputData.placing).trim() !== '' ? String(outputData.placing).trim() : undefined;
+    const colorFromOutput =
+        outputData?.warna != null && String(outputData.warna).trim() !== '' ? String(outputData.warna).trim() : undefined;
+    const sizeFromOutput =
+        outputData?.size != null && String(outputData.size).trim() !== '' ? String(outputData.size).trim() : undefined;
+
+    // Tetap update state lokal agar dashboard internal (scan-state) tetap sinkron.
+    const payload: Record<string, unknown> = { ...body };
+    const finalQty = qtyFromOutput ?? q;
+    if (finalQty != null) {
+        payload.qty = finalQty;
+        payload.wty = finalQty;
+    }
+    if (woFromOutput) payload.wo = woFromOutput;
+    if (styleFromOutput) payload.style = styleFromOutput;
+    if (buyerFromOutput) payload.buyer = buyerFromOutput;
+    if (itemFromOutput) payload.item = itemFromOutput;
+    if (colorFromOutput) payload.color = colorFromOutput;
+    if (sizeFromOutput) payload.size = sizeFromOutput;
+
+    const localRes = await apiPost('/api/cutting/bundle-scan', payload);
+    if (!localRes.success) {
+        return {
+            success: true,
+            data: outputRes.data,
+            status: outputRes.status,
+            error: localRes.error,
+        };
+    }
+    return {
+        ...localRes,
+        data: outputRes.data,
+    };
 };
 
 export interface CuttingScanHistoryEntry {
@@ -1521,6 +2100,10 @@ export interface CuttingScanHistoryEntry {
     size?: string | null;
     location?: string | null;
     line?: string | null;
+    /** Lokasi GM untuk Supply Sewing (mis. `GM 1`). */
+    gm?: string | null;
+    /** true jika baris riwayat dari Check Out (dengan GM + line). */
+    checkout?: boolean;
 }
 
 export interface CuttingScanStateDoc {
@@ -1565,20 +2148,346 @@ export interface CuttingQcScanResponse {
     };
 }
 
+export interface GccCuttingQcQtyResponse {
+    code?: number;
+    status?: string;
+    message?: string;
+    data?: {
+        id_bundles?: number;
+        rfid_bundles?: string;
+        qty_output?: number | string;
+    };
+}
+
+export const getGccCuttingQcQty = async (rfidBundles: string): Promise<ApiResponse<GccCuttingQcQtyResponse>> => {
+    const rid = String(rfidBundles || '').trim();
+    if (!rid) return { success: false, error: 'RFID wajib diisi', status: 400 };
+    const url = resolveGccCuttingQcQtyUrl();
+    const payload = { rfid_bundles: rid };
+    try {
+        // Beberapa gateway tidak menerima GET body; utamakan query string agar kompatibel lintas browser/proxy.
+        const qsUrl = `${url}${url.includes('?') ? '&' : '?'}rfid_bundles=${encodeURIComponent(rid)}`;
+        let res = await fetch(qsUrl, {
+            method: 'GET',
+            headers: {
+                ...getGccCuttingBundlesRequestHeaders(),
+                'Content-Type': 'application/json',
+            },
+        });
+        if (!res.ok && (res.status === 404 || res.status === 405 || res.status === 415)) {
+            res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    ...getGccCuttingBundlesRequestHeaders(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+        }
+        const text = await res.text();
+        let data: unknown = null;
+        try {
+            data = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+        } catch {
+            return { success: false, error: 'Respons GET qty QC GCC bukan JSON', status: 502 };
+        }
+        const code = (data as { code?: number })?.code;
+        const okByBody = code == null || code === 200;
+        if (!res.ok || !okByBody) {
+            const msg =
+                (data as { message?: string })?.message ||
+                (data as { status?: string })?.status ||
+                `HTTP ${res.status}`;
+            return { success: false, error: String(msg), data: data as GccCuttingQcQtyResponse, status: res.status };
+        }
+        return { success: true, data: data as GccCuttingQcQtyResponse, status: res.status };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Gagal GET qty QC GCC',
+            status: 500,
+        };
+    }
+};
+
 export const postCuttingQcScan = async (body: {
     rfid_garment: string;
     good?: number;
     repair?: number;
     reject?: number;
+    nik?: string | number;
 }): Promise<ApiResponse<CuttingQcScanResponse>> => {
-    return await apiPost<CuttingQcScanResponse>('/api/cutting/qc-scan', body);
+    const hasQcCounters =
+        body.good != null && body.repair != null && body.reject != null;
+
+    // Step scan awal (tanpa counter) tetap gunakan endpoint lokal untuk validasi qty + popup input.
+    if (!hasQcCounters) {
+        return await apiPost<CuttingQcScanResponse>('/api/cutting/qc-scan', body);
+    }
+
+    // Step konfirmasi QC (dengan counter) wajib hit API GCC /api/gcc/cutting/qc.
+    const gccUrl = resolveGccCuttingQcUrl();
+    const gccPayload = {
+        rfid_bundles: body.rfid_garment,
+        reject: Math.max(0, Number(body.reject) || 0),
+        repair: Math.max(0, Number(body.repair) || 0),
+        good: Math.max(0, Number(body.good) || 0),
+        nik: body.nik ?? getLoggedNik(),
+    };
+
+    try {
+        const gccRes = await fetch(gccUrl, {
+            method: 'POST',
+            headers: {
+                ...getGccCuttingBundlesRequestHeaders(),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(gccPayload),
+        });
+        const text = await gccRes.text();
+        let gccData: unknown = null;
+        try {
+            gccData = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+        } catch {
+            return { success: false, error: 'Respons POST QC GCC bukan JSON', status: 502 };
+        }
+        const code = (gccData as { code?: number })?.code;
+        const okByBody = code == null || code === 200;
+        if (!gccRes.ok || !okByBody) {
+            const msg =
+                (gccData as { message?: string })?.message ||
+                (gccData as { status?: string })?.status ||
+                `HTTP ${gccRes.status}`;
+            return { success: false, error: String(msg), data: gccData as CuttingQcScanResponse, status: gccRes.status };
+        }
+
+        // Tetap sinkron ke state lokal dashboard QC.
+        const localRes = await apiPost<CuttingQcScanResponse>('/api/cutting/qc-scan', body);
+        if (!localRes.success) {
+            return {
+                success: true,
+                data: gccData as CuttingQcScanResponse,
+                status: gccRes.status,
+                error: localRes.error,
+            };
+        }
+        return {
+            ...localRes,
+            data: gccData as CuttingQcScanResponse,
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Gagal POST QC GCC',
+            status: 500,
+        };
+    }
 };
 
-export const postCuttingStoreScan = async (body: { rfid_garment: string }): Promise<ApiResponse<unknown>> => {
-    return await apiPost('/api/cutting/store-scan', body);
+export const postCuttingStoreScan = async (body: {
+    rfid_garment: string;
+    mode?: 'checkin' | 'checkout' | 'urgent';
+    /** Wajib untuk mode Supply Urgent dan Check Out: angka line (≥ 1). */
+    line?: number | string;
+    /** Wajib untuk mode Supply Urgent dan Check Out: `GM 1` atau `GM 2`. */
+    location?: string;
+    /** Opsional: override NIK operator. Jika kosong, ambil dari user login. */
+    nik?: string | number;
+}): Promise<ApiResponse<unknown>> => {
+    const mode = body.mode ?? 'checkin';
+    const gccStatus: 'in' | 'out' | 'urgent' = mode === 'checkout' ? 'out' : mode === 'urgent' ? 'urgent' : 'in';
+    const normalizedLineRaw = body.line == null ? '' : String(body.line).trim();
+    const normalizedLine =
+        normalizedLineRaw !== '' && /^\d+$/.test(normalizedLineRaw)
+            ? `L${normalizedLineRaw.padStart(2, '0')}`
+            : normalizedLineRaw;
+    const normalizedBranch = String(body.location ?? '')
+        .trim()
+        .replace(/\s+/g, '')
+        .toUpperCase();
+
+    // Guard frontend: untuk status OUT/URGENT, line & branch wajib valid sebelum request dikirim.
+    if (gccStatus === 'out' || gccStatus === 'urgent') {
+        if (!normalizedLine) {
+            return {
+                success: false,
+                error: 'Line wajib diisi untuk status OUT/URGENT.',
+                status: 400,
+            };
+        }
+        if (!/^L\d{2,3}$/i.test(normalizedLine)) {
+            return {
+                success: false,
+                error: 'Format line tidak valid. Gunakan angka atau format L01/L001.',
+                status: 400,
+            };
+        }
+        if (normalizedBranch !== 'GM1' && normalizedBranch !== 'GM2') {
+            return {
+                success: false,
+                error: 'Branch wajib GM1 atau GM2 untuk status OUT/URGENT.',
+                status: 400,
+            };
+        }
+    }
+
+    const gccPayloadBase = {
+        nik: String(body.nik ?? getLoggedNik() ?? '').trim(),
+        status: gccStatus,
+        rfid_bundles: String(body.rfid_garment || '').trim(),
+    };
+    const gccPayload =
+        gccStatus === 'out' || gccStatus === 'urgent'
+            ? {
+                  ...gccPayloadBase,
+                  line: normalizedLine,
+                  branch: normalizedBranch,
+              }
+            : gccPayloadBase;
+
+    try {
+        const gccRes = await fetch(resolveGccCuttingSmarketUrl(), {
+            method: 'POST',
+            headers: {
+                ...getGccCuttingBundlesRequestHeaders(),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(gccPayload),
+        });
+        const text = await gccRes.text();
+        let gccData: unknown = null;
+        try {
+            gccData = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+        } catch {
+            return { success: false, error: 'Respons POST Supermarket GCC bukan JSON', status: 502 };
+        }
+        const successByBody = (gccData as { success?: boolean } | null)?.success;
+        const code = (gccData as { code?: number } | null)?.code;
+        const okByBody = (successByBody == null || successByBody === true) && (code == null || code === 200);
+        if (!gccRes.ok || !okByBody) {
+            const msg =
+                (gccData as { message?: string })?.message ||
+                (gccData as { status?: string })?.status ||
+                `HTTP ${gccRes.status}`;
+            return { success: false, error: String(msg), data: gccData, status: gccRes.status };
+        }
+
+        // Tetap sinkron ke state lokal dashboard cutting.
+        const localRes = await apiPost('/api/cutting/store-scan', body);
+        if (!localRes.success) {
+            return {
+                success: true,
+                data: gccData,
+                status: gccRes.status,
+                error: localRes.error,
+            };
+        }
+        return {
+            ...localRes,
+            data: gccData,
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Gagal POST Supermarket GCC',
+            status: 500,
+        };
+    }
 };
 
-export const postCuttingSupplySewingScan = async (body: { rfid_garment: string; line: string }): Promise<ApiResponse<unknown>> => {
+export const postCuttingSupplySewingScan = async (body: {
+    rfid_garment: string;
+    /** Nomor line (angka ≥ 1), dikirim sebagai string atau number. */
+    line: string | number;
+    /** `GM 1` atau `GM 2`. */
+    location: string;
+}): Promise<ApiResponse<unknown>> => {
     return await apiPost('/api/cutting/supply-sewing-scan', body);
+};
+
+export interface GccCuttingSmarketDashboardDataResponse {
+    success?: boolean;
+    message?: string;
+    data?: {
+        bundle?: number;
+        in?: number;
+        out?: number;
+        urgent?: number;
+    };
+}
+
+export interface GccCuttingQcDashboardDataResponse {
+    success?: boolean;
+    message?: string;
+    data?: {
+        bundle?: number;
+        good?: number;
+        repair?: number;
+        reject?: number;
+    };
+}
+
+export const getGccCuttingSmarketDashboardData = async (): Promise<ApiResponse<GccCuttingSmarketDashboardDataResponse>> => {
+    try {
+        const res = await fetch(resolveGccCuttingSmarketDataUrl(), {
+            method: 'GET',
+            headers: getGccCuttingBundlesRequestHeaders(),
+        });
+        const text = await res.text();
+        let data: unknown = null;
+        try {
+            data = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+        } catch {
+            return { success: false, error: 'Respons dashboard smarket GCC bukan JSON', status: 502 };
+        }
+        const successByBody = (data as { success?: boolean })?.success;
+        const okByBody = successByBody == null || successByBody === true;
+        if (!res.ok || !okByBody) {
+            const msg =
+                (data as { message?: string })?.message ||
+                (data as { status?: string })?.status ||
+                `HTTP ${res.status}`;
+            return { success: false, error: String(msg), data: data as GccCuttingSmarketDashboardDataResponse, status: res.status };
+        }
+        return { success: true, data: data as GccCuttingSmarketDashboardDataResponse, status: res.status };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Gagal GET dashboard smarket GCC',
+            status: 500,
+        };
+    }
+};
+
+export const getGccCuttingQcDashboardData = async (): Promise<ApiResponse<GccCuttingQcDashboardDataResponse>> => {
+    try {
+        const res = await fetch(resolveGccCuttingQcDataUrl(), {
+            method: 'GET',
+            headers: getGccCuttingBundlesRequestHeaders(),
+        });
+        const text = await res.text();
+        let data: unknown = null;
+        try {
+            data = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+        } catch {
+            return { success: false, error: 'Respons dashboard QC GCC bukan JSON', status: 502 };
+        }
+        const successByBody = (data as { success?: boolean })?.success;
+        const okByBody = successByBody == null || successByBody === true;
+        if (!res.ok || !okByBody) {
+            const msg =
+                (data as { message?: string })?.message ||
+                (data as { status?: string })?.status ||
+                `HTTP ${res.status}`;
+            return { success: false, error: String(msg), data: data as GccCuttingQcDashboardDataResponse, status: res.status };
+        }
+        return { success: true, data: data as GccCuttingQcDashboardDataResponse, status: res.status };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Gagal GET dashboard QC GCC',
+            status: 500,
+        };
+    }
 };
 

@@ -32,8 +32,8 @@ interface TrackingRFIDGarmentResponse {
     }>;
 }
 
-// Fetch function untuk RFID data
-const fetchRFIDData = async (): Promise<TrackingRFIDGarmentResponse> => {
+// Fetch function untuk RFID data (diekspor untuk halaman lain, mis. Daftar RFID Cutting)
+export const fetchRFIDData = async (): Promise<TrackingRFIDGarmentResponse> => {
     const apiUrl = `${API_BASE_URL}/tracking/rfid_garment`;
     const response = await fetch(apiUrl, {
         method: 'GET',
@@ -77,8 +77,8 @@ const parseTimestamp = (timestamp: string): Date | null => {
     }
 };
 
-// Helper function untuk map data
-const mapRFIDData = (data: TrackingRFIDGarmentResponse['data'], currentLine: string): RFIDItem[] => {
+// Helper function untuk map data (currentLine `'all'` = semua line)
+export const mapRFIDData = (data: TrackingRFIDGarmentResponse['data'], currentLine: string): RFIDItem[] => {
     const mappedData: RFIDItem[] = data.map((item) => {
         let status = 'Unknown';
         if (item.last_status) {
