@@ -1530,10 +1530,14 @@ export const getScanningDryroomOperator = async (
 /**
  * Folding Check In
  * @param rfid_garment - Nomor RFID garment yang akan di-check in
+ * @param nik - NIK user (wajib di backend; sama pola dengan dryroom check-in)
  * @returns Response data check in
  */
-export const foldingCheckIn = async (rfid_garment: string): Promise<ApiResponse<FinishingCheckResponse>> => {
-    return await apiPost<FinishingCheckResponse>(`/garment/folding/in?rfid_garment=${encodeURIComponent(rfid_garment)}`, {});
+export const foldingCheckIn = async (rfid_garment: string, nik?: string): Promise<ApiResponse<FinishingCheckResponse>> => {
+    const trimmed = nik?.trim();
+    // Backend beberapa environment memakai `nik` atau `nik_user` di JSON (pesan validasi: "NIK User").
+    const body = trimmed ? { nik: trimmed, nik_user: trimmed } : {};
+    return await apiPost<FinishingCheckResponse>(`/garment/folding/in?rfid_garment=${encodeURIComponent(rfid_garment)}`, body);
 };
 
 export const foldingCheckOut = async (rfid_garment: string, nik?: string, tableNumber?: number): Promise<ApiResponse<FinishingCheckResponse>> => {
@@ -2525,10 +2529,10 @@ export interface GccCuttingQcDashboardDataResponse {
     data?: GccQcDashboardPayload;
 }
 
-/** Query opsional GET `/api/gcc/cutting/smarket/data`. */
+/** Query opsional GET `/api/gcc/cutting/smarket/data` (contoh: `?tanggalfrom=2026-03-05&tanggalto=2026-03-06`). */
 export type GccCuttingSmarketDashboardQueryParams = {
-    tanggal_from?: string;
-    tanggal_to?: string;
+    tanggalfrom?: string;
+    tanggalto?: string;
 };
 
 export const getGccCuttingSmarketDashboardData = async (
@@ -2537,18 +2541,18 @@ export const getGccCuttingSmarketDashboardData = async (
     try {
         const base = resolveGccCuttingSmarketDataUrl();
         let reqUrl = base;
-        if (params?.tanggal_from != null || params?.tanggal_to != null) {
+        if (params?.tanggalfrom != null || params?.tanggalto != null) {
             let u: URL;
             try {
                 u = new URL(base);
             } catch {
                 u = new URL(base, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
             }
-            if (params.tanggal_from != null && String(params.tanggal_from).trim() !== '') {
-                u.searchParams.set('tanggal_from', String(params.tanggal_from).trim());
+            if (params.tanggalfrom != null && String(params.tanggalfrom).trim() !== '') {
+                u.searchParams.set('tanggalfrom', String(params.tanggalfrom).trim());
             }
-            if (params.tanggal_to != null && String(params.tanggal_to).trim() !== '') {
-                u.searchParams.set('tanggal_to', String(params.tanggal_to).trim());
+            if (params.tanggalto != null && String(params.tanggalto).trim() !== '') {
+                u.searchParams.set('tanggalto', String(params.tanggalto).trim());
             }
             reqUrl = u.toString();
         }
@@ -2587,10 +2591,10 @@ export const getGccCuttingSmarketDashboardData = async (
     }
 };
 
-/** Query opsional GET `/api/gcc/cutting/qc/data` (contoh: `2026-05-11T00:00:00` … `2026-05-11T23:59:59`). */
+/** Query opsional GET `/api/gcc/cutting/qc/data` (contoh: `?tanggalfrom=2026-03-05&tanggalto=2026-03-06`). */
 export type GccCuttingQcDashboardQueryParams = {
-    tanggal_from?: string;
-    tanggal_to?: string;
+    tanggalfrom?: string;
+    tanggalto?: string;
 };
 
 export const getGccCuttingQcDashboardData = async (
@@ -2599,18 +2603,18 @@ export const getGccCuttingQcDashboardData = async (
     try {
         const base = resolveGccCuttingQcDataUrl();
         let reqUrl = base;
-        if (params?.tanggal_from != null || params?.tanggal_to != null) {
+        if (params?.tanggalfrom != null || params?.tanggalto != null) {
             let u: URL;
             try {
                 u = new URL(base);
             } catch {
                 u = new URL(base, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
             }
-            if (params.tanggal_from != null && String(params.tanggal_from).trim() !== '') {
-                u.searchParams.set('tanggal_from', String(params.tanggal_from).trim());
+            if (params.tanggalfrom != null && String(params.tanggalfrom).trim() !== '') {
+                u.searchParams.set('tanggalfrom', String(params.tanggalfrom).trim());
             }
-            if (params.tanggal_to != null && String(params.tanggal_to).trim() !== '') {
-                u.searchParams.set('tanggal_to', String(params.tanggal_to).trim());
+            if (params.tanggalto != null && String(params.tanggalto).trim() !== '') {
+                u.searchParams.set('tanggalto', String(params.tanggalto).trim());
             }
             reqUrl = u.toString();
         }

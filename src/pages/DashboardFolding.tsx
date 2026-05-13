@@ -1486,6 +1486,7 @@ export default function DashboardFolding() {
           refetchFinishingData();
         }}
         type="folding"
+        nik={user?.nik ? String(user.nik).trim() : undefined}
         onSuccess={async (tableNum?: number) => {
           // Refetch data segera setelah scan berhasil
           refetchFinishingData();

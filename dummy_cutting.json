@@ -1,8 +1,68 @@
 {
   "version": 1,
   "bundle": {
-    "count": 2,
+    "count": 5,
     "history": [
+      {
+        "rfid_garment": "0009634184",
+        "wo": "187370",
+        "style": "133-95",
+        "buyer": "JAPAN",
+        "item": "GM2",
+        "color": "BORDEAUX",
+        "size": "LL",
+        "qty": 10,
+        "current_location": "bundle",
+        "created_at": "2026-05-11T04:09:12.809Z",
+        "updated_at": "2026-05-11T04:09:12.809Z",
+        "timeline": [
+          {
+            "location": "bundle",
+            "at": "2026-05-11T04:09:12.809Z"
+          }
+        ],
+        "at": "2026-05-11T04:09:12.809Z"
+      },
+      {
+        "rfid_garment": "456789",
+        "wo": "187514",
+        "style": "5162816",
+        "buyer": "USA",
+        "item": "GK",
+        "color": "BLACK",
+        "size": "S",
+        "qty": 70,
+        "current_location": "bundle",
+        "created_at": "2026-05-11T03:04:44.667Z",
+        "updated_at": "2026-05-11T03:04:44.667Z",
+        "timeline": [
+          {
+            "location": "bundle",
+            "at": "2026-05-11T03:04:44.667Z"
+          }
+        ],
+        "at": "2026-05-11T03:04:44.667Z"
+      },
+      {
+        "rfid_garment": "123456",
+        "wo": "187566",
+        "style": "66807-54",
+        "buyer": "KUWAIT",
+        "item": "GM2",
+        "color": "ROYAL BLUE",
+        "size": "40 W",
+        "qty": 20,
+        "current_location": "bundle",
+        "created_at": "2026-05-11T02:45:38.526Z",
+        "updated_at": "2026-05-11T02:45:38.526Z",
+        "timeline": [
+          {
+            "location": "bundle",
+            "at": "2026-05-11T02:45:38.526Z"
+          }
+        ],
+        "at": "2026-05-11T02:45:38.526Z"
+      },
       {
         "rfid_garment": "0002028014",
         "wo": "187491",
@@ -46,11 +106,56 @@
     ]
   },
   "quality_control": {
-    "count": 2,
-    "goodTotal": 23,
+    "count": 5,
+    "goodTotal": 123,
     "repairTotal": 0,
     "rejectTotal": 0,
     "history": [
+      {
+        "rfid_garment": "0009634184",
+        "qty": 10,
+        "good": 10,
+        "repair": 0,
+        "reject": 0,
+        "wo": "187370",
+        "style": "133-95",
+        "buyer": "JAPAN",
+        "item": "GM2",
+        "color": "BORDEAUX",
+        "size": "LL",
+        "location": "quality_control",
+        "at": "2026-05-11T08:55:23.379Z"
+      },
+      {
+        "rfid_garment": "456789",
+        "qty": 70,
+        "good": 70,
+        "repair": 0,
+        "reject": 0,
+        "wo": "187514",
+        "style": "5162816",
+        "buyer": "USA",
+        "item": "GK",
+        "color": "BLACK",
+        "size": "S",
+        "location": "quality_control",
+        "at": "2026-05-11T03:06:09.072Z"
+      },
+      {
+        "rfid_garment": "123456",
+        "qty": 20,
+        "good": 20,
+        "repair": 0,
+        "reject": 0,
+        "wo": "187566",
+        "style": "66807-54",
+        "buyer": "KUWAIT",
+        "item": "GM2",
+        "color": "ROYAL BLUE",
+        "size": "40 W",
+        "location": "quality_control",
+        "at": "2026-05-11T02:46:43.476Z"
+      },
       {
         "rfid_garment": "0002028014",
         "qty": 8,
@@ -84,8 +189,60 @@
     ]
   },
   "supermarket": {
-    "count": 2,
+    "count": 6,
     "history": [
+      {
+        "rfid_garment": "456789",
+        "wo": "187514",
+        "qty": 70,
+        "style": "5162816",
+        "buyer": "USA",
+        "item": "GK",
+        "color": "BLACK",
+        "size": "S",
+        "location": "GM 2",
+        "line": "2",
+        "checkout": true,
+        "at": "2026-05-11T03:07:40.650Z"
+      },
+      {
+        "rfid_garment": "456789",
+        "wo": "187514",
+        "qty": 70,
+        "style": "5162816",
+        "buyer": "USA",
+        "item": "GK",
+        "color": "BLACK",
+        "size": "S",
+        "location": "supermarket",
+        "at": "2026-05-11T03:07:10.772Z"
+      },
+      {
+        "rfid_garment": "123456",
+        "wo": "187566",
+        "qty": 20,
+        "style": "66807-54",
+        "buyer": "KUWAIT",
+        "item": "GM2",
+        "color": "ROYAL BLUE",
+        "size": "40 W",
+        "location": "GM 1",
+        "line": "1",
+        "checkout": true,
+        "at": "2026-05-11T02:50:30.823Z"
+      },
+      {
+        "rfid_garment": "123456",
+        "wo": "187566",
+        "qty": 20,
+        "style": "66807-54",
+        "buyer": "KUWAIT",
+        "item": "GM2",
+        "color": "ROYAL BLUE",
+        "size": "40 W",
+        "location": "supermarket",
+        "at": "2026-05-11T02:49:17.423Z"
+      },
       {
         "rfid_garment": "0002028014",
         "wo": "187491",
@@ -151,6 +308,92 @@
         "at": "2026-05-08T07:41:00.084Z"
       }
     },
+    "123456": {
+      "rfid_garment": "123456",
+      "wo": "187566",
+      "style": "66807-54",
+      "buyer": "KUWAIT",
+      "item": "GM2",
+      "color": "ROYAL BLUE",
+      "size": "40 W",
+      "qty": 20,
+      "current_location": "supermarket",
+      "created_at": "2026-05-11T02:45:38.526Z",
+      "updated_at": "2026-05-11T02:50:30.823Z",
+      "timeline": [
+        {
+          "location": "bundle",
+          "at": "2026-05-11T02:45:38.526Z"
+        },
+        {
+          "location": "quality_control",
+          "at": "2026-05-11T02:46:43.476Z",
+          "good": 20,
+          "repair": 0,
+          "reject": 0
+        },
+        {
+          "location": "supermarket",
+          "at": "2026-05-11T02:49:17.423Z"
+        },
+        {
+          "location": "supermarket",
+          "action": "checkout",
+          "line": "1",
+          "urgent_location": "GM 1",
+          "at": "2026-05-11T02:50:30.823Z"
+        }
+      ],
+      "qc": {
+        "good": 20,
+        "repair": 0,
+        "reject": 0,
+        "at": "2026-05-11T02:46:43.476Z"
+      }
+    },
+    "456789": {
+      "rfid_garment": "456789",
+      "wo": "187514",
+      "style": "5162816",
+      "buyer": "USA",
+      "item": "GK",
+      "color": "BLACK",
+      "size": "S",
+      "qty": 70,
+      "current_location": "supermarket",
+      "created_at": "2026-05-11T03:04:44.667Z",
+      "updated_at": "2026-05-11T03:07:40.650Z",
+      "timeline": [
+        {
+          "location": "bundle",
+          "at": "2026-05-11T03:04:44.667Z"
+        },
+        {
+          "location": "quality_control",
+          "at": "2026-05-11T03:06:09.072Z",
+          "good": 70,
+          "repair": 0,
+          "reject": 0
+        },
+        {
+          "location": "supermarket",
+          "at": "2026-05-11T03:07:10.772Z"
+        },
+        {
+          "location": "supermarket",
+          "action": "checkout",
+          "line": "2",
+          "urgent_location": "GM 2",
+          "at": "2026-05-11T03:07:40.650Z"
+        }
+      ],
+      "qc": {
+        "good": 70,
+        "repair": 0,
+        "reject": 0,
+        "at": "2026-05-11T03:06:09.072Z"
+      }
+    },
     "0002028014": {
       "rfid_garment": "0002028014",
       "wo": "187491",
@@ -192,6 +435,38 @@
         "repair": 0,
         "reject": 0,
         "at": "2026-05-08T08:30:57.057Z"
+      }
+    },
+    "0009634184": {
+      "rfid_garment": "0009634184",
+      "wo": "187370",
+      "style": "133-95",
+      "buyer": "JAPAN",
+      "item": "GM2",
+      "color": "BORDEAUX",
+      "size": "LL",
+      "qty": 10,
+      "current_location": "quality_control",
+      "created_at": "2026-05-11T04:09:12.809Z",
+      "updated_at": "2026-05-11T08:55:23.379Z",
+      "timeline": [
+        {
+          "location": "bundle",
+          "at": "2026-05-11T04:09:12.809Z"
+        },
+        {
+          "location": "quality_control",
+          "at": "2026-05-11T08:55:23.379Z",
+          "good": 10,
+          "repair": 0,
+          "reject": 0
+        }
+      ],
+      "qc": {
+        "good": 10,
+        "repair": 0,
+        "reject": 0,
+        "at": "2026-05-11T08:55:23.379Z"
       }
     }
   }

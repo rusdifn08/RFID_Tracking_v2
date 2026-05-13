@@ -195,13 +195,16 @@ export default function DashboardQualityControlCutting() {
     queryKey: [QUERY_CUTTING_QC_GCC_BASE, qcRangeFrom, qcRangeTo] as const,
     queryFn: async () => {
       const r = await getGccCuttingQcDashboardData({
-        tanggal_from: `${qcRangeFrom}T00:00:00`,
-        tanggal_to: `${qcRangeTo}T23:59:59`,
+        tanggalfrom: qcRangeFrom,
+        tanggalto: qcRangeTo,
       });
       if (!r.success || !r.data) throw new Error(r.error || 'Gagal memuat data dashboard QC GCC');
       return r.data;
     },
     refetchInterval: 12_000,
+    /** Hindari UI “kedip” ke kosong saat refetch / error sementara — tetap tampilkan respons sukses terakhir. */
+    placeholderData: (prev) => prev,
+    refetchOnWindowFocus: false,
   });
 
   const qcFilterSummaryLabel =

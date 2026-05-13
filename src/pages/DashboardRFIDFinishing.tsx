@@ -1002,7 +1002,12 @@ export default function DashboardRFIDFinishing() {
             />
 
             <ScanningFinishingModal isOpen={showDryroomScanModal} onClose={() => setShowDryroomScanModal(false)} type="dryroom" />
-            <ScanningFinishingModal isOpen={showFoldingScanModal} onClose={() => setShowFoldingScanModal(false)} type="folding" />
+            <ScanningFinishingModal
+                isOpen={showFoldingScanModal}
+                onClose={() => setShowFoldingScanModal(false)}
+                type="folding"
+                nik={currentUser?.nik ? String(currentUser.nik).trim() : undefined}
+            />
 
             {/* Finishing Detail Modal */}
             <FinishingDetailModal

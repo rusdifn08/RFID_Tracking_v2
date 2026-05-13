@@ -202,13 +202,15 @@ export default function DashboardSupermarketCutting() {
         queryKey: [QUERY_SUPERMARKET_CUTTING_GCC_BASE, smarketRangeFrom, smarketRangeTo] as const,
         queryFn: async () => {
             const r = await getGccCuttingSmarketDashboardData({
-                tanggal_from: `${smarketRangeFrom}T00:00:00`,
-                tanggal_to: `${smarketRangeTo}T23:59:59`,
+                tanggalfrom: smarketRangeFrom,
+                tanggalto: smarketRangeTo,
             });
             if (!r.success || !r.data) throw new Error(r.error || 'Gagal memuat data dashboard Supermarket GCC');
             return r.data;
         },
         refetchInterval: 12_000,
+        placeholderData: (prev) => prev,
+        refetchOnWindowFocus: false,
     });
 
     const storeRows = useMemo(() => {

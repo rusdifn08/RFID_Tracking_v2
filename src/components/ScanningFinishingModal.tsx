@@ -13,7 +13,7 @@ interface ScanningFinishingModalProps {
     defaultAction?: 'checkin' | 'checkout'; // Default action saat modal dibuka
     autoSubmit?: boolean; // Auto submit saat Enter tanpa perlu click
     tableNumber?: number; // Nomor table (optional)
-    nik?: string; // NIK user untuk checkout (optional)
+    nik?: string; // NIK user (folding: check in & checkout; optional jika ada di session)
     onSuccess?: (tableNumber?: number) => void; // Callback saat scan berhasil, dengan tableNumber untuk optimistik update
     compact?: boolean; // Compact mode (tidak fullscreen, untuk embedded)
     customActionLabel?: string; // Custom label untuk action (optional, untuk kasus khusus seperti Reject Mati)
@@ -532,7 +532,15 @@ export default function ScanningFinishingModal({
                 }
             } else if (type === 'folding') {
                 if (currentAction === 'checkin') {
-                    response = await foldingCheckIn(trimmedRfid);
+                    const bodyNik =
+                        nik?.trim() || (sessionUser.nik !== '—' ? sessionUser.nik : '') || undefined;
+                    const trimmedBodyNik = bodyNik?.trim();
+                    if (!trimmedBodyNik || trimmedBodyNik === '00000000') {
+                        throw new Error(
+                            'NIK user tidak tersedia. Pastikan sudah login dengan akun yang memiliki NIK valid.'
+                        );
+                    }
+                    response = await foldingCheckIn(trimmedRfid, trimmedBodyNik);
                 } else {
                     // Untuk checkout, kirim NIK dan table number jika ada
                     // Validasi: NIK harus ada dan valid untuk checkout folding

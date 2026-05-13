@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -7,26 +7,81 @@ import CuttingProcessSection from '../components/dashboard/cutting/CuttingProces
 import CuttingDashboardCharts from '../components/dashboard/cutting/CuttingDashboardCharts';
 import { COLORS } from '../components/dashboard/constants';
 import backgroundImage from '../assets/background.jpg';
-import { getCuttingScanState, filterCuttingScanStateToLocalToday } from '../config/api';
+import { getCuttingScanState, filterCuttingScanStateToLocalToday, type CuttingScanStateDoc } from '../config/api';
 
 const QUERY_CUTTING_SCAN = ['cutting-scan-state'] as const;
 
 const SHIFT_HOURS = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
 
-const DUMMY_TREND_BASE = [2, 5, 8, 11, 14, 16, 18, 20, 22, 24, 26, 28, 30];
+/** Jam mulai shift di sumbu X (lokal), konsisten dengan SHIFT_HOURS. */
+const SHIFT_START_HOUR = 6;
 
-const DUMMY_ACTIVITY_BASE = [8, 12, 18, 22, 25, 28, 32, 30, 35, 38, 40, 42, 45];
+function sameLocalCalendarDay(d: Date, ref: Date): boolean {
+    return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate();
+}
+
+function shiftHourFromLabel(jam: string): number {
+    const n = parseInt(String(jam).split(':')[0], 10);
+    return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Trend: kumulatif jumlah scan Bundle hari ini antara jam shift START..slot (inklusif slot).
+ * Aktivitas: jumlah semua event scan (bundle + QC + supermarket + supply) per jam hari ini.
+ */
+function buildTrendAndActivityFromScanState(
+    doc: CuttingScanStateDoc | undefined,
+    shiftHours: readonly string[],
+    refDay: Date,
+): { trendData: { jam: string; output: number; target: number }[]; activityData: { jam: string; scan: number }[] } {
+    const emptyTrend = shiftHours.map((jam) => ({ jam: jam.slice(0, 5), output: 0, target: 0 }));
+    const emptyActivity = shiftHours.map((jam) => ({ jam: jam.slice(0, 5), scan: 0 }));
+    if (!doc) {
+        return { trendData: emptyTrend, activityData: emptyActivity };
+    }
+
+    const trendData = shiftHours.map((jam) => {
+        const slotH = shiftHourFromLabel(jam);
+        let c = 0;
+        for (const h of doc.bundle.history ?? []) {
+            const d = new Date(h.at);
+            if (Number.isNaN(d.getTime()) || !sameLocalCalendarDay(d, refDay)) continue;
+            const hh = d.getHours();
+            if (hh >= SHIFT_START_HOUR && hh <= slotH) c += 1;
+        }
+        return { jam: jam.slice(0, 5), output: c, target: 0 };
+    });
+
+    const scanPerHour = new Map<number, number>();
+    for (let h = SHIFT_START_HOUR; h <= 18; h++) scanPerHour.set(h, 0);
+
+    const bump = (at?: string) => {
+        if (at == null || String(at).trim() === '') return;
+        const d = new Date(at);
+        if (Number.isNaN(d.getTime()) || !sameLocalCalendarDay(d, refDay)) return;
+        const hh = d.getHours();
+        if (hh < SHIFT_START_HOUR || hh > 18) return;
+        scanPerHour.set(hh, (scanPerHour.get(hh) ?? 0) + 1);
+    };
+
+    for (const h of doc.bundle.history ?? []) bump(h.at);
+    for (const h of doc.qc.history ?? []) bump(h.at);
+    for (const h of doc.store.history ?? []) bump(h.at);
+    for (const h of doc.supply.history ?? []) bump(h.at);
+
+    const activityData = shiftHours.map((jam) => {
+        const H = shiftHourFromLabel(jam);
+        return { jam: jam.slice(0, 5), scan: scanPerHour.get(H) ?? 0 };
+    });
+
+    return { trendData, activityData };
+}
 
 export default function DashboardCutting() {
     const { isOpen } = useSidebar();
     const sidebarWidth = isOpen ? '18%' : '5rem';
 
     const [bundleMetric, setBundleMetric] = useState(0);
-    const [simulatedHourIndex, setSimulatedHourIndex] = useState(7);
-    const [simulatedOutputCumul, setSimulatedOutputCumul] = useState(0);
-    const [simulatedActivity, setSimulatedActivity] = useState<number[]>(() =>
-        DUMMY_ACTIVITY_BASE.map((v) => v + Math.floor(Math.random() * 5))
-    );
 
     const scanQuery = useQuery({
         queryKey: QUERY_CUTTING_SCAN,
@@ -40,16 +95,10 @@ export default function DashboardCutting() {
     const scanDoc = scanQuery.data;
     const scanDocToday = useMemo(() => (scanDoc ? filterCuttingScanStateToLocalToday(scanDoc) : undefined), [scanDoc]);
 
-    useEffect(() => {
-        const t = setInterval(() => {
-            setSimulatedOutputCumul((c) => c + 1);
-            setSimulatedHourIndex((i) => Math.min(SHIFT_HOURS.length - 1, i + (Math.random() > 0.6 ? 1 : 0)));
-            setSimulatedActivity((prev) =>
-                prev.map((v) => Math.max(5, v + (Math.random() > 0.7 ? 1 : 0) - (Math.random() > 0.9 ? 1 : 0)))
-            );
-        }, 4500);
-        return () => clearInterval(t);
-    }, []);
+    const { trendData, activityData } = useMemo(() => {
+        const refDay = new Date();
+        return buildTrendAndActivityFromScanState(scanDocToday, SHIFT_HOURS, refDay);
+    }, [scanDocToday]);
 
     const distributionData = useMemo(() => {
         const bundle = bundleMetric;
@@ -73,26 +122,6 @@ export default function DashboardCutting() {
         }
         return raw;
     }, [bundleMetric, scanDocToday]);
-
-    const trendData = useMemo(() => {
-        return SHIFT_HOURS.map((jam, i) => {
-            const baseOutput = DUMMY_TREND_BASE[i] ?? 10;
-            const simulated = i <= simulatedHourIndex ? simulatedOutputCumul % 4 : 0;
-            const output = Math.min(35, baseOutput + simulated + (i <= simulatedHourIndex ? 1 : 0));
-            return {
-                jam: jam.slice(0, 5),
-                output,
-                target: 14,
-            };
-        });
-    }, [simulatedHourIndex, simulatedOutputCumul]);
-
-    const activityData = useMemo(() => {
-        return SHIFT_HOURS.slice(0, 13).map((jam, i) => ({
-            jam: jam.slice(0, 5),
-            scan: simulatedActivity[i] ?? DUMMY_ACTIVITY_BASE[i] ?? 10,
-        }));
-    }, [simulatedActivity]);
 
     return (
         <div className="flex h-screen w-full font-sans text-slate-800 bg-slate-50 overflow-hidden selection:bg-sky-100 selection:text-sky-900">
