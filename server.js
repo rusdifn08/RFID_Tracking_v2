@@ -96,7 +96,7 @@ const BACKEND_PORT = 7000;
 // Backend API URL - menggunakan IP yang sudah dikonfigurasi dengan port yang sesuai
 const BACKEND_API_URL = process.env.BACKEND_API_URL || `http://${BACKEND_IP}:${BACKEND_PORT}`;
 // Backend khusus Needle Manager (dipisah dari backend environment utama agar tidak mengubah flow existing).
-const NEEDLE_BACKEND_BASE_URL = process.env.NEEDLE_BACKEND_BASE_URL || 'http://10.5.0.3:8080';
+const NEEDLE_BACKEND_BASE_URL = process.env.NEEDLE_BACKEND_BASE_URL || 'http://10.5.0.107:8080';
 
 // MQTT Broker - sama untuk semua environment (MJL, MJL2, CLN)
 const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://10.5.0.106:1883';
@@ -3118,7 +3118,7 @@ app.get('/report/wip', async (req, res) => {
 
 /**
  * GET /api/needle/pickings?tanggalfrom=YYYY-MM-DD&tanggalto=YYYY-MM-DD
- * Proxy ke backend Needle Manager terpisah (10.5.0.3:8080).
+ * Proxy ke backend Needle Manager terpisah (10.5.0.107:8080).
  * Tidak mempengaruhi backend utama per environment (MJL/MJL2/CLN/GCC).
  */
 app.get('/api/needle/pickings', async (req, res) => {

@@ -1486,7 +1486,7 @@ export interface NeedleStockResponse {
 
 /**
  * Needle Manager - daftar pengambilan needle.
- * Proxy path: /api/needle/pickings (server.js -> http://10.5.0.3:8080).
+ * Proxy path: /api/needle/pickings (server.js -> http://10.5.0.107:8080).
  * Query backend memakai tanggalfrom & tanggalto.
  */
 export const getNeedlePickings = async (params: {
