@@ -25,7 +25,7 @@ Dokumen ini menjelaskan **base URL, port, endpoint, header, dan alur verifikasi 
 |------------|------------------------|------------------------|------------------|
 | CLN        | `10.8.0.104`           | `8000`                 | `7000`           |
 | MJL        | `10.5.0.106`           | `8000`                 | `7000`           |
-| MJL2       | `10.5.0.99`            | `8001`                 | `7000`           |
+| MJL2       | `10.6.0.99`            | `8001`                 | `7000`           |
 | GCC        | `10.5.0.106` (default) | `8002`                 | `7000`           |
 
 Nilai bisa di-override dengan environment variable, misalnya:
