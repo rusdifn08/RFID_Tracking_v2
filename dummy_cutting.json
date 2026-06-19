@@ -1,8 +1,48 @@
 {
   "version": 1,
   "bundle": {
-    "count": 7,
+    "count": 9,
     "history": [
+      {
+        "rfid_garment": "0003815061",
+        "wo": "186808",
+        "style": "1128733",
+        "buyer": "JAPAN",
+        "item": "GM1",
+        "color": "RD",
+        "size": "XXL",
+        "qty": 34,
+        "current_location": "bundle",
+        "created_at": "2026-06-17T00:18:42.825Z",
+        "updated_at": "2026-06-17T00:18:42.825Z",
+        "timeline": [
+          {
+            "location": "bundle",
+            "at": "2026-06-17T00:18:42.825Z"
+          }
+        ],
+        "at": "2026-06-17T00:18:42.825Z"
+      },
+      {
+        "rfid_garment": "0013651636",
+        "wo": "186808",
+        "style": "1128733",
+        "buyer": "JAPAN",
+        "item": "GM1",
+        "color": "RD",
+        "size": "XXL",
+        "qty": 34,
+        "current_location": "bundle",
+        "created_at": "2026-06-17T00:07:27.158Z",
+        "updated_at": "2026-06-17T00:07:27.158Z",
+        "timeline": [
+          {
+            "location": "bundle",
+            "at": "2026-06-17T00:07:27.158Z"
+          }
+        ],
+        "at": "2026-06-17T00:07:27.158Z"
+      },
       {
         "rfid_garment": "1212121212",
         "wo": "187764",
@@ -146,11 +186,41 @@
     ]
   },
   "quality_control": {
-    "count": 7,
-    "goodTotal": 192,
+    "count": 9,
+    "goodTotal": 260,
     "repairTotal": 2,
     "rejectTotal": 0,
     "history": [
+      {
+        "rfid_garment": "0003815061",
+        "qty": 34,
+        "good": 34,
+        "repair": 0,
+        "reject": 0,
+        "wo": "186808",
+        "style": "1128733",
+        "buyer": "JAPAN",
+        "item": "GM1",
+        "color": "RD",
+        "size": "XXL",
+        "location": "quality_control",
+        "at": "2026-06-17T00:18:48.807Z"
+      },
+      {
+        "rfid_garment": "0013651636",
+        "qty": 34,
+        "good": 34,
+        "repair": 0,
+        "reject": 0,
+        "wo": "186808",
+        "style": "1128733",
+        "buyer": "JAPAN",
+        "item": "GM1",
+        "color": "RD",
+        "size": "XXL",
+        "location": "quality_control",
+        "at": "2026-06-17T00:07:40.096Z"
+      },
       {
         "rfid_garment": "1212121212",
         "qty": 1,
@@ -259,8 +329,34 @@
     ]
   },
   "supermarket": {
-    "count": 8,
+    "count": 10,
     "history": [
+      {
+        "rfid_garment": "0003815061",
+        "wo": "186808",
+        "qty": 34,
+        "style": "1128733",
+        "buyer": "JAPAN",
+        "item": "GM1",
+        "color": "RD",
+        "size": "XXL",
+        "location": "GM 1",
+        "line": "1",
+        "at": "2026-06-17T00:19:02.381Z"
+      },
+      {
+        "rfid_garment": "0013651636",
+        "wo": "186808",
+        "qty": 34,
+        "style": "1128733",
+        "buyer": "JAPAN",
+        "item": "GM1",
+        "color": "RD",
+        "size": "XXL",
+        "location": "GM 1",
+        "line": "6",
+        "at": "2026-06-17T00:07:54.135Z"
+      },
       {
         "rfid_garment": "0002180391",
         "wo": "187514",
@@ -639,6 +735,88 @@
         "reject": 0,
         "at": "2026-05-15T11:30:42.853Z"
       }
+    },
+    "0013651636": {
+      "rfid_garment": "0013651636",
+      "wo": "186808",
+      "style": "1128733",
+      "buyer": "JAPAN",
+      "item": "GM1",
+      "color": "RD",
+      "size": "XXL",
+      "qty": 34,
+      "current_location": "supermarket",
+      "created_at": "2026-06-17T00:07:27.158Z",
+      "updated_at": "2026-06-17T00:07:54.135Z",
+      "timeline": [
+        {
+          "location": "bundle",
+          "at": "2026-06-17T00:07:27.158Z"
+        },
+        {
+          "location": "quality_control",
+          "at": "2026-06-17T00:07:40.096Z",
+          "good": 34,
+          "repair": 0,
+          "reject": 0
+        },
+        {
+          "location": "supermarket",
+          "at": "2026-06-17T00:07:54.135Z",
+          "store_mode": "urgent",
+          "line": "6",
+          "urgent_location": "GM 1"
+        }
+      ],
+      "qc": {
+        "good": 34,
+        "repair": 0,
+        "reject": 0,
+        "at": "2026-06-17T00:07:40.096Z"
+      },
+      "supermarket_urgent_line": 6,
+      "supermarket_urgent_location": "GM 1"
+    },
+    "0003815061": {
+      "rfid_garment": "0003815061",
+      "wo": "186808",
+      "style": "1128733",
+      "buyer": "JAPAN",
+      "item": "GM1",
+      "color": "RD",
+      "size": "XXL",
+      "qty": 34,
+      "current_location": "supermarket",
+      "created_at": "2026-06-17T00:18:42.825Z",
+      "updated_at": "2026-06-17T00:19:02.381Z",
+      "timeline": [
+        {
+          "location": "bundle",
+          "at": "2026-06-17T00:18:42.825Z"
+        },
+        {
+          "location": "quality_control",
+          "at": "2026-06-17T00:18:48.807Z",
+          "good": 34,
+          "repair": 0,
+          "reject": 0
+        },
+        {
+          "location": "supermarket",
+          "at": "2026-06-17T00:19:02.381Z",
+          "store_mode": "urgent",
+          "line": "1",
+          "urgent_location": "GM 1"
+        }
+      ],
+      "qc": {
+        "good": 34,
+        "repair": 0,
+        "reject": 0,
+        "at": "2026-06-17T00:18:48.807Z"
+      },
+      "supermarket_urgent_line": 1,
+      "supermarket_urgent_location": "GM 1"
     }
   }
 }

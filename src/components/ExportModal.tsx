@@ -47,6 +47,13 @@ export default function ExportModal({ isOpen, onClose, onExport, lineId = '1' }:
             description: 'Data disusun per hari (setiap baris = 1 hari)',
             icon: Calendar,
             color: 'green'
+        },
+        {
+            id: 'detail' as ExportType,
+            title: 'Data Detail',
+            description: 'Detail data Output Sewing, QC Good, dan PQC Good',
+            icon: FileSpreadsheet,
+            color: 'purple'
         }
     ];
 

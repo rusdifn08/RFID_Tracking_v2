@@ -81,11 +81,11 @@ const BORDER = {
 
 const headerFillByGroup = (header: string): string => {
   const h = header.toLowerCase();
-  if (['tanggal', 'wo', 'line', 'style', 'item', 'buyer'].includes(h)) return 'FF1E3A5F';
-  if (['output sewing', 'qc', 'pqc good', 'dryroom_in', 'dryroom_out', 'folding_in', 'folding_out'].includes(h)) return 'FF0369A1';
-  if (h.includes('pic')) return 'FF047857';
-  if (h.includes('nik')) return 'FF6D28D9';
-  return 'FF334155';
+  if (['tanggal', 'wo', 'line', 'style', 'item', 'buyer'].includes(h)) return 'FF1E3A8A'; // Dark Blue
+  if (['output sewing', 'qc', 'pqc good', 'dryroom_in', 'dryroom_out', 'folding_in', 'folding_out'].includes(h)) return 'FF2563EB'; // Medium Blue
+  if (h.includes('pic')) return 'FF3B82F6'; // Brighter Blue
+  if (h.includes('nik')) return 'FF60A5FA'; // Light Blue
+  return 'FF2563EB'; // Default Medium Blue
 };
 
 const isCenterAligned = (header: string): boolean => {

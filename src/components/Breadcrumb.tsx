@@ -488,8 +488,11 @@ export default function Breadcrumb() {
 
     const breadcrumbs = getBreadcrumbs();
     
-    // Cek apakah di halaman Production Lines (/monitoring-rfid)
+    // Cek apakah di halaman Production Lines (/monitoring-rfid) atau Sewing Lines (/sewing)
     const isProductionLinesPage = location.pathname.startsWith('/monitoring-rfid');
+    const isSewingPage = location.pathname === '/sewing' || location.pathname === '/sewing/';
+    const showSettingsButton = isProductionLinesPage || isSewingPage;
+
 
     // Load supervisor data (pakai cache shared, 1x request per env)
     const loadSupervisorData = async () => {
@@ -719,8 +722,8 @@ export default function Breadcrumb() {
                     </div>
                 ))}
                 
-                {/* Tombol Pengaturan di ujung breadcrumb untuk Production Lines */}
-                {isProductionLinesPage && (
+                {/* Tombol Pengaturan di ujung breadcrumb untuk Production Lines / Sewing Lines */}
+                {showSettingsButton && (
                     <>
                         <div className="flex-1"></div>
                         <button
@@ -798,7 +801,12 @@ export default function Breadcrumb() {
                                         const currentStartTime = startTimesData[lineIdStr] || '07:30';
                                         const currentTarget = typeof targetsData[lineIdStr] === 'number' ? targetsData[lineIdStr] : 0;
                                         const currentDisplayTitle = displayTitlesData[lineIdStr] || '';
-                                        const shownTitle = resolveLineDisplayTitle(line.id, line.title, displayTitlesData);
+                                        const isSewingPage = location.pathname.startsWith('/sewing');
+                                        const hasCustomTitle = !!displayTitlesData[lineIdStr]?.trim();
+                                        const resolvedTitle = resolveLineDisplayTitle(line.id, line.title, displayTitlesData);
+                                        const shownTitle = isSewingPage && !hasCustomTitle
+                                            ? resolvedTitle.replace(/^Production Line /i, 'Sewing Line ')
+                                            : resolvedTitle;
                                         const isEditing = editingLine === line.id;
 
                                         return (
@@ -814,7 +822,8 @@ export default function Breadcrumb() {
                                                         <p className="font-semibold text-gray-900 text-base mb-0.5">{shownTitle}</p>
                                                         <p className="text-xs text-gray-500 mb-1">Query data: Line {line.id} · Default: {line.title}</p>
                                                         {isEditing ? (() => {
-                                                            const titlePrefix = line.title.replace(/[\d]+$/, '').trim(); 
+                                                            const baseTitle = isSewingPage ? line.title.replace(/^Production Line /i, 'Sewing Line ') : line.title;
+                                                            const titlePrefix = baseTitle.replace(/[\d]+$/, '').trim(); 
                                                             const currentNumberOnly = editingDisplayTitle ? editingDisplayTitle.replace(titlePrefix, '').trim() : '';
 
                                                             return (

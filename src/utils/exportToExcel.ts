@@ -11,6 +11,31 @@ function formatDateForFilename(isoDate: string): string {
     return `${day}-${month}-${year}`;
 }
 
+/** Resolves display title to card name format: e.g. "Production Line 6" -> "Line 6" */
+function getLineLabelFromDisplayTitle(displayTitle?: string, lineId?: string): string {
+    if (!displayTitle || !displayTitle.trim()) return `Line ${lineId || ''}`;
+    
+    const title = displayTitle.trim();
+    // Check if it matches "Production Line X" or "Sewing Line X"
+    const match = title.match(/(?:Production|Sewing)?\s*Line\s*(\w+)/i);
+    if (match) {
+        return `Line ${match[1]}`;
+    }
+    
+    // Check if it matches "Line X" or "LINE X"
+    const matchLine = title.match(/Line\s*(\w+)/i);
+    if (matchLine) {
+        return `Line ${matchLine[1]}`;
+    }
+    
+    // If it's just a number
+    if (/^\d+$/.test(title)) {
+        return `Line ${title}`;
+    }
+    
+    return title;
+}
+
 /**
  * Nama file export: {jenis_dashboard}{line_x}{date_from}to{date_to}.extension
  */
@@ -30,7 +55,7 @@ function buildExportFilename(
     return `${base}.${ext}`;
 }
 
-interface ExportData {
+export interface ExportData {
     tanggal: string;
     line: string;
     wo: string;
@@ -56,21 +81,456 @@ interface ExportData {
 
 export type ExportType = 'all' | 'daily' | 'summary' | 'detail';
 
+/** Format timestamp: YYYY-MM-DDTHH:mm:ss -> DD MMM YYYY, HH.mm.ss */
+function formatTimestamp(timestamp: string): string {
+    if (!timestamp) return '-';
+    try {
+        let date: Date;
+        const hasTimezone = timestamp.includes('Z') || timestamp.match(/[+-]\d{2}:\d{2}$/);
+        if (!hasTimezone) {
+            const parts = timestamp.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+            if (parts) {
+                const [, year, month, day, hour, minute, second] = parts;
+                date = new Date(
+                    parseInt(year),
+                    parseInt(month) - 1,
+                    parseInt(day),
+                    parseInt(hour),
+                    parseInt(minute),
+                    parseInt(second)
+                );
+            } else {
+                date = new Date(timestamp);
+            }
+        } else {
+            date = new Date(timestamp);
+        }
+
+        if (isNaN(date.getTime())) {
+            return timestamp;
+        }
+
+        const day = String(date.getDate()).padStart(2, '0');
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        const month = monthNames[date.getMonth()];
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+
+        return `${day} ${month} ${year}, ${hours}.${minutes}.${seconds}`;
+    } catch (e) {
+        return timestamp;
+    }
+}/** Menulis worksheet detail dengan layout tabel standard */
+function writeDetailSheet(
+    worksheet: ExcelJS.Worksheet,
+    sectionName: string,
+    items: any[],
+    headerStyle: any,
+    dataCellStyle: any,
+    dataCellStyleAlt: any,
+    lineId: string,
+    filterDateFrom?: string,
+    filterDateTo?: string,
+    supervisorName?: string,
+    resolvedLineLabel?: string
+) {
+    let currentRow = 1;
+
+    // 1. Get Date and Time formatting
+    const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    
+    // Format period dates
+    let periodeStr = '';
+    const formatDateToDDMMYYYY = (dateStr?: string) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}-${month}-${year}`;
+    };
+
+    if (filterDateFrom && filterDateTo) {
+        const fromStr = formatDateToDDMMYYYY(filterDateFrom);
+        const toStr = formatDateToDDMMYYYY(filterDateTo);
+        periodeStr = fromStr === toStr ? fromStr : `${fromStr} s/d ${toStr}`;
+    } else {
+        const todayStr = formatDateToDDMMYYYY(new Date().toISOString().split('T')[0]);
+        periodeStr = todayStr;
+    }
+
+    // Format export time
+    const now = new Date();
+    const expDay = String(now.getDate()).padStart(2, '0');
+    const expMonth = monthNamesShort[now.getMonth()];
+    const expYear = now.getFullYear();
+    const expHour = String(now.getHours()).padStart(2, '0');
+    const expMin = String(now.getMinutes()).padStart(2, '0');
+    const exportTimeStr = `Waktu ekspor: ${expDay} ${expMonth} ${expYear}, ${expHour}.${expMin}`;
+
+    const bannerBorder = {
+        top: { style: 'thin' as const, color: { argb: 'FF94A3B8' } },
+        left: { style: 'thin' as const, color: { argb: 'FF94A3B8' } },
+        bottom: { style: 'thin' as const, color: { argb: 'FF94A3B8' } },
+        right: { style: 'thin' as const, color: { argb: 'FF94A3B8' } }
+    };
+
+    // --- ROW 1: Title Block ---
+    const lineSuffix = supervisorName ? `LINE ${supervisorName.toUpperCase()}` : `LINE ${lineId}`;
+    worksheet.mergeCells(`A${currentRow}:J${currentRow}`);
+    const titleCell = worksheet.getCell(`A${currentRow}`);
+    titleCell.value = `Daily Output Line - ${sectionName} - ${lineSuffix}`;
+    titleCell.font = { bold: true, size: 17, color: { argb: 'FFFFFFFF' }, name: 'Segoe UI' };
+    titleCell.fill = {
+        type: 'pattern' as const,
+        pattern: 'solid' as const,
+        fgColor: { argb: 'FF0F766E' } // Dark teal like the first image
+    };
+    titleCell.alignment = { horizontal: 'left' as const, vertical: 'middle' as const, indent: 1 };
+    titleCell.border = bannerBorder;
+    worksheet.getRow(currentRow).height = 36;
+    currentRow++;
+
+    // --- ROW 2: Filter Period Block ---
+    worksheet.mergeCells(`A${currentRow}:J${currentRow}`);
+    const periodCell = worksheet.getCell(`A${currentRow}`);
+    periodCell.value = `Periode filter: ${periodeStr}`;
+    periodCell.font = { size: 13, color: { argb: 'FF0F172A' }, name: 'Segoe UI' };
+    periodCell.fill = {
+        type: 'pattern' as const,
+        pattern: 'solid' as const,
+        fgColor: { argb: 'FFCCFBF1' } // Light mint/teal like the first image
+    };
+    periodCell.alignment = { horizontal: 'left' as const, vertical: 'middle' as const, indent: 1 };
+    periodCell.border = bannerBorder;
+    worksheet.getRow(currentRow).height = 28;
+    currentRow++;
+
+    // --- ROW 3: Export Time Block ---
+    worksheet.mergeCells(`A${currentRow}:J${currentRow}`);
+    const exportTimeCell = worksheet.getCell(`A${currentRow}`);
+    exportTimeCell.value = exportTimeStr;
+    exportTimeCell.font = { italic: true, size: 12, color: { argb: 'FF334155' }, name: 'Segoe UI' };
+    exportTimeCell.fill = {
+        type: 'pattern' as const,
+        pattern: 'solid' as const,
+        fgColor: { argb: 'FFF1F5F9' } // Light slate background like the first image
+    };
+    exportTimeCell.alignment = { horizontal: 'left' as const, vertical: 'middle' as const, indent: 1 };
+    exportTimeCell.border = bannerBorder;
+    worksheet.getRow(currentRow).height = 24;
+    currentRow++;
+
+    currentRow++; // Spacing empty row
+
+    // Headers
+    const headers = ['No', 'RFID ID', 'WO', 'Style', 'Buyer', 'Item', 'Color', 'Size', 'SPV LINE', 'Timestamp'];
+    const headerRowNumber = currentRow;
+    
+    // Set column widths
+    worksheet.getColumn(1).width = 8;   // No
+    worksheet.getColumn(2).width = 18;  // RFID ID
+    worksheet.getColumn(3).width = 15;  // WO
+    worksheet.getColumn(4).width = 15;  // Style
+    worksheet.getColumn(5).width = 32;  // Buyer
+    worksheet.getColumn(6).width = 35;  // Item
+    worksheet.getColumn(7).width = 12;  // Color
+    worksheet.getColumn(8).width = 12;  // Size
+    worksheet.getColumn(9).width = 15;  // Line (changed to SPV LINE width)
+    worksheet.getColumn(10).width = 25; // Timestamp
+
+    headers.forEach((header, colIndex) => {
+        const cell = worksheet.getCell(currentRow, colIndex + 1);
+        cell.value = header;
+        Object.assign(cell, headerStyle);
+    });
+    worksheet.getRow(currentRow).height = 28;
+
+    // Enable AutoFilter pada baris header
+    worksheet.autoFilter = `A${headerRowNumber}:J${headerRowNumber}`;
+    
+    currentRow++;
+
+    // Sort items by WO ascending first, then by timestamp descending
+    const sortedItems = [...items].sort((a, b) => {
+        const woA = String(a.wo || '');
+        const woB = String(b.wo || '');
+        const compWo = woA.localeCompare(woB, undefined, { numeric: true, sensitivity: 'base' });
+        if (compWo !== 0) return compWo;
+        
+        const timeA = new Date(a.timestamp || 0).getTime();
+        const timeB = new Date(b.timestamp || 0).getTime();
+        return timeB - timeA;
+    });
+
+    // Data rows
+    sortedItems.forEach((item, index) => {
+        const rowStyle = index % 2 === 0 ? dataCellStyle : dataCellStyleAlt;
+        const formattedTime = formatTimestamp(item.timestamp);
+        
+        const rowData = [
+            index + 1, // Berurutan naik
+            item.rfid_garment || '-',
+            item.wo || '-',
+            item.style || '-',
+            item.buyer || '-',
+            item.item || '-',
+            item.color || '-',
+            item.size || '-',
+            supervisorName || resolvedLineLabel || item.line || '-',
+            formattedTime
+        ];
+
+        rowData.forEach((value, colIndex) => {
+            const cell = worksheet.getCell(currentRow, colIndex + 1);
+            cell.value = value;
+            Object.assign(cell, rowStyle);
+
+            // Special styling for RFID ID - Light Blue
+            if (colIndex === 1) {
+                cell.fill = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFE0F2FE' } }; // Light sky blue
+                cell.font = { size: 10, bold: true, color: { argb: 'FF1D4ED8' }, name: 'Segoe UI' }; // Royal blue
+            }
+        });
+
+        worksheet.getRow(currentRow).height = 22.5;
+        currentRow++;
+    });
+}
+
 export async function exportToExcel(
-    data: ExportData[],
+    data: any,
     lineId: string,
     format: 'excel' | 'csv' = 'excel',
     filterDateFrom?: string,
     filterDateTo?: string,
-    exportType: ExportType = 'all'
+    exportType: ExportType = 'all',
+    supervisorName?: string,
+    lineDisplayTitle?: string
 ) {
     // Validasi data
-    if (!data || data.length === 0) {
+    if (!data) {
+        throw new Error('Data tidak boleh kosong');
+    }
+    if (exportType !== 'detail' && (!Array.isArray(data) || data.length === 0)) {
         throw new Error('Data tidak boleh kosong');
     }
 
+    // Resolusi nama line
+    const resolvedLineLabel = getLineLabelFromDisplayTitle(lineDisplayTitle, lineId);
+
     // Buat workbook baru
     const workbook = new ExcelJS.Workbook();
+
+    if (exportType === 'detail') {
+        if (format === 'excel') {
+            const sheetOptions = {
+                pageSetup: {
+                    paperSize: 9, // A4
+                    orientation: 'landscape' as const,
+                    fitToPage: true,
+                    fitToWidth: 1,
+                    fitToHeight: 0,
+                    margins: {
+                        left: 0.5,
+                        right: 0.5,
+                        top: 0.5,
+                        bottom: 0.5,
+                        header: 0.3,
+                        footer: 0.3
+                    }
+                }
+            };
+
+            const sheetOutput = workbook.addWorksheet('Output Sewing', sheetOptions);
+            const sheetQcGood = workbook.addWorksheet('QC Good', sheetOptions);
+            const sheetPqcGood = workbook.addWorksheet('PQC Good', sheetOptions);
+
+            const detailHeaderStyle = {
+                font: { bold: true, size: 11, color: { argb: 'FFFFFFFF' }, name: 'Segoe UI' },
+                fill: {
+                    type: 'pattern' as const,
+                    pattern: 'solid' as const,
+                    fgColor: { argb: 'FF1D4ED8' } // Royal blue header (matches user request)
+                },
+                alignment: { horizontal: 'center' as const, vertical: 'middle' as const, wrapText: true },
+                border: {
+                    top: { style: 'thin' as const, color: { argb: 'FFCBD5E1' } },
+                    bottom: { style: 'medium' as const, color: { argb: 'FF475569' } },
+                    left: { style: 'thin' as const, color: { argb: 'FFCBD5E1' } },
+                    right: { style: 'thin' as const, color: { argb: 'FFCBD5E1' } }
+                }
+            };
+
+            const detailDataRowStyle = {
+                font: { size: 10, color: { argb: 'FF334155' }, name: 'Segoe UI' },
+                fill: {
+                    type: 'pattern' as const,
+                    pattern: 'solid' as const,
+                    fgColor: { argb: 'FFFFFFFF' } // White
+                },
+                alignment: { horizontal: 'center' as const, vertical: 'middle' as const, wrapText: true },
+                border: {
+                    top: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+                    bottom: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+                    left: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+                    right: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } }
+                }
+            };
+
+            const detailDataRowStyleAlt = {
+                font: { size: 10, color: { argb: 'FF334155' }, name: 'Segoe UI' },
+                fill: {
+                    type: 'pattern' as const,
+                    pattern: 'solid' as const,
+                    fgColor: { argb: 'FFF8FAFC' } // Tailwind slate-50 (zebra striping)
+                },
+                alignment: { horizontal: 'center' as const, vertical: 'middle' as const, wrapText: true },
+                border: {
+                    top: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+                    bottom: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+                    left: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+                    right: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } }
+                }
+            };
+
+            writeDetailSheet(
+                sheetOutput,
+                'OUTPUT SEWING',
+                data.outputSewing || [],
+                detailHeaderStyle,
+                detailDataRowStyle,
+                detailDataRowStyleAlt,
+                lineId,
+                filterDateFrom,
+                filterDateTo,
+                supervisorName,
+                resolvedLineLabel
+            );
+
+            writeDetailSheet(
+                sheetQcGood,
+                'QC GOOD',
+                data.qcGood || [],
+                detailHeaderStyle,
+                detailDataRowStyle,
+                detailDataRowStyleAlt,
+                lineId,
+                filterDateFrom,
+                filterDateTo,
+                supervisorName,
+                resolvedLineLabel
+            );
+
+            writeDetailSheet(
+                sheetPqcGood,
+                'PQC GOOD',
+                data.pqcGood || [],
+                detailHeaderStyle,
+                detailDataRowStyle,
+                detailDataRowStyleAlt,
+                lineId,
+                filterDateFrom,
+                filterDateTo,
+                supervisorName,
+                resolvedLineLabel
+            );
+
+            const filename = buildExportFilename(
+                'RFID_Detail_',
+                `Line${lineId}`,
+                'xlsx',
+                filterDateFrom,
+                filterDateTo
+            );
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            return;
+        } else {
+            // CSV Format for Detail
+            const csvData: string[][] = [];
+            const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+                               'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+            let tanggalStr = '';
+            if (filterDateFrom && filterDateTo) {
+                const fromDate = new Date(filterDateFrom);
+                const toDate = new Date(filterDateTo);
+                const fromStr = `${fromDate.getDate()} ${monthNames[fromDate.getMonth()]} ${fromDate.getFullYear()}`;
+                const toStr = `${toDate.getDate()} ${monthNames[toDate.getMonth()]} ${toDate.getFullYear()}`;
+                tanggalStr = fromStr === toStr ? fromStr : `${fromStr} - ${toStr}`;
+            } else {
+                const now = new Date();
+                tanggalStr = `${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+            }
+
+            const lineSuffix = supervisorName ? `LINE ${supervisorName.toUpperCase()}` : `LINE ${lineId}`;
+            csvData.push([`Daily Output Line - RFID DETAIL REPORT - ${lineSuffix} - ${tanggalStr}`]);
+            csvData.push([]);
+
+            // Helper to add data to CSV
+            const addSectionToCsv = (sectionTitle: string, items: any[]) => {
+                csvData.push([sectionTitle]);
+                csvData.push(['No', 'RFID ID', 'WO', 'Style', 'Buyer', 'Item', 'Color', 'Size', 'SPV LINE', 'Timestamp']);
+                
+                // Sort items by WO ascending first, then by timestamp descending
+                const sortedItems = [...items].sort((a, b) => {
+                    const woA = String(a.wo || '');
+                    const woB = String(b.wo || '');
+                    const compWo = woA.localeCompare(woB, undefined, { numeric: true, sensitivity: 'base' });
+                    if (compWo !== 0) return compWo;
+                    
+                    const timeA = new Date(a.timestamp || 0).getTime();
+                    const timeB = new Date(b.timestamp || 0).getTime();
+                    return timeB - timeA;
+                });
+
+                sortedItems.forEach((item, index) => {
+                    csvData.push([
+                        (index + 1).toString(),
+                        item.rfid_garment || '-',
+                        item.wo || '-',
+                        item.style || '-',
+                        item.buyer || '-',
+                        item.item || '-',
+                        item.color || '-',
+                        item.size || '-',
+                        supervisorName || resolvedLineLabel || item.line || '-',
+                        formatTimestamp(item.timestamp)
+                    ]);
+                });
+                csvData.push([]);
+            };
+
+            addSectionToCsv('OUTPUT SEWING', data.outputSewing || []);
+            addSectionToCsv('QC GOOD', data.qcGood || []);
+            addSectionToCsv('PQC GOOD', data.pqcGood || []);
+
+            const filename = buildExportFilename(
+                'RFID_Detail_',
+                `Line${lineId}`,
+                'csv',
+                filterDateFrom,
+                filterDateTo
+            );
+
+            const csv = csvData.map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            return;
+        }
+    }
+
     const worksheet = workbook.addWorksheet('RFID Tracking', {
         pageSetup: {
             paperSize: 9, // A4
@@ -95,7 +555,7 @@ export async function exportToExcel(
         fill: {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'FF4472C4' } // Blue
+            fgColor: { argb: 'FF1D4ED8' } // Royal Blue
         },
         alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
         border: {
@@ -111,7 +571,7 @@ export async function exportToExcel(
         fill: {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'FF5B9BD5' } // Light Blue
+            fgColor: { argb: 'FF2563EB' } // Medium Blue
         },
         alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
         border: {
@@ -167,14 +627,90 @@ export async function exportToExcel(
     }
     
     // Adjust merge cells based on export type
-    const titleMergeRange = isDailyExport ? `A${currentRow}:R${currentRow}` : `A${currentRow}:Q${currentRow}`;
-    worksheet.mergeCells(titleMergeRange);
-    const titleCell = worksheet.getCell(`A${currentRow}`);
-    titleCell.value = `RFID TRACKING REPORT DAILY - ${tanggalStr}`;
-    titleCell.font = { bold: true, size: 16, color: { argb: 'FF000000' } };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    worksheet.getRow(currentRow).height = 30;
+    const ncol = isDailyExport ? 18 : 17;
+    const bannerBorder = {
+        top: { style: 'thin' as const, color: { argb: 'FF94A3B8' } },
+        left: { style: 'thin' as const, color: { argb: 'FF94A3B8' } },
+        bottom: { style: 'thin' as const, color: { argb: 'FF94A3B8' } },
+        right: { style: 'thin' as const, color: { argb: 'FF94A3B8' } }
+    };
+
+    // --- ROW 1: Title Block ---
+    const lineSuffix = supervisorName ? `LINE ${supervisorName.toUpperCase()}` : `LINE ${lineId}`;
+    worksheet.mergeCells(currentRow, 1, currentRow, ncol);
+    const titleCell = worksheet.getCell(currentRow, 1);
+    titleCell.value = `Daily Output Line - RFID TRACKING REPORT - ${lineSuffix}`;
+    titleCell.font = { bold: true, size: 17, color: { argb: 'FFFFFFFF' }, name: 'Segoe UI' };
+    titleCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF0F766E' } // Dark teal like the first image
+    };
+    titleCell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+    titleCell.border = bannerBorder;
+    worksheet.getRow(currentRow).height = 36;
     currentRow++;
+
+    // --- ROW 2: Filter Period Block ---
+    worksheet.mergeCells(currentRow, 1, currentRow, ncol);
+    const periodCell = worksheet.getCell(currentRow, 1);
+    
+    // Format period dates
+    let formattedPeriod = '';
+    const formatDateToDDMMYYYY = (dateStr?: string) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}-${month}-${year}`;
+    };
+    if (filterDateFrom && filterDateTo) {
+        const fromStr = formatDateToDDMMYYYY(filterDateFrom);
+        const toStr = formatDateToDDMMYYYY(filterDateTo);
+        formattedPeriod = fromStr === toStr ? fromStr : `${fromStr} s/d ${toStr}`;
+    } else {
+        formattedPeriod = tanggalStr;
+    }
+    
+    periodCell.value = `Periode filter: ${formattedPeriod}`;
+    periodCell.font = { size: 13, color: { argb: 'FF0F172A' }, name: 'Segoe UI' };
+    periodCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFCCFBF1' } // Light mint/teal like the first image
+    };
+    periodCell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+    periodCell.border = bannerBorder;
+    worksheet.getRow(currentRow).height = 28;
+    currentRow++;
+
+    // --- ROW 3: Export Time Block ---
+    worksheet.mergeCells(currentRow, 1, currentRow, ncol);
+    const exportTimeCell = worksheet.getCell(currentRow, 1);
+    
+    const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const now = new Date();
+    const expDay = String(now.getDate()).padStart(2, '0');
+    const expMonth = monthNamesShort[now.getMonth()];
+    const expYear = now.getFullYear();
+    const expHour = String(now.getHours()).padStart(2, '0');
+    const expMin = String(now.getMinutes()).padStart(2, '0');
+    
+    exportTimeCell.value = `Waktu ekspor: ${expDay} ${expMonth} ${expYear}, ${expHour}.${expMin}`;
+    exportTimeCell.font = { italic: true, size: 12, color: { argb: 'FF334155' }, name: 'Segoe UI' };
+    exportTimeCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF1F5F9' } // Light slate background like the first image
+    };
+    exportTimeCell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+    exportTimeCell.border = bannerBorder;
+    worksheet.getRow(currentRow).height = 24;
+    currentRow++;
+
+    currentRow++; // Spacing empty row
 
     // ===== TABLE HEADER SECTION =====
     // Header Row 1: Main Headers
@@ -190,7 +726,7 @@ export async function exportToExcel(
     // Main Headers - jika daily export, tambahkan kolom Tanggal di awal
     const mainHeaders = isDailyExport ? [
         { col: 1, text: 'Tanggal' }, // Kolom tanggal untuk daily export
-        { col: 2, text: 'LINE' },
+        { col: 2, text: 'SPV LINE' },
         { col: 3, text: 'WO' },
         { col: 4, text: 'Style' },
         { col: 5, text: 'Item' },
@@ -201,7 +737,7 @@ export async function exportToExcel(
         { col: 16, text: 'GOOD SEWING' },
         { col: 17, text: 'BALANCE' }
     ] : [
-        { col: 1, text: 'LINE' },
+        { col: 1, text: 'SPV LINE' },
         { col: 2, text: 'WO' },
         { col: 3, text: 'Style' },
         { col: 4, text: 'Item' },
@@ -260,7 +796,7 @@ export async function exportToExcel(
     // ===== DATA ROWS =====
     const dataRows: number[] = [];
     
-    data.forEach((rowData) => {
+    data.forEach((rowData: any) => {
         const dataRow = currentRow;
         dataRows.push(dataRow);
         
@@ -277,7 +813,7 @@ export async function exportToExcel(
         
         const dataValues = isDailyExport ? [
             tanggalDisplay || rowData.tanggal || '-', // Col 1 - Tanggal (untuk daily export)
-            rowData.line || '-',           // Col 2 - LINE
+            supervisorName || resolvedLineLabel || rowData.line || '-',           // Col 2 - LINE
             rowData.wo || '-',             // Col 3 - WO
             rowData.style || '-',          // Col 4 - Style
             rowData.item || '-',           // Col 5 - Item
@@ -294,7 +830,7 @@ export async function exportToExcel(
             rowData.goodSewing || 0,       // Col 16 - GOOD SEWING
             rowData.balance || 0           // Col 17 - BALANCE
         ] : [
-            rowData.line || '-',           // Col 1 - LINE
+            supervisorName || resolvedLineLabel || rowData.line || '-',           // Col 1 - LINE
             rowData.wo || '-',             // Col 2 - WO
             rowData.style || '-',          // Col 3 - Style
             rowData.item || '-',           // Col 4 - Item
@@ -336,8 +872,8 @@ export async function exportToExcel(
         const totalRow = currentRow;
         
         // Hitung total
-        const totalOutputSewing = data.reduce((sum, row) => sum + (row.outputSewing || 0), 0);
-        const totalPqcGood = data.reduce((sum, row) => sum + (row.pqcGood || 0), 0);
+        const totalOutputSewing = data.reduce((sum: number, row: any) => sum + (row.outputSewing || 0), 0);
+        const totalPqcGood = data.reduce((sum: number, row: any) => sum + (row.pqcGood || 0), 0);
         const balanceFinal = totalOutputSewing - totalPqcGood;
         
         // Style untuk baris total
@@ -503,14 +1039,14 @@ export async function exportToExcel(
             const now = new Date();
             tanggalStr = `${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
         }
-        
-        csvData.push([`RFID TRACKING REPORT DAILY - ${tanggalStr}`]);
+               const lineSuffix = supervisorName ? `LINE ${supervisorName.toUpperCase()}` : `LINE ${lineId}`;
+        csvData.push([`Daily Output Line - RFID TRACKING REPORT DAILY - ${lineSuffix} - ${tanggalStr}`]);
         csvData.push([]);
 
         // Add headers - Row 1: Main Headers
         if (isDailyExport) {
             csvData.push([
-                'Tanggal', 'LINE', 'WO', 'Style', 'Item', 'Buyer',
+                'Tanggal', 'SPV LINE', 'WO', 'Style', 'Item', 'Buyer',
                 'Output Sewing',
                 'QC Endline', 'QC Endline', 'QC Endline', 'QC Endline',
                 'PQC', 'PQC', 'PQC', 'PQC',
@@ -527,7 +1063,7 @@ export async function exportToExcel(
             ]);
 
             // Add data
-            data.forEach(row => {
+            data.forEach((row: any) => {
                 let tanggalDisplay = '';
                 if (row.tanggal) {
                     const date = new Date(row.tanggal);
@@ -539,7 +1075,7 @@ export async function exportToExcel(
                 }
                 csvData.push([
                     tanggalDisplay || row.tanggal || '-',
-                    row.line || '-',
+                    supervisorName || resolvedLineLabel || row.line || '-',
                     row.wo || '-',
                     row.style || '-',
                     row.item || '-',
@@ -560,8 +1096,8 @@ export async function exportToExcel(
             
             // Tambahkan baris total untuk CSV daily export
             if (data.length > 0) {
-                const totalOutputSewing = data.reduce((sum, row) => sum + (row.outputSewing || 0), 0);
-                const totalPqcGood = data.reduce((sum, row) => sum + (row.pqcGood || 0), 0);
+                const totalOutputSewing = data.reduce((sum: number, row: any) => sum + (row.outputSewing || 0), 0);
+                const totalPqcGood = data.reduce((sum: number, row: any) => sum + (row.pqcGood || 0), 0);
                 const balanceFinal = totalOutputSewing - totalPqcGood;
                 
                 csvData.push([]); // Baris kosong
@@ -577,7 +1113,7 @@ export async function exportToExcel(
             }
         } else {
             csvData.push([
-                'LINE', 'WO', 'Style', 'Item', 'Buyer',
+                'SPV LINE', 'WO', 'Style', 'Item', 'Buyer',
                 'Output Sewing',
                 'QC Endline', 'QC Endline', 'QC Endline', 'QC Endline',
                 'PQC', 'PQC', 'PQC', 'PQC',
@@ -594,9 +1130,9 @@ export async function exportToExcel(
             ]);
 
             // Add data
-            data.forEach(row => {
+            data.forEach((row: any) => {
                 csvData.push([
-                    row.line || '-',
+                    supervisorName || resolvedLineLabel || row.line || '-',
                     row.wo || '-',
                     row.style || '-',
                     row.item || '-',

@@ -26,3 +26,6 @@ dist-ssr
 # Dokumentasi dan file test (lokal)
 Document/
 Test/
+
+# Scratch directory
+scratch/

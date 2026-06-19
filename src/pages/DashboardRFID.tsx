@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } from 'recharts';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
-import { API_BASE_URL, getDefaultHeaders, getBackendEnvironment, getSupervisorDataFromAPI, type BackendEnvironment } from '../config/api';
+import { API_BASE_URL, getDefaultHeaders, getBackendEnvironment, getEnvironmentFromAPI, getSupervisorDataFromAPI, type BackendEnvironment } from '../config/api';
 import ExportModal from '../components/ExportModal';
 import type { ExportType } from '../components/ExportModal';
 import { exportToExcel } from '../utils/exportToExcel';
@@ -82,17 +82,27 @@ export default function DashboardRFID() {
     
     // Tarik data Supervisor untuk mempersonalisasi judul (contoh: LINE IYAH)
     const [supervisorName, setSupervisorName] = useState<string>('');
+    const [lineDisplayTitle, setLineDisplayTitle] = useState<string>('');
     
     useEffect(() => {
         const fetchSupervisor = async () => {
             try {
-                const env = await getBackendEnvironment();
+                const env = await getEnvironmentFromAPI();
                 if (!env) return;
                 const data = await getSupervisorDataFromAPI(env);
                 if (data && data.supervisors && data.supervisors[lineId] && data.supervisors[lineId] !== '-') {
                     setSupervisorName(data.supervisors[lineId]);
                 } else {
                     setSupervisorName('');
+                }
+
+                if (data && data.displayTitles && data.displayTitles[lineId]) {
+                    setLineDisplayTitle(data.displayTitles[lineId]);
+                } else {
+                    const defaultTitle = DASHBOARD_RFID_LINE_IDS.includes(Number(lineId))
+                        ? (Number(lineId) === 7 ? 'CUTTING GM1' : `SEWING LINE ${lineId}`)
+                        : `LINE ${lineId}`;
+                    setLineDisplayTitle(defaultTitle);
                 }
             } catch (e) {
                 // ignore
@@ -912,7 +922,7 @@ export default function DashboardRFID() {
         // Ambil data WO jika ada
         const firstWo = woData || null;
 
-        let exportData: any[] = [];
+        let exportData: any = [];
 
         if (exportType === 'daily') {
             // Fetch data per hari
@@ -942,10 +952,56 @@ export default function DashboardRFID() {
                 qcChartImage: undefined,
                 pqcChartImage: undefined
             }];
+        } else if (exportType === 'detail') {
+            const fetchDetail = async (statusVal: string) => {
+                const url = `${API_BASE_URL}/wira/detail?status=${encodeURIComponent(statusVal)}&line=${encodeURIComponent(lineId)}&tanggal_from=${encodeURIComponent(filterDateFrom)}&tanggal_to=${encodeURIComponent(filterDateTo)}`;
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { ...getDefaultHeaders() },
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const result = await response.json();
+                if (result.status === 'success' && result.data) {
+                    if (statusVal === 'output_sewing') {
+                        const raw = result.data.raw_data || [];
+                        return [...raw].sort((a: any, b: any) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+                    } else {
+                        const raw = Array.isArray(result.data) ? result.data : [];
+                        return [...raw].sort((a: any, b: any) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+                    }
+                }
+                if ((result.status === 'success' || result.success) && Array.isArray(result.data)) {
+                    return [...result.data].sort((a: any, b: any) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+                }
+                return [];
+            };
+
+            const [outputSewingData, qcGoodData, pqcGoodData] = await Promise.all([
+                fetchDetail('output_sewing'),
+                fetchDetail('GOOD'),
+                fetchDetail('PQC_GOOD')
+            ]);
+
+            exportData = {
+                outputSewing: outputSewingData,
+                qcGood: qcGoodData,
+                pqcGood: pqcGoodData
+            };
         }
 
-        await exportToExcel(exportData, lineId, format, filterDateFrom, filterDateTo, exportType);
-    }, [lineId, woData, outputLine, rework, wiraQc, reject, good, pqcRework, wiraPqc, pqcReject, pqcGood, filterDateFrom, filterDateTo]);
+        await exportToExcel(
+            exportData,
+            lineId,
+            format,
+            filterDateFrom,
+            filterDateTo,
+            exportType,
+            supervisorName,
+            lineDisplayTitle
+        );
+    }, [lineId, woData, outputLine, rework, wiraQc, reject, good, pqcRework, wiraPqc, pqcReject, pqcGood, filterDateFrom, filterDateTo, supervisorName, lineDisplayTitle]);
 
     // LOGIKA SIZE SIDEBAR (PENTING UNTUK MENGHINDARI TABRAKAN)
     // Offset & lebar area utama mengikuti SidebarProvider → --layout-sidebar-* (desktop vs smartphone).

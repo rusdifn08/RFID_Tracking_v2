@@ -7,6 +7,7 @@ import SewingBatchHourlyChart from '../../components/sewing/SewingBatchHourlyCha
 import SewingBatchOverviewKpi from '../../components/sewing/SewingBatchOverviewKpi';
 import CommandCenterHeader from '../../components/sewing/CommandCenterHeader';
 import { useSewingBatchDashboardQuery, type SewingBatchData } from '../../hooks/useSewingBatchDashboardQuery';
+import { exportSewingBatchToExcel } from '../../utils/exportSewingBatchToExcel';
 import batchData from '../../data/sewing/sewing-batch-dashboard.json';
 import flowData from '../../data/sewing/sewing-flow-detail.json';
 import {
@@ -25,6 +26,23 @@ import { SEWING_DASHBOARD_BATCH_DEFAULT } from '../../utils/sewingBatchVisibilit
 const SewingBatchDashboardPage = memo(() => {
   const { id } = useParams<{ id: string }>();
   const lineId = id ?? '1';
+
+  // Dummy data fallback untuk line 12 jika API kosong
+  const DUMMY_LINE12_ORDER = {
+    wo: '187583',
+    style: '1128733',
+    size: 'S',
+    buyer: 'HEXAPOLE COMPANY LIMITED',
+    item: "STORM CRUISER JACKET M'S",
+    color: 'BL',
+  };
+  const DUMMY_LINE12_BATCHES: SewingBatchData[] = Array.from({ length: 5 }, (_, i) => ({
+    no_batch: i + 1,
+    nama_batch: `Proses`,
+    in: 1,
+    out: 1,
+    output_pcs: 15,
+  } as SewingBatchData));
 
   // Filters State
   const [filterDateFrom, setFilterDateFrom] = useState('');
@@ -47,22 +65,31 @@ const SewingBatchDashboardPage = memo(() => {
   const [batchDetailNo, setBatchDetailNo] = useState<number | null>(null);
 
   const batchesFromApi = useMemo(() => {
-    if (!apiResponse?.data?.[0]?.batch) return [];
-    return apiResponse.data[0].batch;
-  }, [apiResponse]);
+    if (apiResponse?.data?.[0]?.batch && apiResponse.data[0].batch.length > 0) {
+      return apiResponse.data[0].batch;
+    }
+    // Fallback dummy untuk line 12
+    if (lineId === '12') return DUMMY_LINE12_BATCHES;
+    return [];
+  }, [apiResponse, lineId]);
 
   const order = useMemo(() => {
     if (apiResponse?.data?.[0]) {
       const d = apiResponse.data[0];
-      return {
-        wo: d.wo || '—',
-        style: d.style || '—',
-        size: d.size || '—',
-        buyer: d.buyer || '—',
-        item: d.item || '—',
-        color: d.color || '—',
-      };
+      const hasData = d.wo || d.style || d.size || d.buyer || d.item || d.color;
+      if (hasData) {
+        return {
+          wo: d.wo || '—',
+          style: d.style || '—',
+          size: d.size || '—',
+          buyer: d.buyer || '—',
+          item: d.item || '—',
+          color: d.color || '—',
+        };
+      }
     }
+    // Fallback dummy untuk line 12
+    if (lineId === '12') return DUMMY_LINE12_ORDER;
     return {
       wo: '—',
       style: '—',
@@ -71,7 +98,7 @@ const SewingBatchDashboardPage = memo(() => {
       item: '—',
       color: '—',
     };
-  }, [apiResponse]);
+  }, [apiResponse, lineId]);
 
   const batchOverviewList = useMemo(() => {
     if (batchesFromApi.length === 0) return [];
@@ -97,6 +124,7 @@ const SewingBatchDashboardPage = memo(() => {
         wip,
         efficiencyPct,
         outProgressPct: efficiencyPct,
+        outputPcs: Number(b.output_pcs) || 0,
       };
     });
     return applyAssemblyInConstraint(raw);
@@ -208,6 +236,17 @@ const SewingBatchDashboardPage = memo(() => {
     setAppliedDateTo('');
   }, []);
 
+  const handleExportExcel = useCallback(() => {
+    exportSewingBatchToExcel(
+      lineId,
+      order,
+      batchesFromApi,
+      pcsPerBundle,
+      appliedDateFrom || 'Semua Tanggal',
+      appliedDateTo || 'Semua Tanggal'
+    );
+  }, [lineId, order, batchesFromApi, pcsPerBundle, appliedDateFrom, appliedDateTo]);
+
   if (isLoading) {
     return (
       <SewingPageShell fullPage>
@@ -236,6 +275,7 @@ const SewingBatchDashboardPage = memo(() => {
               onDateToChange={setFilterDateTo}
               onSearchClick={handleSearch}
               onResetClick={handleReset}
+              onExportExcelClick={handleExportExcel}
             />
 
             <div className="min-h-0 h-full">
@@ -274,15 +314,25 @@ const SewingBatchDashboardPage = memo(() => {
                 />
               );
             } else {
+              const emptyBatch = {
+                batch: batchNo,
+                type: '—',
+                label: `B${batchNo}`,
+                desc: '—',
+                currentBundle: 0,
+                pcsIn: 0,
+                pcsOut: 0,
+                wip: 0,
+                efficiencyPct: 0,
+                outProgressPct: 0,
+              };
               return (
-                <div
-                  key={`coming-soon-${batchNo}`}
-                  className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-200/60 opacity-80 shadow-inner"
-                  aria-hidden
-                >
-                  <span className="text-[clamp(0.75rem,1.2vw,0.85rem)] font-bold text-slate-400">Batch {batchNo}</span>
-                  <span className="mt-1 text-[clamp(0.65rem,1vw,0.7rem)] font-semibold tracking-wider text-slate-400 uppercase">Coming Soon</span>
-                </div>
+                <BatchOverviewCard
+                  key={batchNo}
+                  batch={emptyBatch as any}
+                  pcsPerBundle={pcsPerBundle}
+                  onOpen={() => openBatchDetail(batchNo)}
+                />
               );
             }
           })}

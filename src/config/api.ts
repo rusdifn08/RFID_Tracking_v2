@@ -661,6 +661,22 @@ export function filterGccBundlesByCreatedLocalDate(
     return rows.filter((r) => r.createdAt != null && isSameLocalCalendarDay(String(r.createdAt), dateRef));
 }
 
+/** Bundle yang `createdAt` jatuh di antara `fromDate` dan `toDate` (inclusive, timezone lokal browser). */
+export function filterGccBundlesByCreatedLocalDateRange(
+    rows: GccCuttingBundleRow[],
+    fromDate: Date,
+    toDate: Date
+): GccCuttingBundleRow[] {
+    const startOfFrom = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate(), 0, 0, 0, 0);
+    const endOfTo = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999);
+    return rows.filter((r) => {
+        if (r.createdAt == null) return false;
+        const d = new Date(String(r.createdAt));
+        if (Number.isNaN(d.getTime())) return false;
+        return d >= startOfFrom && d <= endOfTo;
+    });
+}
+
 /** Ambil array `data` dari body { code, data: [...] }. */
 export function extractGccCuttingBundlesData(payload: unknown): GccCuttingBundleRow[] {
     if (payload == null || typeof payload !== 'object') return [];
@@ -4048,3 +4064,162 @@ export async function saveSewingLayoutData(
     }
 }
 
+// ============================================
+// PREP OPERATOR BATCH API
+// ============================================
+
+/** Payload untuk POST /api/prep/op_batch. */
+export interface PrepOpBatchPayload {
+    nik: string;
+    line: string;
+    batch: string;
+    ket_batch: string;
+    scan_type: string;
+    is_active: string;
+}
+
+/** Respons dari POST /api/prep/op_batch. */
+export interface PrepOpBatchResponseData {
+    id: number;
+    operator_name: string;
+    nik: string;
+    rfid_user: string;
+    line_no: number;
+    batch_no: number;
+    ket_batch: string;
+    scan_type: string;
+    is_active: number;
+    created_at: string;
+    updated_at: string;
+}
+
+/** Resolve URL POST /api/prep/op_batch (service :9000 MJL). */
+function resolvePrepOpBatchUrl(): string {
+    return resolveSameOriginServiceUrl('/api/prep/op_batch', 'http://10.5.0.107:9000/api/prep/op_batch');
+}
+
+/**
+ * POST — simpan data akses operator batch prep.
+ * Browser: same-origin `/api/prep/op_batch`. Backend: `http://10.5.0.107:9000/api/prep/op_batch`.
+ */
+export async function postPrepOpBatch(
+    payload: PrepOpBatchPayload
+): Promise<ApiResponse<PrepOpBatchResponseData>> {
+    try {
+        const url = resolvePrepOpBatchUrl();
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'rfid-key': '0011779933',
+            },
+            body: JSON.stringify(payload),
+        });
+        const text = await res.text();
+        let parsed: unknown = null;
+        try {
+            parsed = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+        } catch {
+            return { success: false, error: 'Respons server bukan JSON', status: 502 };
+        }
+        const body = parsed as {
+            code?: number;
+            status?: string;
+            message?: string;
+            data?: PrepOpBatchResponseData;
+        };
+        if (!res.ok || (body.code != null && body.code >= 400)) {
+            const msg = body.message || body.status || `HTTP ${res.status}`;
+            return { success: false, error: typeof msg === 'string' ? msg : 'Gagal menyimpan operator batch', status: res.status };
+        }
+        return {
+            success: true,
+            data: body.data,
+            status: res.status,
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Gagal POST operator batch prep',
+            status: 500,
+        };
+    }
+}
+
+/** Respons data dari GET /api/prep/batch_layout. */
+export interface PrepBatchLayoutData {
+    batch_layout_id: number;
+    rfid_user: string;
+    nama: string;
+    nik: string;
+    branch: string;
+    line: string;
+    timestamp: string;
+    isDone: number;
+    batch: number;
+    ket_batch: string;
+}
+
+/** Resolve URL GET /api/prep/batch_layout (service :9000 MJL). */
+function resolvePrepBatchLayoutUrl(): string {
+    return resolveSameOriginServiceUrl('/api/prep/batch_layout', 'http://10.5.0.107:9000/api/prep/batch_layout');
+}
+
+/**
+ * GET — mengambil satu record terbaru dari tabel batch_layout untuk RFID user tertentu.
+ * Browser: same-origin `/api/prep/batch_layout`. Backend: `http://10.5.0.107:9000/api/prep/batch_layout`.
+ */
+export async function getPrepBatchLayout(
+    rfidUser: string
+): Promise<ApiResponse<PrepBatchLayoutData>> {
+    const rid = String(rfidUser || '').trim();
+    if (!rid) return { success: false, error: 'RFID user wajib diisi.' };
+    try {
+        const base = resolvePrepBatchLayoutUrl();
+        let reqUrl: string;
+        try {
+            const u = new URL(base);
+            u.searchParams.set('rfid_user', rid);
+            reqUrl = u.toString();
+        } catch {
+            reqUrl = `${base}?rfid_user=${encodeURIComponent(rid)}`;
+        }
+        const res = await fetch(reqUrl, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json',
+                'rfid-key': '0011779933',
+            },
+        });
+        const text = await res.text();
+        let parsed: unknown = null;
+        try {
+            parsed = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+        } catch {
+            return { success: false, error: 'Respons server bukan JSON', status: 502 };
+        }
+        const body = parsed as {
+            code?: number;
+            status?: string;
+            message?: string;
+            count?: number;
+            data?: PrepBatchLayoutData | null;
+        };
+        if (!res.ok || (body.code != null && body.code >= 400)) {
+            const msg = body.message || body.status || `HTTP ${res.status}`;
+            return { success: false, error: typeof msg === 'string' ? msg : 'Gagal mengambil batch layout', status: res.status };
+        }
+        return {
+            success: true,
+            data: body.data ?? undefined,
+            status: res.status,
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Gagal GET batch layout',
+            status: 500,
+        };
+    }
+}

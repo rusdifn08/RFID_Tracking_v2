@@ -33,6 +33,8 @@ export type BatchInOutMetrics = {
   wip: number;
   efficiencyPct: number;
   outProgressPct: number;
+  /** Output pcs aktual dari API (jika tersedia, dipakai di kartu alih-alih bundleOut × pcsPerBundle) */
+  outputPcs?: number;
 };
 
 /** KPI line: max IN & min OUT dari batch produksi (1–5), bukan assembly */
@@ -76,13 +78,15 @@ export const buildBatchProgressFromMetrics = (
 ): BatchProgressFromMetrics => {
   const bundleIn = pcsToBundleCount(metrics.pcsIn, pcsPerBundle);
   const targetOutput = bundleIn * pcsPerBundle;
-  const actual = metrics.pcsOut;
+  const actual = (metrics.outputPcs != null && metrics.outputPcs > 0) ? metrics.outputPcs : metrics.pcsOut;
+  const balance = actual - targetOutput;
+  const persentase = targetOutput > 0 ? Math.round((actual / targetOutput) * 100) : 0;
   return {
     bundleIn,
     targetOutput,
     actual,
-    balance: actual - targetOutput,
-    persentase: metrics.efficiencyPct,
+    balance,
+    persentase,
   };
 };
 

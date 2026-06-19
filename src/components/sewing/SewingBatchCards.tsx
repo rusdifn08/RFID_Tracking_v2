@@ -20,31 +20,23 @@ import {
   PANEL_CAT,
   type CategoryKind,
 } from './sewingBatchTw';
+import { HIDE_SEWING_BATCH_HIGHLIGHT_BADGES } from '../../config/hide';
 
 const MiniMetric = ({
   label,
   value,
   unit,
-  tone,
   className,
   valueClassName,
 }: {
   label: string;
   value: string | number;
   unit?: string;
-  tone: 'amber' | 'violet' | 'slate' | 'blue' | 'teal' | 'rose';
+  tone?: string;
   className?: string;
   valueClassName?: string;
 }) => {
   const shell = 'border-blue-100/70 bg-blue-50/35';
-  const valueTone = {
-    amber: 'text-amber-900',
-    violet: 'text-violet-900',
-    slate: 'text-slate-900',
-    blue: 'text-blue-900',
-    teal: 'text-teal-900',
-    rose: 'text-rose-900',
-  };
 
   return (
     <div
@@ -57,7 +49,7 @@ const MiniMetric = ({
     >
       <span
         className={cn(
-          'w-full truncate pb-[0.06rem] font-semibold leading-snug tracking-wide text-blue-700',
+          'w-full truncate pb-[0.06rem] font-bold leading-snug tracking-wide text-slate-600',
           FLUID.metricInline
         )}
       >
@@ -66,9 +58,9 @@ const MiniMetric = ({
       <span className="flex w-full items-baseline justify-center gap-0.5">
         <strong
           className={cn(
-            'truncate font-black tabular-nums',
+            'truncate font-black tabular-nums text-blue-700',
             FLUID.metricSm,
-            valueClassName ?? valueTone[tone]
+            valueClassName
           )}
         >
           {value}
@@ -240,7 +232,7 @@ const batchHeaderBadges = (
   highlights: ProductionBatchHighlight[] | undefined,
   currentBundle: number
 ) => {
-  if (highlights && highlights.length > 0) {
+  if (!HIDE_SEWING_BATCH_HIGHLIGHT_BADGES && highlights && highlights.length > 0) {
     return highlights.map((h) => HIGHLIGHT_BADGE[h]);
   }
   return [
@@ -267,8 +259,8 @@ export const BatchOverviewCard = memo(
     const bundleIn = pcsToBundleCount(batch.pcsIn, pcsPerBundle);
     const bundleOut = pcsToBundleCount(batch.pcsOut, pcsPerBundle);
     const wipBundle = Math.max(0, bundleIn - bundleOut);
-    /** Output pcs = bundle OUT × pcs per bundle */
-    const outputPcs = bundleOut * pcsPerBundle;
+    /** Output pcs: pakai nilai aktual dari API jika tersedia, fallback = bundle OUT × pcs per bundle */
+    const outputPcs = (batch.outputPcs != null && batch.outputPcs > 0) ? batch.outputPcs : bundleOut * pcsPerBundle;
     const progressPct = Math.min(100, batch.outProgressPct);
     const badges = batchHeaderBadges(highlight, currentBundle);
 
@@ -339,13 +331,13 @@ export const BatchOverviewCard = memo(
                 <span className={cn('font-semibold text-blue-400/80', FLUID.caption)}>Bundle</span>
               </span>
             </div>
-            <div className="flex h-full min-h-0 items-center justify-between gap-2 rounded-lg border border-emerald-100 bg-gradient-to-r from-emerald-50/80 to-white px-[clamp(0.35rem,0.55vw,0.5rem)]">
-              <span className={cn('shrink-0 font-bold uppercase tracking-wide text-emerald-600', FLUID.body)}>OUT</span>
+            <div className="flex h-full min-h-0 items-center justify-between gap-2 rounded-lg border border-blue-100 bg-gradient-to-r from-blue-50/80 to-white px-[clamp(0.35rem,0.55vw,0.5rem)]">
+              <span className={cn('shrink-0 font-bold uppercase tracking-wide text-blue-500', FLUID.body)}>OUT</span>
               <span className="flex items-baseline gap-0.5">
-                <strong className={cn('font-black tabular-nums leading-none text-emerald-700', FLUID.metricInOut)}>
+                <strong className={cn('font-black tabular-nums leading-none text-blue-700', FLUID.metricInOut)}>
                   {bundleOut}
                 </strong>
-                <span className={cn('font-semibold text-emerald-400/80', FLUID.caption)}>Bundle</span>
+                <span className={cn('font-semibold text-blue-400/80', FLUID.caption)}>Bundle</span>
               </span>
             </div>
           </div>

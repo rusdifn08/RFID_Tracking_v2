@@ -13,14 +13,14 @@ export type BatchHourlyOutputSeries = {
 
 /** Warna garis per batch (1–8) */
 export const BATCH_HOURLY_OUTPUT_COLORS: Record<number, string> = {
-  1: '#2563eb',
-  2: '#7c3aed',
-  3: '#0891b2',
-  4: '#d97706',
-  5: '#e11d48',
-  6: '#059669',
-  7: '#6366f1',
-  8: '#14b8a6',
+  1: '#4f81bd',
+  2: '#9f7ae2',
+  3: '#4ba3a5',
+  4: '#db953b',
+  5: '#d4657a',
+  6: '#4b9e74',
+  7: '#7a82e6',
+  8: '#52b2a8',
 };
 
 export const batchHourlyOutputKey = (batchNo: number): string => `batch${batchNo}`;

@@ -25,7 +25,7 @@
     "MJL_9": "TATAN",
     "MJL_10": "LINA",
     "MJL_11": "WIDYA",
-    "MJL_12": "SITI",
+    "MJL_12": "TINI",
     "MJL_13": "SUCI",
     "MJL_14": "TINI",
     "MJL_15": "LINA",
@@ -213,7 +213,8 @@
     "MJL_10": "Production Line 8",
     "MJL_11": "Production Line 7",
     "MJL_13": "Production Line 5",
-    "MJL_1": "Production Line 1"
+    "MJL_1": "Production Line 1",
+    "MJL_12": "Production Line 6"
   },
   "lastUpdated": "2026-06-12T08:15:18.265Z",
   "description": "Data supervisor, jam masuk, dan target untuk production lines. Key sama dengan supervisors/startTimes. Target: angka 150-200 kelipatan 5 (acuan distribusi dashboard line)."

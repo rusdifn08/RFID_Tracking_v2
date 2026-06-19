@@ -1109,6 +1109,11 @@ app.get('/health', (req, res) => {
     });
 });
 
+// QC & PQC Scan Endpoints
+// QC & PQC Scan Endpoints
+app.post('/qc/check', (req, res) => proxyRequest('/qc/check', req, res));
+app.post('/pqc/check', (req, res) => proxyRequest('/pqc/check', req, res));
+
 // Environment Config Endpoint
 app.get('/api/config/environment', (req, res) => {
     // Deteksi environment dari referer/origin header untuk membedakan port 5174 (MJL2) vs 5173 (MJL)

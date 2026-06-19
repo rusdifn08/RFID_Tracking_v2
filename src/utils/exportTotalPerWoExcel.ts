@@ -72,17 +72,17 @@ const BORDER = {
 /** Pewarnaan header dari key API utama (kolom pertama di `keys`). */
 const headerFillForTotalPerWo = (col: ColDef): string => {
   const k = (col.keys[0] || '').toLowerCase();
-  if (['wo', 'style'].includes(k)) return 'FF1E3A5F';
-  if (['item', 'buyer'].includes(k)) return 'FF1F4E78';
-  if (k === 'factory') return 'FF047857';
-  if (k.includes('pic id')) return 'FF6D28D9';
-  if (k.includes('pic') && k.includes('qty')) return 'FF047857';
+  if (['wo', 'style'].includes(k)) return 'FF1E3A8A'; // Dark Blue
+  if (['item', 'buyer'].includes(k)) return 'FF2563EB'; // Medium Blue
+  if (k === 'factory') return 'FF3B82F6'; // Brighter Blue
+  if (k.includes('pic id')) return 'FF60A5FA'; // Light Blue
+  if (k.includes('pic') && k.includes('qty')) return 'FF3B82F6'; // Brighter Blue
   if (
     ['output_sewing', 'good', 'pqc_good', 'in_dryroom', 'out_dryroom', 'in_folding', 'out_folding'].includes(k)
   ) {
-    return 'FF0369A1';
+    return 'FF1D4ED8'; // Royal Blue
   }
-  return 'FF334155';
+  return 'FF2563EB'; // Default Medium Blue
 };
 
 const toDateToken = (date?: string): string => {

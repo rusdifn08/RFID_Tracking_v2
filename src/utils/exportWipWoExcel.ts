@@ -53,14 +53,14 @@ const BORDER = {
   right: { style: 'thin' as const, color: { argb: 'FFBFDBFE' } },
 };
 
-/** Biru gelap info (WO–Buyer, dryroom–folding); biru medium (output sewing); oranye/hijau soft. */
-const INFO_BLUE_HEADER = 'FF1E40AF';
-const INFO_BLUE_DATA = 'FFE0E7FF';
+/** Biru gelap info (WO–Buyer, dryroom–folding); biru medium (output sewing); biru/cyan soft. */
+const INFO_BLUE_HEADER = 'FF1E3A8A';
+const INFO_BLUE_DATA = 'FFEBF2FF';
 /** Header lebih gelap agar teks putih kontras (sel data tetap pastel). */
-const SOFT_GREEN_HEADER = 'FF166534';
-const SOFT_GREEN_DATA = 'FFDCFCE7';
-const SOFT_ORANGE_HEADER = 'FFC2410C';
-const SOFT_ORANGE_DATA = 'FFFFEDD5';
+const SOFT_GREEN_HEADER = 'FF1D4ED8';
+const SOFT_GREEN_DATA = 'FFE0F2FE';
+const SOFT_ORANGE_HEADER = 'FF3B82F6';
+const SOFT_ORANGE_DATA = 'FFEFF6FF';
 
 const HEADER_FILL: Record<WipCol['group'], string> = {
   info: INFO_BLUE_HEADER,

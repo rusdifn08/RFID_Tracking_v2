@@ -24,9 +24,6 @@ type SewingBatchHourlyChartProps = {
   compact?: boolean;
 };
 
-const Y_DOMAIN: [number, number] = [12, 28];
-const Y_TICKS = [12, 15, 18, 21, 24, 27];
-
 const BatchToggleButton = memo(
   ({
     series,
@@ -149,6 +146,40 @@ const SewingBatchHourlyChart = memo(
       [series, focusedBatch]
     );
 
+    const yDomain = useMemo<[number, number]>(() => {
+      if (!chartData || chartData.length === 0 || activeSeries.length === 0) {
+        return [0, 10];
+      }
+
+      let minVal = Infinity;
+      let maxVal = -Infinity;
+
+      chartData.forEach((point) => {
+        activeSeries.forEach((s) => {
+          const val = point[s.dataKey];
+          const num = typeof val === 'number' ? val : Number(val);
+          if (!isNaN(num)) {
+            if (num < minVal) minVal = num;
+            if (num > maxVal) maxVal = num;
+          }
+        });
+      });
+
+      if (minVal === Infinity || maxVal === -Infinity) {
+        return [0, 10];
+      }
+
+      if (minVal === maxVal) {
+        return [Math.max(0, minVal - 5), minVal + 5];
+      }
+
+      const padding = Math.max(1, Math.round((maxVal - minVal) * 0.1));
+      const finalMin = Math.max(0, minVal - padding);
+      const finalMax = maxVal + padding;
+
+      return [finalMin, finalMax];
+    }, [chartData, activeSeries]);
+
     const showDotLabels = activeSeries.length <= 3;
 
     const headerRef = useRef<HTMLDivElement>(null);
@@ -263,8 +294,7 @@ const SewingBatchHourlyChart = memo(
                 height={compact ? 36 : 30}
               />
               <YAxis
-                domain={Y_DOMAIN}
-                ticks={Y_TICKS}
+                domain={yDomain}
                 tick={{ fontSize: compact ? 9 : 11, fill: '#64748b', fontWeight: 600 }}
                 axisLine={{ stroke: '#cbd5e1' }}
                 tickLine={{ stroke: '#cbd5e1' }}

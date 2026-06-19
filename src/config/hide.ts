@@ -102,3 +102,11 @@ export function filterVisibleProductionLines<T extends { id: number }>(
     const hidden = new Set(HIDDEN_PRODUCTION_LINE_IDS_MJL);
     return lines.filter((line) => !hidden.has(line.id));
 }
+
+// --- Dashboard Sewing Line (batch card indicators) ---
+/**
+ * Badge indikator perbandingan batch (IN Terbesar, IN Terkecil, OUT Terbesar, OUT Terkecil)
+ * di kartu batch pada dashboard sewing line.
+ * true = badge disembunyikan, hanya tampil default "Bundle-N".
+ */
+export const HIDE_SEWING_BATCH_HIGHLIGHT_BADGES = true;

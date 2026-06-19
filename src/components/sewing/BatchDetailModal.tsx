@@ -54,6 +54,16 @@ const metricCell = (label: string, value: string, valueClass?: string) => (
   </div>
 );
 
+const batchMetricCell = (label: string, value: ReactNode, sub?: ReactNode) => (
+  <div className="rounded-md border border-slate-200 bg-gradient-to-b from-white to-[#f8fbff] px-1 py-2 text-center flex flex-col items-center justify-center">
+    <span className="block text-[0.54rem] font-bold uppercase tracking-wide text-slate-400">{label}</span>
+    <b className={cn('mt-0.5 block text-[1rem] font-black', modalDataValue)}>{value}</b>
+    {sub ? (
+      <small className="mt-0.5 block text-[0.55rem] font-bold leading-tight text-slate-500">{sub}</small>
+    ) : null}
+  </div>
+);
+
 const scanBadge = (ok: boolean, label: string) => (
   <span
     className={cn(
@@ -104,15 +114,7 @@ const BatchDetailModal = memo(
       if (!batch || !lane) return null;
 
       const simLane = sim?.batches.find((b) => b.batchNo === batch.batch);
-      const currentBundle = resolveCurrentBundle(batch.batch, batch, simLane, useLiveSim);
       const orderBundleCount = parseOrderBundleCount(lane.demoQty);
-      const bundleStatusList = buildBatchBundleStatusList(
-        batch.batch,
-        lane,
-        simLane,
-        !!useLiveSim,
-        pcsPerBundle
-      );
 
       const metrics: BatchInOutMetrics = inOutMetrics ?? {
         pcsIn: 0,
@@ -125,7 +127,43 @@ const BatchDetailModal = memo(
       const bundleIn = pcsToBundleCount(metrics.pcsIn, pcsPerBundle);
       const bundleOut = pcsToBundleCount(metrics.pcsOut, pcsPerBundle);
       const wipBundle = Math.max(0, bundleIn - bundleOut);
-      const outputPcs = bundleOut * pcsPerBundle;
+      const outputPcs = (metrics.outputPcs != null && metrics.outputPcs > 0) ? metrics.outputPcs : bundleOut * pcsPerBundle;
+
+      const currentBundle = inOutMetrics
+        ? (inOutMetrics as any).currentBundle
+        : resolveCurrentBundle(batch.batch, batch, simLane, useLiveSim);
+
+      // Jika ada data dari API (inOutMetrics), buat list sederhana dari jumlah IN/OUT aktual
+      // tanpa data dummy (waktu scan, durasi, RFID palsu).
+      let bundleStatusList: BatchBundleStatus[];
+      if (inOutMetrics) {
+        const totalBundles = Math.max(bundleIn, bundleOut);
+        bundleStatusList = Array.from({ length: totalBundles }, (_, i) => {
+          const bundleNo = i + 1;
+          const scannedIn = bundleNo <= bundleIn;
+          const scannedOut = bundleNo <= bundleOut;
+          return {
+            bundleNo,
+            rfid: '—',
+            scannedIn,
+            scannedOut,
+            outputPcs: scannedOut ? pcsPerBundle : 0,
+            targetPcs: pcsPerBundle,
+            persentase: scannedOut ? 100 : 0,
+            scanInAt: null,
+            scanOutAt: null,
+            durationLabel: scannedOut ? 'Selesai' : scannedIn ? 'Dalam proses' : null,
+          } satisfies BatchBundleStatus;
+        });
+      } else {
+        bundleStatusList = buildBatchBundleStatusList(
+          batch.batch,
+          lane,
+          simLane,
+          !!useLiveSim,
+          pcsPerBundle
+        );
+      }
 
       return {
         currentBundle,
@@ -136,7 +174,7 @@ const BatchDetailModal = memo(
         bundleOut,
         wipBundle,
         outputPcs,
-        progressPct: metrics.efficiencyPct,
+        progressPct: outputProgress.persentase,
       };
     }, [batch, lane, pcsPerBundle, sim, useLiveSim, inOutMetrics]);
 
@@ -172,23 +210,13 @@ const BatchDetailModal = memo(
                   B{batch.batch}
                 </span>
                 <div className="min-w-0">
-                  <p className="m-0 text-[0.62rem] font-bold uppercase tracking-wider text-white/80">
-                    Dashboard Batch Jahit
-                  </p>
                   <h2
                     id="sd-v2-batch-detail-title"
-                    className="m-0 mt-1 text-[clamp(0.95rem,2vh,1.12rem)] font-black leading-tight tracking-tight"
+                    className="m-0 text-[clamp(0.95rem,2vh,1.12rem)] font-black leading-tight tracking-tight uppercase text-white"
                   >
-                    Batch {batch.batch}
+                    BATCH {batch.batch} : {batch.type}
                   </h2>
-                  <p className="mt-0.5 text-[0.68rem] leading-snug text-white/80">{batch.type}</p>
                 </div>
-              </div>
-              <div className="flex shrink-0 flex-wrap items-stretch justify-end gap-1.5">
-                {heroMetricBox('Bundle Masuk', bundleIn, 'bundle scan IN')}
-                {heroMetricBox('Bundle Selesai', bundleOut, 'bundle scan OUT')}
-                {heroMetricBox('WIP Bundle', wipBundle, 'belum selesai')}
-                {heroMetricBox('Output', outputPcs, 'pcs produksi')}
               </div>
             </div>
             <div className="relative z-[1] mt-2.5 h-[0.35rem] overflow-hidden rounded-full bg-white/20">
@@ -204,30 +232,12 @@ const BatchDetailModal = memo(
           <div className={modalCardHead}>
             <h3 className={modalCardTitle}>Ringkasan Produksi Batch</h3>
           </div>
-          <div className="grid grid-cols-5 gap-1.5 max-sm:grid-cols-2">
-            {metricCell('Bundle Masuk (IN)', String(prog.bundleIn))}
-            {metricCell('Target Produksi (pcs)', String(prog.targetOutput))}
-            {metricCell('Output Selesai (pcs)', String(prog.actual))}
-            <div className="rounded-md border border-slate-200 bg-gradient-to-b from-white to-[#f8fbff] px-1 py-1.5 text-center">
-              <span className="block text-[0.54rem] font-bold uppercase tracking-wide text-slate-400">
-                Selisih vs Target
-              </span>
-              <b
-                className={cn(
-                  'mt-0.5 block text-[0.88rem] font-black',
-                  prog.balance < 0 ? 'text-red-600' : modalDataValue
-                )}
-              >
-                {prog.balance > 0 ? '+' : ''}
-                {prog.balance}
-              </b>
-            </div>
-            {metricCell('Tingkat Penyelesaian', `${prog.persentase}%`)}
+          <div className="grid grid-cols-4 gap-1.5 max-sm:grid-cols-2">
+            {batchMetricCell('Bundle Masuk', bundleIn, 'bundle scan IN')}
+            {batchMetricCell('Bundle Selesai', bundleOut, 'bundle scan OUT')}
+            {batchMetricCell('WIP Bundle', wipBundle, 'belum selesai')}
+            {batchMetricCell('Output', outputPcs, 'pcs produksi')}
           </div>
-          <p className="mt-2 text-[0.62rem] leading-relaxed text-slate-500">
-            Bundle Masuk = jumlah bundle yang sudah scan IN. Target Produksi = Bundle Masuk × {pcsPerBundle}{' '}
-            pcs. Output Selesai = total pcs scan OUT. Tingkat Penyelesaian = Output ÷ Target.
-          </p>
         </section>
 
         <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
@@ -238,26 +248,32 @@ const BatchDetailModal = memo(
             <div className="grid grid-cols-2 gap-1.5">
               <div>
                 <span className={modalLabel}>Bundle Sedang Dikerjakan</span>
-                <strong className={modalStrong}>Ke-{currentBundle}</strong>
+                <strong className={modalStrong}>
+                  {inOutMetrics ? (
+                    bundleIn === 0 ? '—' : bundleIn === bundleOut ? 'Selesai' : `Ke-${bundleOut + 1}`
+                  ) : (
+                    `Ke-${currentBundle}`
+                  )}
+                </strong>
               </div>
               <div>
-                <span className={modalLabel}>Isi per Bundle</span>
-                <strong className={modalStrong}>{pcsPerBundle} pcs</strong>
-              </div>
-              <div className="col-span-2">
                 <span className={modalLabel}>Total Output (pcs)</span>
                 <strong className={modalStrong}>{outputPcs} pcs</strong>
               </div>
-              <div>
-                <span className={modalLabel}>Jenis Output</span>
-                <strong className={modalStrong}>{lane.outputTag}</strong>
-              </div>
-              <div>
-                <span className={modalLabel}>Total Bundle Order</span>
-                <strong className={modalStrong}>
-                  {orderBundleCount > 0 ? `${orderBundleCount} bundle` : lane.demoQty}
-                </strong>
-              </div>
+              {!inOutMetrics && (
+                <>
+                  <div>
+                    <span className={modalLabel}>Jenis Output</span>
+                    <strong className={modalStrong}>{lane.outputTag}</strong>
+                  </div>
+                  <div>
+                    <span className={modalLabel}>Total Bundle Order</span>
+                    <strong className={modalStrong}>
+                      {orderBundleCount > 0 ? `${orderBundleCount} bundle` : lane.demoQty}
+                    </strong>
+                  </div>
+                </>
+              )}
             </div>
           </section>
 
@@ -299,7 +315,7 @@ const BatchDetailModal = memo(
           </div>
           {bundleStatusList.length === 0 ? (
             <p className="m-0 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-[0.66rem] text-slate-500">
-              Belum ada bundle. Jalankan simulasi (S) untuk mengisi data IN/OUT.
+              Belum ada data bundle. Data IN/OUT akan tampil sesuai data dari API.
             </p>
           ) : (
             <ul className="m-0 max-h-[min(22rem,50vh)] list-none space-y-1.5 overflow-auto p-0">

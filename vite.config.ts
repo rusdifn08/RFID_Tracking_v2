@@ -84,6 +84,7 @@ const VITE_HANDLED_PREFIXES = [
   '/api/homedashboard',
   '/api/sewing',
   '/api/smv',
+  '/api/prep',
   '/rework',
   '/qc-pqc',
   '/pqc-rework',
@@ -125,6 +126,8 @@ function shouldProxyToServerJs(url: string): boolean {
     '/user',
     '/wo/',
     '/health',
+    '/qc',
+    '/pqc',
   ]
   return serverJsPrefixes.some((p) => path === p || path.startsWith(p.endsWith('/') ? p : p + '/'))
 }
@@ -312,6 +315,11 @@ export default defineConfig(({ mode, command }) => {
           secure: false,
         },
         '/api/smv': {
+          target: sewingServiceTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api/prep': {
           target: sewingServiceTarget,
           changeOrigin: true,
           secure: false,

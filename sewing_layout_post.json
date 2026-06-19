@@ -800,6 +800,20 @@
           "batch": 1
         }
       ]
+    },
+    {
+      "line": "2",
+      "style": "G81449",
+      "environment": "MJL",
+      "count": 1,
+      "updatedAt": "2026-06-12T09:23:16.572Z",
+      "data": [
+        {
+          "smv_id": 98061,
+          "rfid_user": "0009116099",
+          "batch": 1
+        }
+      ]
     }
   ]
 }

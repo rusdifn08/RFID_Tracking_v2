@@ -8,6 +8,7 @@ import {
     fetchGccCuttingBundlesList,
     extractGccCuttingBundlesData,
     filterGccBundlesByCreatedLocalDate,
+    filterGccBundlesByCreatedLocalDateRange,
     postGccCuttingBundleBatchRegister,
     fetchGccCuttingRegBatchList,
     extractGccCuttingRegBatchRows,
@@ -18,7 +19,7 @@ import {
     type GccCuttingFormFields,
     type GccCuttingRegBatchRow,
 } from '../config/api';
-import { Camera, ChevronDown, PenLine, RefreshCw, Search, X } from 'lucide-react';
+import { Camera, ChevronDown, List, PenLine, RefreshCw, Search, X } from 'lucide-react';
 
 const CuttingLabelScanModal = lazy(() => import('../components/cutting/CuttingLabelScanModal'));
 
@@ -129,7 +130,13 @@ const DaftarRFIDCutting: React.FC = memo(() => {
     const [bundlesToday, setBundlesToday] = useState<GccCuttingBundleRow[]>([]);
     const [bundlesLoading, setBundlesLoading] = useState(false);
     const [bundlesError, setBundlesError] = useState<string | null>(null);
-    const [bundleFilterDate, setBundleFilterDate] = useState(todayIso);
+    /** Date range filter: from / to */
+    const [bundleFilterFrom, setBundleFilterFrom] = useState(todayIso);
+    const [bundleFilterTo, setBundleFilterTo] = useState(todayIso);
+    /** true = tampilkan semua data tanpa filter tanggal */
+    const [showAllBundles, setShowAllBundles] = useState(false);
+    /** Filter by style (case-insensitive substring match). */
+    const [styleFilter, setStyleFilter] = useState('');
     const [bundleMenuOpen, setBundleMenuOpen] = useState(false);
     const [bundleSearch, setBundleSearch] = useState('');
     const [lastBundlePickLabel, setLastBundlePickLabel] = useState<string | null>(null);
@@ -144,14 +151,24 @@ const DaftarRFIDCutting: React.FC = memo(() => {
         return ket ? `Batch ${num} — ${ket}` : `Batch ${num}`;
     }, [batchMetaList]);
 
-    const loadBundlesByDate = useCallback(async (dateIso: string) => {
+    /** Muat bundle — jika showAll=true semua data ditampilkan; jika tidak, filter by range from–to. */
+    const loadBundles = useCallback(async (opts: { showAll: boolean; from: string; to: string }) => {
         setBundlesLoading(true);
         setBundlesError(null);
         try {
             const raw = await fetchGccCuttingBundlesList();
             const all = extractGccCuttingBundlesData(raw);
-            const filterDate = dateIso ? new Date(`${dateIso}T00:00:00`) : new Date();
-            setBundlesToday(filterGccBundlesByCreatedLocalDate(all, filterDate));
+            if (opts.showAll) {
+                setBundlesToday(all);
+            } else if (opts.from === opts.to) {
+                // Single day — pakai filter hari yang sama
+                const filterDate = opts.from ? new Date(`${opts.from}T00:00:00`) : new Date();
+                setBundlesToday(filterGccBundlesByCreatedLocalDate(all, filterDate));
+            } else {
+                const fromDate = opts.from ? new Date(`${opts.from}T00:00:00`) : new Date();
+                const toDate = opts.to ? new Date(`${opts.to}T00:00:00`) : new Date();
+                setBundlesToday(filterGccBundlesByCreatedLocalDateRange(all, fromDate, toDate));
+            }
         } catch (e) {
             setBundlesToday([]);
             setBundlesError(e instanceof Error ? e.message : String(e));
@@ -161,8 +178,8 @@ const DaftarRFIDCutting: React.FC = memo(() => {
     }, []);
 
     useEffect(() => {
-        void loadBundlesByDate(bundleFilterDate);
-    }, [bundleFilterDate, loadBundlesByDate]);
+        void loadBundles({ showAll: showAllBundles, from: bundleFilterFrom, to: bundleFilterTo });
+    }, [bundleFilterFrom, bundleFilterTo, showAllBundles, loadBundles]);
 
     useEffect(() => {
         if (!bundleMenuOpen) return;
@@ -176,25 +193,41 @@ const DaftarRFIDCutting: React.FC = memo(() => {
         return () => document.removeEventListener('mousedown', onDoc);
     }, [bundleMenuOpen]);
 
+    /** Bundles yang sudah difilter berdasarkan style global + pencarian di dropdown. */
     const filteredBundles = useMemo(() => {
+        let list = bundlesToday;
+
+        // Filter by style (global filter)
+        const sf = styleFilter.trim().toLowerCase();
+        if (sf) {
+            list = list.filter((b) => {
+                const s = b.style != null ? String(b.style).toLowerCase() : '';
+                return s.includes(sf);
+            });
+        }
+
+        // Filter by search query (dropdown search)
         const q = bundleSearch.trim().toLowerCase();
-        if (!q) return bundlesToday;
-        return bundlesToday.filter((b) => {
-            const hay = [
-                b.barcode,
-                b.wo,
-                b.rfidBundles,
-                b.warna,
-                b.size,
-                b.placing,
-                b.style,
-                b.country,
-            ]
-                .map((x) => (x != null ? String(x).toLowerCase() : ''))
-                .join(' ');
-            return hay.includes(q);
-        });
-    }, [bundlesToday, bundleSearch]);
+        if (q) {
+            list = list.filter((b) => {
+                const hay = [
+                    b.barcode,
+                    b.wo,
+                    b.rfidBundles,
+                    b.warna,
+                    b.size,
+                    b.placing,
+                    b.style,
+                    b.country,
+                ]
+                    .map((x) => (x != null ? String(x).toLowerCase() : ''))
+                    .join(' ');
+                return hay.includes(q);
+            });
+        }
+
+        return list;
+    }, [bundlesToday, bundleSearch, styleFilter]);
 
     /** Isi seluruh form dari baris bundle API. */
     const onSelectBundle = useCallback((row: GccCuttingBundleRow) => {
@@ -480,19 +513,10 @@ const DaftarRFIDCutting: React.FC = memo(() => {
                             />
 
                             <div className="relative flex items-center justify-between gap-2 sm:gap-3 mb-3 sm:mb-5 min-h-[44px]">
-                                <div className="flex items-center gap-1.5 shrink-0 z-10">
-                                    <label className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 shadow-sm w-fit">
-                                        <input
-                                            type="date"
-                                            value={bundleFilterDate}
-                                            onChange={(e) => setBundleFilterDate(e.target.value)}
-                                            className="h-7 px-2 text-[10px] sm:text-xs border border-blue-300 rounded-md bg-white text-slate-700 focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none"
-                                        />
-                                    </label>
-                                </div>
                                 <h1 className="absolute left-1/2 -translate-x-1/2 text-center text-lg sm:text-2xl md:text-3xl font-extrabold text-slate-800 z-10 px-8 tracking-tight">
                                     Daftar RFID Cutting
                                 </h1>
+                                <div className="shrink-0 z-10" />
                                 <button
                                     type="button"
                                     onClick={() => setScanModalOpen(true)}
@@ -504,9 +528,73 @@ const DaftarRFIDCutting: React.FC = memo(() => {
                                 </button>
                             </div>
 
+                            {/* Filter: Date Range + Tampilkan Semua */}
+                            <div className="relative flex flex-wrap items-end gap-2 sm:gap-3 mb-3 sm:mb-5">
+                                <label className="flex flex-col gap-0.5">
+                                    <span className="text-[10px] sm:text-xs font-semibold text-slate-600">From</span>
+                                    <input
+                                        type="date"
+                                        value={bundleFilterFrom}
+                                        onChange={(e) => {
+                                            setBundleFilterFrom(e.target.value);
+                                            setShowAllBundles(false);
+                                        }}
+                                        className="h-8 px-2 text-[10px] sm:text-xs border border-blue-300 rounded-lg bg-white text-slate-700 focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none shadow-sm"
+                                    />
+                                </label>
+                                <label className="flex flex-col gap-0.5">
+                                    <span className="text-[10px] sm:text-xs font-semibold text-slate-600">To</span>
+                                    <input
+                                        type="date"
+                                        value={bundleFilterTo}
+                                        onChange={(e) => {
+                                            setBundleFilterTo(e.target.value);
+                                            setShowAllBundles(false);
+                                        }}
+                                        className="h-8 px-2 text-[10px] sm:text-xs border border-blue-300 rounded-lg bg-white text-slate-700 focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none shadow-sm"
+                                    />
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAllBundles(true)}
+                                    className={`h-8 px-3 sm:px-4 text-[10px] sm:text-xs font-bold rounded-lg border transition-all duration-200 flex items-center gap-1.5 shadow-sm ${
+                                        showAllBundles
+                                            ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-indigo-400 shadow-[0_4px_12px_rgba(79,70,229,0.3)]'
+                                            : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-400'
+                                    }`}
+                                    title="Tampilkan semua data tanpa filter tanggal"
+                                >
+                                    <List size={14} />
+                                    <span>Tampilkan Semua</span>
+                                </button>
+                                <label className="flex flex-col gap-0.5 flex-1 min-w-[140px]">
+                                    <span className="text-[10px] sm:text-xs font-semibold text-slate-600">Style</span>
+                                    <div className="relative">
+                                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+                                        <input
+                                            type="text"
+                                            value={styleFilter}
+                                            onChange={(e) => setStyleFilter(e.target.value)}
+                                            placeholder="Cari style…"
+                                            className="w-full h-8 pl-7 pr-7 text-[10px] sm:text-xs border border-blue-300 rounded-lg bg-white text-slate-700 focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none shadow-sm placeholder:text-slate-400"
+                                        />
+                                        {styleFilter && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setStyleFilter('')}
+                                                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                                                title="Hapus filter style"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </label>
+                            </div>
+
                             <p className="relative text-center text-[11px] sm:text-sm text-slate-500 mb-3 sm:mb-5 px-2">
                                 Scan QR, ketik barcode lalu <strong>Ambil data</strong>, atau pilih bundle di kolom{' '}
-                                <strong>Barcode label</strong> (sesuai tanggal filter — form terisi otomatis).
+                                <strong>Barcode label</strong> ({showAllBundles ? 'semua data' : `filter ${bundleFilterFrom} s/d ${bundleFilterTo}`} — form terisi otomatis).
                             </p>
 
                             <form onSubmit={handleManualSubmit} className="relative space-y-3 shrink-0">
@@ -562,7 +650,7 @@ const DaftarRFIDCutting: React.FC = memo(() => {
                                                 <button
                                                     type="button"
                                                     title="Muat ulang daftar bundle sesuai tanggal filter"
-                                                    onClick={() => void loadBundlesByDate(bundleFilterDate)}
+                                                    onClick={() => void loadBundles({ showAll: showAllBundles, from: bundleFilterFrom, to: bundleFilterTo })}
                                                     disabled={bundlesLoading}
                                                     className="shrink-0 min-h-[2.5rem] px-2.5 rounded-lg border-2 border-gray-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:border-blue-300 disabled:opacity-50"
                                                 >

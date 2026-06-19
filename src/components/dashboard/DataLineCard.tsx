@@ -3,7 +3,7 @@ import { Filter, Search, Calendar, ChevronLeft, ChevronRight } from 'lucide-reac
 import ChartCard from './ChartCard';
 import { getTodayLocalDateString } from '../../utils/dateUtils';
 import { ExportButton } from '../finishing/ExportButton';
-import { HIDE_DATA_LINE_NUMBER } from '../../config/hide';
+
 
 interface DataLineCardProps {
     lineTitle: string;
