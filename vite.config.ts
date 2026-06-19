@@ -282,7 +282,7 @@ export default defineConfig(({ mode, command }) => {
         '/last-status': { target: trackingProxyTarget, changeOrigin: true, secure: false },
 
         // Single query API untuk cycle time
-        '/cycletime': { target: 'http://localhost:8000', changeOrigin: true, secure: false },
+        '/cycletime': { target: `http://localhost:${nodeProxyPort}`, changeOrigin: true, secure: false },
 
         // GCC cutting (:9000) — path sama dengan backend agar Network tab konsisten
         '/api/gcc/cutting': {
