@@ -74,7 +74,7 @@ const getBackendIP = (): string => {
         if (storedEnv === 'MJL') {
             return '10.5.0.106';
         } else if (storedEnv === 'MJL2') {
-            return '10.5.0.99';
+            return '10.6.0.99';
         } else if (storedEnv === 'GCC') {
             return '10.5.0.106';
         }

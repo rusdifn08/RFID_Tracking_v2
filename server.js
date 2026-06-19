@@ -62,7 +62,7 @@ if (args.includes('cln')) {
     BACKEND_IP = '10.5.0.106';
     CURRENT_ENV = 'MJL';
 } else if (args.includes('mjl2')) {
-    BACKEND_IP = '10.5.0.99';
+    BACKEND_IP = '10.6.0.99';
     CURRENT_ENV = 'MJL2';
 } else if (args.includes('gcc')) {
     // Route /gcc/* (daily-output, dll.) di lab: sama dengan host MJL; override dengan BACKEND_IP jika backend GCC terpisah.
@@ -679,7 +679,7 @@ function loadActiveSessionsFromFile() {
             // Cek environment dari log.environment atau log.backendIP
             const logEnvironment = log.environment || (log.backendIP === '10.8.0.104' ? 'CLN' :
                 log.backendIP === '10.5.0.106' ? 'MJL' :
-                    log.backendIP === '10.5.0.99' ? 'MJL2' :
+                    log.backendIP === '10.6.0.99' ? 'MJL2' :
                         log.backendIP === '10.5.0.201' ? 'GCC' : null);
             const isSameEnvironment = logEnvironment === CURRENT_ENV;
 
@@ -864,7 +864,7 @@ function updateUserLogout(nik, req) {
                 const lineNumber = extractLineNumber(loggedOutUser.name) || loggedOutUser.line;
                 const logEnvironment = loggedOutUser.environment || (loggedOutUser.backendIP === '10.8.0.104' ? 'CLN' :
                     loggedOutUser.backendIP === '10.5.0.106' ? 'MJL' :
-                        loggedOutUser.backendIP === '10.5.0.99' ? 'MJL2' :
+                        loggedOutUser.backendIP === '10.6.0.99' ? 'MJL2' :
                             loggedOutUser.backendIP === '10.5.0.201' ? 'GCC' : null);
                 const isSameEnvironment = logEnvironment === CURRENT_ENV;
 
@@ -1605,7 +1605,7 @@ app.post('/api/cutting/supply-sewing-scan', (req, res) => {
 // ============================================
 
 // Database Configuration
-const DATABASE_URL = 'http://10.5.0.99/db/garment';
+const DATABASE_URL = 'http://10.6.0.99/db/garment';
 const BACKEND_API_URL_CHECK = process.env.BACKEND_API_URL || BACKEND_API_URL;
 
 // MySQL Configuration - Berbeda untuk setiap IP
@@ -3927,7 +3927,7 @@ app.get('/cycletime', async (req, res) => {
         // Gunakan BACKEND_API_URL sesuai environment
         // CLN: 10.8.0.104:7000
         // MJL: 10.5.0.106:7000
-        // MJL2: 10.5.0.99:7000 (atau sesuai konfigurasi)
+        // MJL2: 10.6.0.99:7000 (atau sesuai konfigurasi)
 
         // Build query parameters
         const queryParams = new URLSearchParams();
@@ -6249,7 +6249,7 @@ app.listen(PORT, HOST, () => {
                         const log = userLogs[i];
                         const logEnvironment = log.environment || (log.backendIP === '10.8.0.104' ? 'CLN' :
                             log.backendIP === '10.5.0.106' ? 'MJL' :
-                                log.backendIP === '10.5.0.99' ? 'MJL2' : null);
+                                log.backendIP === '10.6.0.99' ? 'MJL2' : null);
 
                         if (log.nik === user.nik &&
                             !log.logoutTime &&

@@ -36,7 +36,7 @@ npm run dev:all
 # Atau per environment:
 npm run dev:all:cln   # CLN
 npm run dev:all:mjl    # MJL (backend 10.5.0.106)
-npm run dev:all:mjl2   # MJL2 (backend 10.5.0.99, port 8001 & 5174)
+npm run dev:all:mjl2   # MJL2 (backend 10.6.0.99, port 8001 & 5174)
 ```
 
 **Opsi B – Dua terminal:**
@@ -60,7 +60,7 @@ npm run dev:all:mjl2   # MJL2 (backend 10.5.0.99, port 8001 & 5174)
 |---------------|------------|------------|--------------------------|
 | CLN (default) | 10.8.0.104 | 8000       | 5173                     |
 | MJL           | 10.5.0.106 | 8000       | 5173                     |
-| MJL2          | 10.5.0.99  | 8001       | 5174                     |
+| MJL2          | 10.6.0.99  | 8001       | 5174                     |
 
 - **Lokasi konfigurasi backend:** `server.js` (variabel `BACKEND_IP`, `PORT`).
 - **Lokasi konfigurasi frontend:** `src/config/api.ts` (base URL proxy dan WebSocket).
