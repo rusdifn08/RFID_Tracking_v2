@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { AlertTriangle, CalendarRange, CheckCircle2, CircleX, ClipboardCheck, FileSpreadsheet, Layers, Loader2, Wrench } from 'lucide-react';
@@ -127,7 +127,7 @@ function BundleCard({ value }: { value: number }) {
     <div className="relative overflow-hidden rounded-2xl border border-violet-200/80 bg-gradient-to-b from-violet-50/70 to-fuchsia-50/50 p-4 shadow-sm h-full" style={{ containerType: 'inline-size' }}>
       <div className="relative z-[2] flex items-start justify-between gap-2">
         <h3 className="font-extrabold tracking-[0.12em] text-violet-700 uppercase" style={{ fontSize: QC_TYPO.stationTitle }}>
-          Jumlah Bundle
+          PENDING BUNDLE
         </h3>
         <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-violet-200 bg-white text-violet-600 shadow-sm">
           <Layers className="h-5 w-5" />

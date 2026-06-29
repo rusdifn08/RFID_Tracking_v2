@@ -16,8 +16,8 @@ import {
   type SewingFlowBatch,
 } from '../../types/sewingDashboard';
 import {
-  applyAssemblyInConstraint,
   computeProductionBatchHighlights,
+  isAssemblyBatch,
 } from '../../utils/sewingBatchInOut';
 import type { BatchHourlyOutputPoint } from '../../utils/sewingBatchHourlyOutput';
 import { getBatchGridConfig } from '../../utils/sewingBatchGridLayout';
@@ -107,10 +107,13 @@ const SewingBatchDashboardPage = memo(() => {
     const raw = batchesFromApi.map((b: SewingBatchData) => {
       const batchNo = Number(b.no_batch) || 0;
       const type = b.nama_batch || 'Proses';
+      const isAssembly = isAssemblyBatch(batchNo);
       
-      const pcsIn = b.in * pcsPerBundle;
-      const pcsOut = b.out * pcsPerBundle;
-      const wip = Math.max(0, b.in - b.out) * pcsPerBundle;
+      // ASSEMBLING batch: API returns in/out already in pcs, not bundle count
+      // Production batches (1-5): API returns in/out in bundle count, multiply by pcsPerBundle
+      const pcsIn = isAssembly ? b.in : b.in * pcsPerBundle;
+      const pcsOut = isAssembly ? b.out : b.out * pcsPerBundle;
+      const wip = isAssembly ? Math.max(0, b.in - b.out) : Math.max(0, b.in - b.out) * pcsPerBundle;
       const efficiencyPct = b.in > 0 ? Math.round((b.out / b.in) * 100) : 0;
       
       return {
@@ -118,7 +121,7 @@ const SewingBatchDashboardPage = memo(() => {
         type,
         label: `B${batchNo}`,
         desc: type,
-        currentBundle: Math.max(1, Math.min(b.in, b.out + 1)),
+        currentBundle: isAssembly ? b.in : Math.max(1, Math.min(b.in, b.out + 1)),
         pcsIn,
         pcsOut,
         wip,
@@ -127,7 +130,7 @@ const SewingBatchDashboardPage = memo(() => {
         outputPcs: Number(b.output_pcs) || 0,
       };
     });
-    return applyAssemblyInConstraint(raw);
+    return raw;
   }, [batchesFromApi, pcsPerBundle]);
 
   const overviewKpi = useMemo(() => {
@@ -178,11 +181,14 @@ const SewingBatchDashboardPage = memo(() => {
     });
   }, [batchesFromApi]);
 
-  const TARGET_BATCH_COUNT = 6;
+  const TARGET_BATCH_COUNT = useMemo(() => {
+    if (batchOverviewList.length === 0) return 6;
+    return Math.max(6, ...batchOverviewList.map((b) => b.batch));
+  }, [batchOverviewList]);
 
   const batchGrid = useMemo(
     () => getBatchGridConfig(TARGET_BATCH_COUNT),
-    []
+    [TARGET_BATCH_COUNT]
   );
 
   const openBatchDetail = useCallback((batchNo: number) => {
@@ -241,11 +247,10 @@ const SewingBatchDashboardPage = memo(() => {
       lineId,
       order,
       batchesFromApi,
-      pcsPerBundle,
       appliedDateFrom || 'Semua Tanggal',
       appliedDateTo || 'Semua Tanggal'
     );
-  }, [lineId, order, batchesFromApi, pcsPerBundle, appliedDateFrom, appliedDateTo]);
+  }, [lineId, order, batchesFromApi, appliedDateFrom, appliedDateTo]);
 
   if (isLoading) {
     return (
@@ -310,6 +315,7 @@ const SewingBatchDashboardPage = memo(() => {
                   batch={b as any}
                   pcsPerBundle={pcsPerBundle}
                   highlight={batchHighlights.get(b.batch) ?? undefined}
+                  usePcsUnit={isAssemblyBatch(batchNo)}
                   onOpen={() => openBatchDetail(b.batch)}
                 />
               );
@@ -331,6 +337,7 @@ const SewingBatchDashboardPage = memo(() => {
                   key={batchNo}
                   batch={emptyBatch as any}
                   pcsPerBundle={pcsPerBundle}
+                  usePcsUnit={isAssemblyBatch(batchNo)}
                   onOpen={() => openBatchDetail(batchNo)}
                 />
               );

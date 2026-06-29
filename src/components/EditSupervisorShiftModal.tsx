@@ -16,7 +16,7 @@ interface EditSupervisorShiftModalProps {
     defaultLineTitle?: string;
     environment: BackendEnvironment;
     onUpdate: () => void; // Callback setelah update berhasil
-}
+}   
 
 export default function EditSupervisorShiftModal({
     isOpen,

@@ -1,4 +1,4 @@
-﻿import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
@@ -28,7 +28,8 @@ import {
     getHomeDashboard,
     type HomeDashboardItem,
 } from '../../../config/api';
-import { SUPPLY_SEWING_ENABLED } from '../../../config/comingsoon';
+import { COMINGSOON_SUPPLY_SEWING } from '../../../config/hide';
+import { useAuth } from '../../../hooks/useAuth';
 import ChartCard from '../ChartCard';
 import CuttingScanStationModal, { type CuttingScanSessionRow } from './CuttingScanStationModal';
 import QcScanStationHost from './QcScanStationHost';
@@ -444,6 +445,9 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     onHomeDashboardCounts?: (c: { bundle: number; qc: number; store: number }) => void;
 }) {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const isAdmin = user?.role?.toLowerCase() === 'admin';
+    const isSupplySewingEnabled = !COMINGSOON_SUPPLY_SEWING || isAdmin;
     const queryClient = useQueryClient();
     const successAudioRef = useRef<HTMLAudioElement | null>(null);
     const errorAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -1415,6 +1419,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 icon={PackagePlus}
                 iconColor="#047857"
                 iconBgColor="#d1fae5"
+                onClick={() => navigate('/dashboard-bundle-cutting')}
                 className={CUTTING_STAGE_CHART_CARD_CLASS}
             >
                 <WireTable
@@ -1497,7 +1502,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     <CuttingStageHeader
                         title="Supply Sewing"
                         action={
-                            SUPPLY_SEWING_ENABLED ? (
+                            isSupplySewingEnabled ? (
                                 <ScanningButton accent="violet" onClick={() => setScanningModal('supply')} />
                             ) : (
                                 <span className="text-[9px] px-2 py-1 rounded-md border border-slate-300 text-slate-500 bg-slate-100/90 font-semibold">
@@ -1510,9 +1515,16 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 icon={Truck}
                 iconColor="#5b21b6"
                 iconBgColor="#ede9fe"
-                onClick={SUPPLY_SEWING_ENABLED ? () => navigate('/dashboard-supply-sewing-cutting') : undefined}
-                className={`${CUTTING_STAGE_CHART_CARD_CLASS} relative group ${SUPPLY_SEWING_ENABLED ? '' : 'grayscale saturate-0 !border-slate-300 !from-slate-100 !via-slate-100 !to-slate-200/60 shadow-[0_8px_18px_rgba(15,23,42,0.06)]'}`}
+                onClick={isSupplySewingEnabled ? () => navigate('/dashboard-supply-sewing-cutting') : undefined}
+                className={`${CUTTING_STAGE_CHART_CARD_CLASS} relative group ${isSupplySewingEnabled ? '' : 'grayscale saturate-0 !border-slate-300 !from-slate-100 !via-slate-100 !to-slate-200/60 shadow-[0_8px_18px_rgba(15,23,42,0.06)]'}`}
             >
+                {!isSupplySewingEnabled && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/40 backdrop-blur-[1px] cursor-not-allowed">
+                        <span className="bg-slate-800 text-white text-[11px] px-3 py-1.5 rounded shadow-lg">
+                            comingsoon sedang di kerjakan sabar ya
+                        </span>
+                    </div>
+                )}
                 <WireTable
                     columns={[
                         { key: 'rfid', label: 'RFID Bundle' },
@@ -1522,7 +1534,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     ]}
                     rows={sortTableRowsNewestFirst(supplyRows)}
                     emptyText="Belum ada data"
-                    onRowClick={SUPPLY_SEWING_ENABLED ? (row) => openDetailFromRow('Supply Sewing', row) : undefined}
+                    onRowClick={isSupplySewingEnabled ? (row) => openDetailFromRow('Supply Sewing', row) : undefined}
                 />
                 <div className="px-1.5 py-0.5 border-t border-gray-50 shrink-0 flex justify-end bg-white/90">
                     <button

@@ -88,7 +88,10 @@ export const OverviewStatCard = memo(
         ) : null}
       </div>
       {description ? (
-        <p className={cn('relative z-[1] m-0 mt-auto shrink-0 line-clamp-2', KPI_DESC_CLASS)}>
+        <p 
+          className={cn('relative z-[1] m-0 mt-auto shrink-0 truncate', KPI_DESC_CLASS)}
+          title={description}
+        >
           {description}
         </p>
       ) : null}

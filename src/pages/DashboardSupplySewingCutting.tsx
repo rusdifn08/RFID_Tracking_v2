@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { CalendarRange, ClipboardList, Layers, Loader2, MapPin, Truck } from 'lucide-react';
+import { CalendarRange, ClipboardList, FileSpreadsheet, Layers, Loader2, MapPin, Truck } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import ChartCard from '../components/dashboard/ChartCard';
 import backgroundImage from '../assets/background.jpg';
-import { getCuttingScanState, type CuttingScanHistoryEntry } from '../config/api';
+import { getCuttingScanState, getGccCuttingSewingDashboardData, type CuttingScanHistoryEntry, type GccSewingDashboardItem } from '../config/api';
+import { exportSupplySewingDashboardExcel, mapGccSewingItemToExportRow } from '../utils/exportCuttingDashboardExcel';
 
 const QUERY_SUPPLY_CUTTING = ['supply-sewing-cutting-dashboard'] as const;
+const QUERY_SUPPLY_CUTTING_GCC_BASE = 'supply-sewing-cutting-dashboard-gcc' as const;
 const SHIFT_HOURS = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
 
 const SUPPLY_CHART = {
@@ -144,7 +146,7 @@ function BundleCard({ value }: { value: number }) {
                     className="font-extrabold tracking-[0.12em] text-violet-700 uppercase"
                     style={{ fontSize: SUPPLY_TYPO.stationTitle }}
                 >
-                    Jumlah Bundle
+                    PENDING BUNDLE
                 </h3>
                 <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-violet-200 bg-white text-violet-600 shadow-sm">
                     <Layers className="h-5 w-5" />
@@ -172,6 +174,7 @@ export default function DashboardSupplySewingCutting() {
     const [draftFrom, setDraftFrom] = useState(ymdTodayLocal);
     const [draftTo, setDraftTo] = useState(ymdTodayLocal);
     const filterPanelRef = useRef<HTMLDivElement>(null);
+    const [exportingSupplyReport, setExportingSupplyReport] = useState(false);
 
     useEffect(() => {
         if (!filterOpen) return;
@@ -273,6 +276,112 @@ export default function DashboardSupplySewingCutting() {
         return SHIFT_HOURS.map((jam) => ({ jam, ...buckets[jam] }));
     }, [supplyRows]);
 
+    const gccDashboardQuery = useQuery({
+        queryKey: [QUERY_SUPPLY_CUTTING_GCC_BASE, rangeFrom, rangeTo] as const,
+        queryFn: async () => {
+            const r = await getGccCuttingSewingDashboardData({
+                tanggalfrom: rangeFrom,
+                tanggalto: rangeTo,
+            });
+            if (!r.success || !r.data) throw new Error(r.error || 'Gagal memuat data dashboard Supply Sewing GCC');
+            return r.data;
+        },
+        refetchInterval: 12_000,
+        placeholderData: (prev) => prev,
+        refetchOnWindowFocus: false,
+    });
+
+    const gccPayload = gccDashboardQuery.data;
+
+    const metricsFromApi = useMemo(() => {
+        const s = gccPayload?.summary;
+        if (!s) return null;
+        return {
+            bundle: safeNum(s.jumlah_bundle),
+            gm1: safeNum(s.GM1),
+            gm2: safeNum(s.GM2),
+            total: safeNum(s.total_scan),
+            other: 0,
+        };
+    }, [gccPayload]);
+
+    const metricsDisplay = metricsFromApi ?? metrics;
+
+    const useGccDashboard = gccDashboardQuery.isSuccess && gccPayload != null;
+
+    const perHourFromApi = useMemo(() => {
+        if (gccPayload == null || !Array.isArray(gccPayload.data_per_jam)) return null;
+        const rows = gccPayload.data_per_jam;
+        const byJam = new Map<string, { gm1: number; gm2: number; other: number }>();
+        for (const r of rows) {
+            const jam = String(r.jam || '').trim();
+            if (!jam) continue;
+            byJam.set(jam, {
+                gm1: safeNum(r.GM1),
+                gm2: safeNum(r.GM2),
+                other: 0,
+            });
+        }
+        return SHIFT_HOURS.map((jam) => {
+            const v = byJam.get(jam);
+            return v ? { jam, ...v } : { jam, gm1: 0, gm2: 0, other: 0 };
+        });
+    }, [gccPayload]);
+
+    const chartRows = perHourFromApi ?? perHourRows;
+
+    const tableItemsFromApi: GccSewingDashboardItem[] | null = useMemo(() => {
+        if (!useGccDashboard) return null;
+        return gccPayload?.items ?? [];
+    }, [useGccDashboard, gccPayload]);
+
+    const exportTableRows = useMemo(() => {
+        if (tableItemsFromApi) {
+            return tableItemsFromApi.map(mapGccSewingItemToExportRow);
+        }
+        return supplyRows.map((r) => ({
+            rfid: r.rfid_garment?.trim() || '—',
+            wo: r.wo?.trim() || '—',
+            style: r.style?.trim() || '—',
+            buyer: r.buyer?.trim() || '—',
+            color: r.color?.trim() || '—',
+            size: r.size?.trim() || '—',
+            qty: safeNum(r.qty ?? 1),
+            line: r.line?.trim() || '—',
+            location: r.gm?.trim() || r.location?.trim() || '—',
+            status: r.checkout ? 'Check Out' : 'Check In',
+            smarket_time: '—',
+            waktu: formatIsoShort(r.at || ''),
+        }));
+    }, [tableItemsFromApi, supplyRows]);
+
+    const handleExportSupplyReport = async () => {
+        setExportingSupplyReport(true);
+        try {
+            await exportSupplySewingDashboardExcel({
+                filterDateFrom: rangeFrom,
+                filterDateTo: rangeTo,
+                summary: {
+                    bundle: metricsDisplay.bundle,
+                    gm1: metricsDisplay.gm1,
+                    gm2: metricsDisplay.gm2,
+                    total: metricsDisplay.total,
+                },
+                hourlyRows: chartRows.map((r) => ({
+                    jam: r.jam,
+                    gm1: r.gm1,
+                    gm2: r.gm2,
+                    other: r.other,
+                })),
+                detailRows: exportTableRows,
+            });
+        } catch (e) {
+            window.alert(e instanceof Error ? e.message : 'Gagal export report Supply Sewing');
+        } finally {
+            setExportingSupplyReport(false);
+        }
+    };
+
     return (
         <div className="flex h-screen w-full font-sans text-slate-800 bg-slate-50 overflow-hidden selection:bg-violet-100 selection:text-violet-900">
             <div
@@ -300,10 +409,10 @@ export default function DashboardSupplySewingCutting() {
                                 className="grid h-full min-h-0 grid-cols-2 lg:grid-cols-4 gap-2"
                                 style={{ gap: 'clamp(0.25rem, 0.6vw + 0.15rem, 0.625rem)' }}
                             >
-                                <BundleCard value={metrics.bundle} />
+                                <BundleCard value={metricsDisplay.bundle} />
                                 <StationStatusCard
                                     title="GM 1"
-                                    value={metrics.gm1}
+                                    value={metricsDisplay.gm1}
                                     valueClassName="text-violet-700"
                                     icon={<MapPin className="h-5 w-5" />}
                                     iconClassName="border-violet-200 bg-white text-violet-600"
@@ -312,7 +421,7 @@ export default function DashboardSupplySewingCutting() {
                                 />
                                 <StationStatusCard
                                     title="GM 2"
-                                    value={metrics.gm2}
+                                    value={metricsDisplay.gm2}
                                     valueClassName="text-fuchsia-700"
                                     icon={<MapPin className="h-5 w-5" />}
                                     iconClassName="border-fuchsia-200 bg-white text-fuchsia-600"
@@ -321,7 +430,7 @@ export default function DashboardSupplySewingCutting() {
                                 />
                                 <StationStatusCard
                                     title="Total Scan"
-                                    value={metrics.total}
+                                    value={metricsDisplay.total}
                                     valueClassName="text-indigo-700"
                                     icon={<Truck className="h-5 w-5" />}
                                     iconClassName="border-indigo-200 bg-white text-indigo-600"
@@ -345,7 +454,7 @@ export default function DashboardSupplySewingCutting() {
                                 >
                                     <div className="w-full flex-1 min-h-0 min-w-0">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={perHourRows} margin={{ top: 4, right: 4, left: -12, bottom: 0 }}>
+                                            <LineChart data={chartRows} margin={{ top: 4, right: 4, left: -12, bottom: 0 }}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                                 <XAxis
                                                     dataKey="jam"
@@ -413,10 +522,17 @@ export default function DashboardSupplySewingCutting() {
                                     iconBgColor="#ede9fe"
                                     headerAction={
                                         <div className="flex items-center gap-2 flex-wrap justify-end">
-                                            {scanQuery.isFetching ? (
+                                            {(scanQuery.isFetching || gccDashboardQuery.isFetching) ? (
                                                 <Loader2 className="h-4 w-4 animate-spin text-violet-600" aria-hidden />
                                             ) : null}
-                                            {scanQuery.error ? (
+                                            {gccDashboardQuery.error ? (
+                                                <span
+                                                    className="text-rose-600 text-xs font-medium max-w-[14rem] truncate"
+                                                    title={(gccDashboardQuery.error as Error).message}
+                                                >
+                                                    {(gccDashboardQuery.error as Error).message}
+                                                </span>
+                                            ) : scanQuery.error ? (
                                                 <span
                                                     className="text-rose-600 text-xs font-medium max-w-[14rem] truncate"
                                                     title={(scanQuery.error as Error).message}
@@ -481,6 +597,22 @@ export default function DashboardSupplySewingCutting() {
                                                     </div>
                                                 ) : null}
                                             </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleExportSupplyReport()}
+                                                disabled={exportingSupplyReport || exportTableRows.length === 0}
+                                                className="inline-flex items-center gap-1.5 rounded-xl border border-violet-300 bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-800 shadow-sm transition hover:bg-violet-100 disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
+                                                title="Export Excel report Supply Sewing"
+                                            >
+                                                {exportingSupplyReport ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+                                                ) : (
+                                                    <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden />
+                                                )}
+                                                <span className="whitespace-nowrap">
+                                                    {exportingSupplyReport ? 'Mengekspor…' : 'Export Excel'}
+                                                </span>
+                                            </button>
                                         </div>
                                     }
                                     className="min-h-0 h-full flex flex-col py-1.5 bg-gradient-to-b from-white via-white to-violet-50/20 shadow-[0_10px_22px_rgba(91,33,182,0.08)] hover:shadow-[0_14px_28px_rgba(91,33,182,0.15)] transition-all duration-300 border border-violet-100/70 lg:col-span-2"
@@ -498,7 +630,41 @@ export default function DashboardSupplySewingCutting() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100" style={{ fontSize: SUPPLY_TYPO.tableBody }}>
-                                                {supplyRows.length === 0 ? (
+                                                {tableItemsFromApi ? (
+                                                    tableItemsFromApi.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
+                                                                Belum ada data supply sewing (API).
+                                                            </td>
+                                                        </tr>
+                                                    ) : (
+                                                        tableItemsFromApi.map((it, idx) => (
+                                                            <tr
+                                                                key={`${it.rfid_bundles || 'x'}-${it.id_bundles ?? ''}-${idx}`}
+                                                                className="hover:bg-violet-50/50 transition-colors"
+                                                            >
+                                                                <td className="px-3 py-2.5 font-mono font-semibold text-slate-900 whitespace-nowrap">
+                                                                    {it.rfid_bundles?.trim() || '—'}
+                                                                </td>
+                                                                <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">
+                                                                    {it.wo?.trim() ? it.wo.trim() : '—'}
+                                                                </td>
+                                                                <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
+                                                                    {safeNum(it.qty_sewing)}
+                                                                </td>
+                                                                <td className="px-3 py-2.5 whitespace-nowrap">
+                                                                    {it.line?.trim() ? it.line.trim() : '—'}
+                                                                </td>
+                                                                <td className="px-3 py-2.5 whitespace-nowrap">
+                                                                    {it.branch?.trim() || '—'}
+                                                                </td>
+                                                                <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
+                                                                    {formatIsoShort(it.last_time_sewing || it.tanggal || '')}
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    )
+                                                ) : supplyRows.length === 0 ? (
                                                     <tr>
                                                         <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
                                                             Belum ada data supply sewing pada periode ini.

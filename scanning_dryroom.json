@@ -2,35 +2,24 @@
   "checkin": {
     "nama_operator": "YULI SOPIANI",
     "nik_operator": "92400628",
-    "updatedAt": "2026-06-29T03:00:12.531Z",
+    "updatedAt": "2026-06-29T04:10:25.870Z",
     "last_scan": {
-      "rfid": "0013533289",
-      "wo": "187233",
-      "item": "M FROST DOWN PUFFER",
-      "buyer": "ZUG MANUFACTURING COMPANY LIMI",
-      "style": "G81449",
+      "rfid": "0013492694",
+      "wo": "187696",
+      "item": "MENS ENVIRON XT JACKET",
+      "buyer": "A GARMENT (H.K.) LIMITED",
+      "style": "200898",
       "color": "BLUE",
-      "size": "XXL",
+      "size": "MD          ",
       "status": "IN_DRYROOM",
       "message": "Success IN Dryroom",
-      "updatedAt": "2026-06-29T03:00:12.531Z"
+      "updatedAt": "2026-06-29T04:10:25.870Z"
     }
   },
   "checkout": {
-    "nama_operator": "RUSDI FADLI NURYUDA",
-    "nik_operator": "11111111",
-    "updatedAt": "2026-04-02T07:26:13.908Z",
-    "last_scan": {
-      "rfid": "0013543154",
-      "wo": "TEST_FINISHING",
-      "item": "TEST_FINISHING",
-      "buyer": "TEST_FINISHING",
-      "style": "TEST_FINISHING",
-      "color": "TEST_FINISHING",
-      "size": "TEST_FINISHING",
-      "status": "OUT_DRYROOM",
-      "message": "Success OUT Dryroom",
-      "updatedAt": "2026-04-02T07:26:13.908Z"
-    }
+    "nama_operator": "",
+    "nik_operator": "",
+    "updatedAt": null,
+    "last_scan": null
   }
 }

@@ -1683,12 +1683,20 @@ export const dryroomCheckOut = async (rfid_garment: string, nik?: string): Promi
 };
 
 /**
- * Dryroom Urgent — API backend: `POST /garment/dryroom/urgent?rfid_garment=…` (+ body `{ nik }` opsional).
+ * Dryroom Urgent — `POST /garment/dryroom/urgent?rfid_garment={rfid}`
+ * Body: `{ "nik": "string" }`
  */
 export const dryroomUrgent = async (rfid_garment: string, nik?: string): Promise<ApiResponse<FinishingCheckResponse>> => {
+    const trimmedRfid = rfid_garment?.trim();
+    if (!trimmedRfid) {
+        return { success: false, error: 'rfid_garment wajib diisi', status: 400 };
+    }
     const trimmed = nik?.trim();
     const body = trimmed ? { nik: trimmed } : {};
-    return await apiPost<FinishingCheckResponse>(`/garment/dryroom/urgent?rfid_garment=${encodeURIComponent(rfid_garment)}`, body);
+    return await apiPost<FinishingCheckResponse>(
+        `/garment/dryroom/urgent?rfid_garment=${encodeURIComponent(trimmedRfid)}`,
+        body
+    );
 };
 
 /** Satu scan sukses terakhir per mode (dari respons API dryroom in/out). */
@@ -1791,12 +1799,20 @@ export const foldingCheckOut = async (rfid_garment: string, nik?: string, tableN
 };
 
 /**
- * Folding Urgent — API backend: `POST /garment/folding/urgent?rfid_garment=…` (+ body `{ nik, nik_user }` opsional).
+ * Folding Urgent — `POST /garment/folding/urgent?rfid_garment={rfid}`
+ * Body: `{ "nik": "string" }`
  */
 export const foldingUrgent = async (rfid_garment: string, nik?: string): Promise<ApiResponse<FinishingCheckResponse>> => {
+    const trimmedRfid = rfid_garment?.trim();
+    if (!trimmedRfid) {
+        return { success: false, error: 'rfid_garment wajib diisi', status: 400 };
+    }
     const trimmed = nik?.trim();
-    const body = trimmed ? { nik: trimmed, nik_user: trimmed } : {};
-    return await apiPost<FinishingCheckResponse>(`/garment/folding/urgent?rfid_garment=${encodeURIComponent(rfid_garment)}`, body);
+    const body = trimmed ? { nik: trimmed } : {};
+    return await apiPost<FinishingCheckResponse>(
+        `/garment/folding/urgent?rfid_garment=${encodeURIComponent(trimmedRfid)}`,
+        body
+    );
 };
 
 /**
@@ -4442,6 +4458,12 @@ export interface GccSewingDashboardItem {
     rfid_bundles?: string;
     wo?: string;
     style?: string;
+    buyer?: string;
+    country?: string;
+    warna?: string;
+    color?: string;
+    size?: string;
+    ukuran?: string;
     qty_sewing?: number;
     last_time_sewing?: string;
     line?: string;

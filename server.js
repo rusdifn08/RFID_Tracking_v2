@@ -3542,6 +3542,32 @@ app.post('/scrap', async (req, res) => {
 // ============================================
 
 /**
+ * POST /garment/dryroom/urgent | /garment/folding/urgent
+ * Query: rfid_garment (required)
+ * Body: { nik: string }
+ */
+function normalizeGarmentUrgentRequest(req, res) {
+    const rfid_garment = req.query?.rfid_garment;
+    if (!rfid_garment || !String(rfid_garment).trim()) {
+        res.status(400).json({
+            success: false,
+            message: 'Query parameter rfid_garment wajib diisi',
+            timestamp: new Date().toISOString(),
+        });
+        return false;
+    }
+    const nikRaw = req.body?.nik;
+    const nik = nikRaw != null ? String(nikRaw).trim() : '';
+    req.body = nik ? { nik } : {};
+    return true;
+}
+
+async function proxyGarmentUrgentScan(endpoint, req, res) {
+    if (!normalizeGarmentUrgentRequest(req, res)) return;
+    return await proxyRequest(endpoint, req, res);
+}
+
+/**
  * Proxy dryroom in/out + track hourly Check In / Check Out di server (mirip folding checkout)
  */
 async function proxyDryroomWithHourlyTracking(endpoint, req, res, action) {
@@ -3609,11 +3635,12 @@ app.post('/garment/dryroom/out', async (req, res) => {
 });
 
 /**
- * POST /garment/dryroom/urgent - Urgent scan RFID garment di area Dryroom
- * Query: ?rfid_garment=xxx
+ * POST /garment/dryroom/urgent - Scan urgent RFID garment di Dryroom
+ * Query: ?rfid_garment=xxx (required)
+ * Body: { "nik": "string" }
  */
 app.post('/garment/dryroom/urgent', async (req, res) => {
-    return await proxyRequest('/garment/dryroom/urgent', req, res);
+    return await proxyGarmentUrgentScan('/garment/dryroom/urgent', req, res);
 });
 
 /** Base URL untuk Reject Room in/out (port 7000); override lewat REJECT_ROOM_INOUT_URL */
@@ -3843,12 +3870,12 @@ app.post('/garment/folding/out', async (req, res) => {
 });
 
 /**
- * POST /garment/folding/urgent - Urgent scan RFID garment di area Folding
- * Query: ?rfid_garment=xxx
- * Body: { nik: "xxx", nik_user: "xxx" } (optional)
+ * POST /garment/folding/urgent - Scan urgent RFID garment di Folding
+ * Query: ?rfid_garment=xxx (required)
+ * Body: { "nik": "string" }
  */
 app.post('/garment/folding/urgent', async (req, res) => {
-    return await proxyRequest('/garment/folding/urgent', req, res);
+    return await proxyGarmentUrgentScan('/garment/folding/urgent', req, res);
 });
 
 /**
