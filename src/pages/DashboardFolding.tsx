@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { Layers, Scan, RefreshCw, TrendingUp, X } from 'lucide-react';
+import { Layers, Scan, RefreshCw, TrendingUp, X, AlertTriangle } from 'lucide-react';
 import foldingIcon from '../assets/folding_icon.webp';
 import { getFinishingData, getFinishingDataWithFilter, getFinishingDataByLine, API_BASE_URL, getDefaultHeaders, getActiveUsers, getScanningUsers } from '../config/api';
 import ScanningFinishingModal from '../components/ScanningFinishingModal';
@@ -89,6 +89,7 @@ export default function DashboardFolding() {
 
   // State untuk modal scanning
   const [showFoldingScanModal, setShowFoldingScanModal] = useState(false);
+  const [showFoldingUrgentScanModal, setShowFoldingUrgentScanModal] = useState(false);
 
   // State untuk modal table detail
   const [selectedTableDetail, setSelectedTableDetail] = useState<number | null>(null);
@@ -824,6 +825,23 @@ export default function DashboardFolding() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const shipmentStationUrgentAction = (
+    <button
+      type="button"
+      onClick={() => canAccessFoldingCheckIn && setShowFoldingUrgentScanModal(true)}
+      disabled={!canAccessFoldingCheckIn}
+      title={!canAccessFoldingCheckIn ? 'Akses hanya untuk FOLDING / ROBOTIC' : 'Scan Urgent'}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shrink-0 ${
+        canAccessFoldingCheckIn
+          ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 hover:border-amber-300 shadow-sm'
+          : 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed opacity-60'
+      }`}
+    >
+      <AlertTriangle className="w-3.5 h-3.5" />
+      Urgent
+    </button>
+  );
+
   return (
     <div className="flex h-screen w-screen bg-[#f8fafc] font-sans text-slate-800 overflow-hidden relative selection:bg-teal-200 selection:text-teal-900">
 
@@ -1026,7 +1044,7 @@ export default function DashboardFolding() {
 
               {/* BAGIAN BAWAH: TABLE CARDS - Full width di mobile */}
               <div className="flex-none w-full min-h-[400px]">
-                <Card title="Shipment Station Folding" icon={Layers} iconImage={{ src: foldingIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}>
+                <Card title="Shipment Station Folding" icon={Layers} action={shipmentStationUrgentAction} iconImage={{ src: foldingIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}>
                   {!canViewFoldingCheckoutTable ? (
                     <div className="flex-1 min-h-0 mt-1 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-center p-4">
                       <div className="text-slate-500 text-sm font-semibold">
@@ -1329,7 +1347,7 @@ export default function DashboardFolding() {
 
                 {/* RIGHT: TABLE CARDS */}
                 <div className="col-span-12 md:col-span-6 min-h-0 flex flex-col">
-                  <Card title="Shipment Station Folding" icon={Layers} iconImage={{ src: foldingIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}>
+                  <Card title="Shipment Station Folding" icon={Layers} action={shipmentStationUrgentAction} iconImage={{ src: foldingIcon, filter: 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1000%) hue-rotate(166deg) brightness(96%) contrast(101%)' }}>
                     {!canViewFoldingCheckoutTable ? (
                       <div className="flex-1 min-h-0 mt-1 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-center p-4">
                         <div className="text-slate-500 text-sm font-semibold">
@@ -1475,6 +1493,23 @@ export default function DashboardFolding() {
       </div>
 
       {/* --- MODALS --- */}
+      <ScanningFinishingModal
+        isOpen={showFoldingUrgentScanModal}
+        onClose={() => {
+          setShowFoldingUrgentScanModal(false);
+          refetchFinishingData();
+        }}
+        type="folding"
+        defaultAction="urgent"
+        customActionLabel="Urgent"
+        nik={user?.nik ? String(user.nik).trim() : undefined}
+        onSuccess={() => {
+          refetchFinishingData();
+          refetchHourlyData();
+          refetchTableCount();
+        }}
+      />
+
       <ScanningFinishingModal
         isOpen={showFoldingScanModal}
         onClose={() => {

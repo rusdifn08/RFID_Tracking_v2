@@ -214,14 +214,15 @@ function normalizeScanningDryroomBranch(b) {
 function loadScanningDryroomDoc() {
     try {
         if (!fs.existsSync(SCANNING_DRYROOM_FILE)) {
-            return { checkin: emptyScanningDryroomBranch(), checkout: emptyScanningDryroomBranch() };
+            return { checkin: emptyScanningDryroomBranch(), checkout: emptyScanningDryroomBranch(), urgent: emptyScanningDryroomBranch() };
         }
         const raw = fs.readFileSync(SCANNING_DRYROOM_FILE, 'utf-8');
         const j = JSON.parse(raw);
-        if (j.checkin != null || j.checkout != null) {
+        if (j.checkin != null || j.checkout != null || j.urgent != null) {
             return {
                 checkin: normalizeScanningDryroomBranch(j.checkin),
                 checkout: normalizeScanningDryroomBranch(j.checkout),
+                urgent: normalizeScanningDryroomBranch(j.urgent),
             };
         }
         const legacyOp = {
@@ -236,10 +237,11 @@ function loadScanningDryroomDoc() {
                 last_scan: normalizeLastScanRecord(j.last_scan),
             },
             checkout: emptyScanningDryroomBranch(),
+            urgent: emptyScanningDryroomBranch(),
         };
     } catch (e) {
         console.warn('⚠️ [SCANNING_DRYROOM] load:', e.message);
-        return { checkin: emptyScanningDryroomBranch(), checkout: emptyScanningDryroomBranch() };
+        return { checkin: emptyScanningDryroomBranch(), checkout: emptyScanningDryroomBranch(), urgent: emptyScanningDryroomBranch() };
     }
 }
 
@@ -259,9 +261,9 @@ function buildLastScanFromBackendResponse(data) {
     };
 }
 
-/** @param {'checkin'|'checkout'} action */
+/** @param {'checkin'|'checkout'|'urgent'} action */
 function saveScanningDryroomFromBackendResponse(data, action) {
-    const key = action === 'checkout' ? 'checkout' : 'checkin';
+    const key = action === 'checkout' ? 'checkout' : action === 'urgent' ? 'urgent' : 'checkin';
     try {
         const doc = loadScanningDryroomDoc();
         const branch = { ...doc[key] };
@@ -1150,9 +1152,10 @@ app.get('/api/config/environment', (req, res) => {
  */
 function handleScanningDryroomOperatorGet(req, res) {
     try {
-        const mode = req.query.mode === 'checkout' ? 'checkout' : 'checkin';
+        const modeRaw = String(req.query.mode || 'checkin').toLowerCase();
+        const mode = modeRaw === 'checkout' ? 'checkout' : modeRaw === 'urgent' ? 'urgent' : 'checkin';
         const doc = loadScanningDryroomDoc();
-        const branch = doc[mode];
+        const branch = doc[mode] || emptyScanningDryroomBranch();
         return res.json({
             success: true,
             data: {
@@ -3517,6 +3520,15 @@ app.post('/inputUser', async (req, res) => {
 });
 
 /**
+ * POST /user/update_user - Update user details in database (proxied to backend)
+ * Body: { rfid_user, line }
+ */
+app.post('/user/update_user', async (req, res) => {
+    // Log removed for successful requests
+    return await proxyRequest('/user/update_user', req, res);
+});
+
+/**
  * POST /scrap - Set RFID garment ke status SCRAP
  * Body: { rfid_garment }
  */
@@ -3594,6 +3606,14 @@ app.post('/garment/dryroom/in', async (req, res) => {
  */
 app.post('/garment/dryroom/out', async (req, res) => {
     return proxyDryroomWithHourlyTracking('/garment/dryroom/out', req, res, 'checkout');
+});
+
+/**
+ * POST /garment/dryroom/urgent - Urgent scan RFID garment di area Dryroom
+ * Query: ?rfid_garment=xxx
+ */
+app.post('/garment/dryroom/urgent', async (req, res) => {
+    return await proxyRequest('/garment/dryroom/urgent', req, res);
 });
 
 /** Base URL untuk Reject Room in/out (port 7000); override lewat REJECT_ROOM_INOUT_URL */
@@ -3820,6 +3840,15 @@ app.post('/garment/folding/out', async (req, res) => {
         // Fallback ke proxyRequest jika ada error
         return await proxyRequest('/garment/folding/out', req, res);
     }
+});
+
+/**
+ * POST /garment/folding/urgent - Urgent scan RFID garment di area Folding
+ * Query: ?rfid_garment=xxx
+ * Body: { nik: "xxx", nik_user: "xxx" } (optional)
+ */
+app.post('/garment/folding/urgent', async (req, res) => {
+    return await proxyRequest('/garment/folding/urgent', req, res);
 });
 
 /**

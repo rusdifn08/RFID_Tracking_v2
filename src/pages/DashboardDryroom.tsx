@@ -6,7 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
 import {
-  Droplet, TrendingUp, RefreshCw, Filter, Calendar, Layers, LogIn, LogOut
+  Droplet, TrendingUp, RefreshCw, Filter, Calendar, Layers, LogIn, LogOut, AlertTriangle
 } from 'lucide-react';
 import dryroomIcon from '../assets/dryroom_icon.webp';
 
@@ -90,6 +90,7 @@ export default function DashboardDryroom() {
   const [filters, setFilters] = useState<FilterState>({ dateFrom: '', dateTo: '', wo: '' });
   const [modals, setModals] = useState({ filter: false, wo: false, export: false });
   const [scanAction, setScanAction] = useState<'checkin' | 'checkout' | null>(null);
+  const [showDryroomUrgentScanModal, setShowDryroomUrgentScanModal] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [showWoFilterModal, setShowWoFilterModal] = useState(false);
   const [showDateFilterModal, setShowDateFilterModal] = useState(false);
@@ -309,6 +310,23 @@ export default function DashboardDryroom() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  const scanningStationUrgentAction = (
+    <button
+      type="button"
+      onClick={() => canAccessDryroomScanning && setShowDryroomUrgentScanModal(true)}
+      disabled={!canAccessDryroomScanning}
+      title={!canAccessDryroomScanning ? 'Akses hanya untuk DRYROOM / ROBOTIC' : 'Scan Urgent'}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all shrink-0 ${
+        canAccessDryroomScanning
+          ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 hover:border-amber-300 shadow-sm'
+          : 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed opacity-60'
+      }`}
+    >
+      <AlertTriangle className="w-3.5 h-3.5" />
+      Urgent
+    </button>
+  );
 
   return (
     <div className="flex h-screen w-screen bg-[#f8fafc] font-sans text-slate-800 overflow-hidden relative selection:bg-sky-200 selection:text-sky-900">
@@ -592,9 +610,9 @@ export default function DashboardDryroom() {
                   </Card>
                 </div>
 
-                {/* RIGHT: SCANNING STATION (2 tombol card) */}
+                {/* RIGHT: SCANNING STATION (Check In + Check Out) */}
                 <div className="col-span-12 md:col-span-6 min-h-0 flex flex-col">
-                  <Card title="Scanning Station Dryroom" icon={Layers}>
+                  <Card title="Scanning Station Dryroom" icon={Layers} action={scanningStationUrgentAction}>
                     <div className="h-full min-h-0 grid grid-cols-2 gap-2 md:gap-3 lg:gap-4">
                       <button
                         type="button"
@@ -706,6 +724,21 @@ export default function DashboardDryroom() {
           </div>
         </ModalOverlay>
       )}
+      <ScanningFinishingModal
+        isOpen={showDryroomUrgentScanModal && canAccessDryroomScanning}
+        onClose={() => {
+          setShowDryroomUrgentScanModal(false);
+          void refetchFinishingData();
+          void refetchDryroomHourly();
+        }}
+        type="dryroom"
+        defaultAction="urgent"
+        customActionLabel="Urgent"
+        onSuccess={() => {
+          void refetchFinishingData();
+          void refetchDryroomHourly();
+        }}
+      />
       <ScanningFinishingModal
         isOpen={scanAction !== null && canAccessDryroomScanning}
         onClose={() => {
