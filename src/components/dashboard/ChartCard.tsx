@@ -13,11 +13,13 @@ interface ChartCardProps {
     style?: React.CSSProperties;
     iconColor?: string;
     iconBgColor?: string;
+    htmlTitle?: string;
 }
 
-const ChartCard = memo(forwardRef<HTMLDivElement, ChartCardProps>(({ children, title, icon: Icon, iconImageSrc, iconImageAlt, headerAction, onClick, className, style, iconColor = '#0284C7', iconBgColor = '#e0f2fe' }, ref) => (
+const ChartCard = memo(forwardRef<HTMLDivElement, ChartCardProps>(({ children, title, icon: Icon, iconImageSrc, iconImageAlt, headerAction, onClick, className, style, iconColor = '#0284C7', iconBgColor = '#e0f2fe', htmlTitle }, ref) => (
     <div
         ref={ref}
+        title={htmlTitle}
         className={`bg-white rounded-md sm:rounded-lg md:rounded-xl lg:rounded-2xl flex flex-col shadow-sm relative overflow-hidden transition-all duration-300 hover:shadow-lg group border border-blue-500 h-full min-w-0 ${onClick ? 'cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2' : ''} ${className || ''}`}
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}

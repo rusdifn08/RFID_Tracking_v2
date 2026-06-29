@@ -248,19 +248,23 @@ export const BatchOverviewCard = memo(
     batch,
     pcsPerBundle = 15,
     highlight,
+    usePcsUnit = false,
     onOpen,
   }: {
     batch: BatchOverview;
     pcsPerBundle?: number;
     highlight?: ProductionBatchHighlight[];
+    usePcsUnit?: boolean;
     onOpen: () => void;
   }) => {
     const currentBundle = batch.currentBundle ?? 1;
-    const bundleIn = pcsToBundleCount(batch.pcsIn, pcsPerBundle);
-    const bundleOut = pcsToBundleCount(batch.pcsOut, pcsPerBundle);
-    const wipBundle = Math.max(0, bundleIn - bundleOut);
+    const displayIn = usePcsUnit ? batch.pcsIn : pcsToBundleCount(batch.pcsIn, pcsPerBundle);
+    const displayOut = usePcsUnit ? batch.pcsOut : pcsToBundleCount(batch.pcsOut, pcsPerBundle);
+    const displayWip = Math.max(0, displayIn - displayOut);
+    const unitLabel = usePcsUnit ? 'pcs' : 'Bundle';
+    const headerUnitLabel = usePcsUnit ? 'Pcs' : 'Bundle';
     /** Output pcs: pakai nilai aktual dari API jika tersedia, fallback = bundle OUT × pcs per bundle */
-    const outputPcs = (batch.outputPcs != null && batch.outputPcs > 0) ? batch.outputPcs : bundleOut * pcsPerBundle;
+    const outputPcs = (batch.outputPcs != null && batch.outputPcs > 0) ? batch.outputPcs : pcsToBundleCount(batch.pcsOut, pcsPerBundle) * pcsPerBundle;
     const progressPct = Math.min(100, batch.outProgressPct);
     const badges = batchHeaderBadges(highlight, currentBundle);
 
@@ -282,7 +286,7 @@ export const BatchOverviewCard = memo(
             onOpen();
           }
         }}
-        aria-label={`Detail Batch ${batch.batch}: IN ${bundleIn} bundle, OUT ${bundleOut} bundle`}
+        aria-label={`Detail Batch ${batch.batch}: IN ${displayIn} ${unitLabel}, OUT ${displayOut} ${unitLabel}`}
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between gap-1 border-b border-blue-50 bg-gradient-to-r from-blue-50/90 to-white px-[clamp(0.4rem,0.75vw,0.65rem)] py-[clamp(0.3rem,0.55vh,0.45rem)]">
@@ -326,18 +330,18 @@ export const BatchOverviewCard = memo(
               <span className={cn('shrink-0 font-bold uppercase tracking-wide text-blue-500', FLUID.body)}>IN</span>
               <span className="flex items-baseline gap-0.5">
                 <strong className={cn('font-black tabular-nums leading-none text-blue-700', FLUID.metricInOut)}>
-                  {bundleIn}
+                  {displayIn}
                 </strong>
-                <span className={cn('font-semibold text-blue-400/80', FLUID.caption)}>Bundle</span>
+                <span className={cn('font-semibold text-blue-400/80', FLUID.caption)}>{unitLabel}</span>
               </span>
             </div>
             <div className="flex h-full min-h-0 items-center justify-between gap-2 rounded-lg border border-blue-100 bg-gradient-to-r from-blue-50/80 to-white px-[clamp(0.35rem,0.55vw,0.5rem)]">
               <span className={cn('shrink-0 font-bold uppercase tracking-wide text-blue-500', FLUID.body)}>OUT</span>
               <span className="flex items-baseline gap-0.5">
                 <strong className={cn('font-black tabular-nums leading-none text-blue-700', FLUID.metricInOut)}>
-                  {bundleOut}
+                  {displayOut}
                 </strong>
-                <span className={cn('font-semibold text-blue-400/80', FLUID.caption)}>Bundle</span>
+                <span className={cn('font-semibold text-blue-400/80', FLUID.caption)}>{unitLabel}</span>
               </span>
             </div>
           </div>
@@ -349,7 +353,7 @@ export const BatchOverviewCard = memo(
               'gap-[clamp(0.12rem,0.35vh,0.28rem)]'
             )}
           >
-            <MiniMetric label="WIP" value={wipBundle} unit="Bundle" tone="amber" />
+            <MiniMetric label="WIP" value={displayWip} unit={headerUnitLabel} tone="amber" />
             <MiniMetric label="Percentage" value={`${batch.efficiencyPct}%`} tone="violet" />
             <MiniMetric label="Output" value={outputPcs} unit="pcs" tone="slate" />
           </div>

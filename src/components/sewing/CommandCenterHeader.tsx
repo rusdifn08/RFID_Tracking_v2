@@ -74,25 +74,29 @@ const CommandCenterHeader: React.FC<CommandCenterHeaderProps> = memo(({
         </div>
 
         {/* Date Filter inputs */}
-        <div className="flex flex-col justify-between border-l border-slate-100 pl-[clamp(0.25rem,0.6vw,0.75rem)] min-h-0 gap-1 py-0.5">
-          <div className="flex flex-col flex-1 justify-center gap-1">
-            <div className="flex items-center gap-2">
-              <span className="w-8 sm:w-10 text-[clamp(0.56rem,0.45vw+0.6vh,0.9rem)] font-bold text-slate-400 uppercase tracking-wide">From</span>
-              <input
-                type="date"
-                value={filterDateFrom}
-                onChange={(e) => onDateFromChange(e.target.value)}
-                className="flex-1 h-[clamp(1.5rem,1.3vw+1.3vh,2.4rem)] px-[clamp(0.35rem,0.4vw,0.6rem)] text-[clamp(0.68rem,0.55vw+0.7vh,1.1rem)] font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
+        <div className="flex flex-col justify-between border-l border-slate-100 pl-[clamp(0.25rem,0.5vw,0.75rem)] min-h-0 min-w-0 gap-[clamp(0.2rem,0.5vh,0.38rem)] py-0.5">
+          <div className="flex flex-col flex-1 justify-center gap-[clamp(0.2rem,0.5vh,0.38rem)] min-w-0">
+            <div className="flex items-center gap-[clamp(0.15rem,0.4vw,0.5rem)] min-w-0">
+              <span className="w-[clamp(1.6rem,2.5vw,2.2rem)] shrink-0 text-[clamp(0.5rem,0.4vw+0.5vh,0.85rem)] font-bold text-slate-500 uppercase tracking-wider">From</span>
+              <div className="relative flex-1 min-w-0">
+                <input
+                  type="date"
+                  value={filterDateFrom}
+                  onChange={(e) => onDateFromChange(e.target.value)}
+                  className="w-full min-w-0 h-[clamp(1.4rem,1.2vw+1.2vh,2.2rem)] px-[clamp(0.15rem,0.3vw,0.5rem)] text-[clamp(0.55rem,0.4vw+0.6vh,0.9rem)] font-bold text-slate-700 bg-slate-50/80 border border-slate-200 hover:border-blue-300 rounded-md shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white focus:border-blue-500 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-60 hover:[&::-webkit-calendar-picker-indicator]:opacity-100"
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-8 sm:w-10 text-[clamp(0.56rem,0.45vw+0.6vh,0.9rem)] font-bold text-slate-400 uppercase tracking-wide">To</span>
-              <input
-                type="date"
-                value={filterDateTo}
-                onChange={(e) => onDateToChange(e.target.value)}
-                className="flex-1 h-[clamp(1.5rem,1.3vw+1.3vh,2.4rem)] px-[clamp(0.35rem,0.4vw,0.6rem)] text-[clamp(0.68rem,0.55vw+0.7vh,1.1rem)] font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
+            <div className="flex items-center gap-[clamp(0.15rem,0.4vw,0.5rem)] min-w-0">
+              <span className="w-[clamp(1.6rem,2.5vw,2.2rem)] shrink-0 text-[clamp(0.5rem,0.4vw+0.5vh,0.85rem)] font-bold text-slate-500 uppercase tracking-wider">To</span>
+              <div className="relative flex-1 min-w-0">
+                <input
+                  type="date"
+                  value={filterDateTo}
+                  onChange={(e) => onDateToChange(e.target.value)}
+                  className="w-full min-w-0 h-[clamp(1.4rem,1.2vw+1.2vh,2.2rem)] px-[clamp(0.15rem,0.3vw,0.5rem)] text-[clamp(0.55rem,0.4vw+0.6vh,0.9rem)] font-bold text-slate-700 bg-slate-50/80 border border-slate-200 hover:border-blue-300 rounded-md shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white focus:border-blue-500 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-60 hover:[&::-webkit-calendar-picker-indicator]:opacity-100"
+                />
+              </div>
             </div>
           </div>
 

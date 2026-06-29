@@ -19,7 +19,7 @@ export const ASSEMBLY_BATCH_NO = 6;
 export const isProductionBatch = (batchNo: number): boolean =>
   batchNo >= 1 && batchNo <= PRODUCTION_BATCH_MAX;
 
-export const isAssemblyBatch = (batchNo: number): boolean => batchNo === ASSEMBLY_BATCH_NO;
+export const isAssemblyBatch = (batchNo: number): boolean => batchNo >= 6;
 
 /** Konversi total pcs → jumlah bundle untuk tampilan kartu */
 export const pcsToBundleCount = (pcs: number, pcsPerBundle: number): number =>

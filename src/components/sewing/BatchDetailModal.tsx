@@ -35,24 +35,6 @@ const modalLabel = 'mb-0.5 block text-[0.56rem] font-bold uppercase tracking-wid
 const modalDataValue = 'text-blue-700';
 const modalStrong = `text-[0.78rem] font-extrabold leading-snug ${modalDataValue} break-words`;
 
-const heroMetricBox = (label: string, value: ReactNode, sub?: ReactNode) => (
-  <div className="flex min-w-[3.25rem] shrink-0 flex-col items-center justify-center rounded-lg border border-white/30 bg-white/15 px-2 py-1.5 text-center backdrop-blur-sm">
-    <span className="block text-[0.5rem] font-bold uppercase tracking-wide opacity-90">{label}</span>
-    <strong className="mt-0.5 block text-[clamp(0.88rem,1.7vh,1.2rem)] font-black leading-none">
-      {value}
-    </strong>
-    {sub ? (
-      <small className="mt-0.5 block text-[0.55rem] font-bold leading-tight opacity-85">{sub}</small>
-    ) : null}
-  </div>
-);
-
-const metricCell = (label: string, value: string, valueClass?: string) => (
-  <div className="rounded-md border border-slate-200 bg-gradient-to-b from-white to-[#f8fbff] px-1 py-1.5 text-center">
-    <span className="block text-[0.54rem] font-bold uppercase tracking-wide text-slate-400">{label}</span>
-    <b className={cn('mt-0.5 block text-[0.88rem] font-black', modalDataValue, valueClass)}>{value}</b>
-  </div>
-);
 
 const batchMetricCell = (label: string, value: ReactNode, sub?: ReactNode) => (
   <div className="rounded-md border border-slate-200 bg-gradient-to-b from-white to-[#f8fbff] px-1 py-2 text-center flex flex-col items-center justify-center">
@@ -182,7 +164,6 @@ const BatchDetailModal = memo(
 
     const {
       currentBundle,
-      outputProgress: prog,
       orderBundleCount,
       bundleStatusList,
       bundleIn,

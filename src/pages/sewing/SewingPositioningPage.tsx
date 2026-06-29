@@ -6,10 +6,12 @@ import {
   getInitialEnvironment,
   getEnvironmentFromAPI,
   postPrepOpBatch,
-  getPrepBatchLayout,
+  getPrepOpAccess,
+  getPrepListBatch,
   type PrepOpBatchPayload,
   type PrepOpBatchResponseData,
-  type PrepBatchLayoutData,
+  type PrepOpAccessData,
+  type PrepListBatchData,
   type BackendEnvironment,
 } from '../../config/api';
 import {
@@ -26,7 +28,6 @@ import {
   Save,
   CheckCircle2,
   XCircle,
-  Search,
   User,
   Hash,
   Layers,
@@ -34,7 +35,9 @@ import {
   Power,
   FileText,
   Loader2,
-  Sparkles,
+  Users,
+  RefreshCw,
+  ChevronDown,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -55,13 +58,6 @@ const labelBase = 'flex flex-col gap-1.5';
 const labelText = 'flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-wider text-slate-500';
 
 const sectionTitle = 'flex items-center gap-2.5 text-[0.95rem] font-bold text-slate-800';
-
-const kv = (label: string, value: React.ReactNode, accent = false) => (
-  <div className="flex items-start gap-3 py-2.5">
-    <span className="min-w-[6.5rem] shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</span>
-    <span className={cn('text-sm font-medium', accent ? 'text-blue-700' : 'text-slate-800')}>{value}</span>
-  </div>
-);
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -119,12 +115,96 @@ const SewingPositioningPage = memo(() => {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastFadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* ---------- Check Batch Layout state ---------- */
-  const [rfidSearch, setRfidSearch] = useState('');
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [layoutData, setLayoutData] = useState<PrepBatchLayoutData | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
+  /* ---------- Registered Operators state ---------- */
+  const [opAccessList, setOpAccessList] = useState<PrepOpAccessData[]>([]);
+  const [loadingOpAccess, setLoadingOpAccess] = useState(false);
+  const [opAccessError, setOpAccessError] = useState<string>('');
+
+  const [listBatch, setListBatch] = useState<PrepListBatchData[]>([]);
+
+  const fetchOpAccess = useCallback(async () => {
+    setLoadingOpAccess(true);
+    setOpAccessError('');
+    try {
+      const [resAccess, resBatch] = await Promise.all([
+        getPrepOpAccess(),
+        getPrepListBatch()
+      ]);
+      
+      if (resAccess.success && resAccess.data) {
+        setOpAccessList(resAccess.data);
+      } else {
+        setOpAccessError(resAccess.error || 'Gagal memuat data operator batch');
+      }
+
+      if (resBatch.success && resBatch.data) {
+        setListBatch(resBatch.data);
+      }
+    } catch (err: any) {
+      setOpAccessError(err.message || 'Terjadi kesalahan jaringan');
+    } finally {
+      setLoadingOpAccess(false);
+    }
+  }, []);
+
+  const uniqueOperators = useMemo(() => {
+    const map = new Map<string, string>();
+    opAccessList.forEach((op) => {
+      if (op.nik && !map.has(op.nik)) {
+        map.set(op.nik, op.operator_name);
+      }
+    });
+    return Array.from(map.entries()).map(([nik, name]) => ({ nik, name }));
+  }, [opAccessList]);
+
+  const [showNikSuggestions, setShowNikSuggestions] = useState(false);
+  const nikWrapperRef = useRef<HTMLLabelElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (nikWrapperRef.current && !nikWrapperRef.current.contains(event.target as Node)) {
+        setShowNikSuggestions(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredOperators = useMemo(() => {
+    if (!form.nik) return uniqueOperators.slice(0, 5);
+    const lower = form.nik.toLowerCase();
+    return uniqueOperators
+      .filter(op => op.nik.toLowerCase().includes(lower) || op.name.toLowerCase().includes(lower))
+      .slice(0, 5);
+  }, [uniqueOperators, form.nik]);
+
+  const [showKetBatchSuggestions, setShowKetBatchSuggestions] = useState(false);
+  const [ketBatchDropdownOpen, setKetBatchDropdownOpen] = useState(false);
+  const ketBatchWrapperRef = useRef<HTMLLabelElement>(null);
+
+  useEffect(() => {
+    function handleClickOutsideKet(event: MouseEvent) {
+      if (ketBatchWrapperRef.current && !ketBatchWrapperRef.current.contains(event.target as Node)) {
+        setShowKetBatchSuggestions(false);
+        setKetBatchDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutsideKet);
+    return () => document.removeEventListener('mousedown', handleClickOutsideKet);
+  }, []);
+
+  const filteredKetBatch = useMemo(() => {
+    if (!form.ket_batch) {
+      return ketBatchDropdownOpen ? listBatch : listBatch.slice(0, 5);
+    }
+    const lower = form.ket_batch.toLowerCase();
+    const matches = listBatch.filter(b => b.ket_batch.toLowerCase().includes(lower));
+    return ketBatchDropdownOpen ? matches : matches.slice(0, 5);
+  }, [listBatch, form.ket_batch, ketBatchDropdownOpen]);
+
+  useEffect(() => {
+    void fetchOpAccess();
+  }, [fetchOpAccess]);
 
   /* ---------- Handlers ---------- */
   const handleChange = useCallback((field: keyof PrepOpBatchPayload, value: string) => {
@@ -164,6 +244,9 @@ const SewingPositioningPage = memo(() => {
           setToastVisible(false);
           setToastFadingOut(false);
         }, 5500);
+
+        // Refresh table
+        void fetchOpAccess();
       } else {
         setFormError(result.error || 'Gagal menyimpan data operator batch.');
       }
@@ -172,29 +255,7 @@ const SewingPositioningPage = memo(() => {
     } finally {
       setSaving(false);
     }
-  }, [form]);
-
-  const handleSearch = useCallback(async () => {
-    if (!rfidSearch.trim()) { setSearchError('RFID User wajib diisi.'); return; }
-
-    setSearching(true);
-    setSearchError(null);
-    setLayoutData(null);
-    setHasSearched(true);
-
-    try {
-      const result = await getPrepBatchLayout(rfidSearch.trim());
-      if (result.success && result.data) {
-        setLayoutData(result.data);
-      } else {
-        setSearchError(result.error || 'Data batch layout tidak ditemukan.');
-      }
-    } catch (e) {
-      setSearchError(e instanceof Error ? e.message : 'Terjadi kesalahan.');
-    } finally {
-      setSearching(false);
-    }
-  }, [rfidSearch]);
+  }, [form, fetchOpAccess]);
 
   return (
     <SewingPageShell>
@@ -288,7 +349,7 @@ const SewingPositioningPage = memo(() => {
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-[min(100%,76rem)] px-[clamp(0.5rem,2vw,1.5rem)] py-[clamp(0.5rem,2vh,1.25rem)]">
+      <div className="mx-auto w-full max-w-[min(100%,76rem)] px-[clamp(0.5rem,2vw,1.5rem)] py-[clamp(0.5rem,2vh,1.25rem)] flex flex-col h-[calc(100vh-4rem)] sm:h-[calc(100vh-4.5rem)]">
         {/* ====== HEADER ====== */}
         <section
           className={cn(
@@ -317,9 +378,9 @@ const SewingPositioningPage = memo(() => {
         </section>
 
         {/* ====== TWO COLUMN LAYOUT ====== */}
-        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2 flex-1 min-h-0">
           {/* ── LEFT: Form Operator Batch ── */}
-          <section className={cn(glassCard, 'animate-fade-in-up delay-1 p-5 sm:p-6')}>
+          <section className={cn(glassCard, 'animate-fade-in-up delay-1 p-5 sm:p-6 flex flex-col h-full overflow-y-auto min-h-0')}>
             {/* Accent bar top */}
             <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 rounded-t-2xl" />
 
@@ -335,18 +396,52 @@ const SewingPositioningPage = memo(() => {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {/* NIK */}
-              <label className={labelBase}>
+              <label className={labelBase} ref={nikWrapperRef}>
                 <span className={labelText}>
                   <User className="h-3 w-3 text-blue-500" /> NIK
                 </span>
-                <input
-                  id="field-nik"
-                  type="text"
-                  value={form.nik}
-                  onChange={(e) => handleChange('nik', e.target.value)}
-                  className={inputBase}
-                  placeholder="Contoh: 92300014"
-                />
+                <div className="relative">
+                  <input
+                    id="field-nik"
+                    type="text"
+                    value={form.nik}
+                    onFocus={() => setShowNikSuggestions(true)}
+                    onChange={(e) => {
+                      handleChange('nik', e.target.value);
+                      setShowNikSuggestions(true);
+                    }}
+                    className={inputBase}
+                    placeholder="Contoh: 92300014"
+                    autoComplete="off"
+                  />
+                  {showNikSuggestions && form.nik.trim().length > 0 && filteredOperators.length > 0 && (
+                    <ul className="absolute left-0 right-0 z-50 mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-blue-900/5 animate-in fade-in slide-in-from-top-2">
+                      {filteredOperators.map((op) => (
+                        <li
+                          key={op.nik}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleChange('nik', op.nik);
+                            setShowNikSuggestions(false);
+                          }}
+                          className="group flex cursor-pointer items-center gap-3 border-b border-slate-50 px-3 py-2.5 last:border-0 hover:bg-blue-50 transition-colors"
+                        >
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                            <User className="h-4 w-4" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="truncate text-[0.8rem] font-bold text-slate-700 group-hover:text-blue-700">
+                              {op.nik}
+                            </span>
+                            <span className="truncate text-[0.65rem] font-medium text-slate-500 group-hover:text-blue-500/80">
+                              {op.name}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </label>
 
               {/* Line */}
@@ -388,18 +483,61 @@ const SewingPositioningPage = memo(() => {
               </label>
 
               {/* Keterangan Batch */}
-              <label className={labelBase}>
+              <label className={labelBase} ref={ketBatchWrapperRef}>
                 <span className={labelText}>
                   <FileText className="h-3 w-3 text-emerald-500" /> Keterangan Batch
                 </span>
-                <input
-                  id="field-ket-batch"
-                  type="text"
-                  value={form.ket_batch}
-                  onChange={(e) => handleChange('ket_batch', e.target.value)}
-                  className={inputBase}
-                  placeholder="Contoh: Kelim Bawah"
-                />
+                <div className="relative">
+                  <input
+                    id="field-ket-batch"
+                    type="text"
+                    value={form.ket_batch}
+                    onFocus={() => setShowKetBatchSuggestions(true)}
+                    onChange={(e) => {
+                      handleChange('ket_batch', e.target.value);
+                      setShowKetBatchSuggestions(true);
+                      setKetBatchDropdownOpen(true);
+                    }}
+                    className={cn(inputBase, 'pr-10')}
+                    placeholder="Contoh: Kelim Bawah"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKetBatchDropdownOpen(prev => !prev);
+                      setShowKetBatchSuggestions(true);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                  >
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", ketBatchDropdownOpen && "rotate-180")} />
+                  </button>
+                  {showKetBatchSuggestions && (form.ket_batch.trim().length > 0 || ketBatchDropdownOpen) && filteredKetBatch.length > 0 && (
+                    <ul className="absolute left-0 right-0 z-50 mt-1.5 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl shadow-emerald-900/5 animate-in fade-in slide-in-from-top-2">
+                      {filteredKetBatch.map((b) => (
+                        <li
+                          key={b.no}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleChange('ket_batch', b.ket_batch);
+                            setShowKetBatchSuggestions(false);
+                            setKetBatchDropdownOpen(false);
+                          }}
+                          className="group flex cursor-pointer items-center gap-3 border-b border-slate-50 px-3 py-2.5 last:border-0 hover:bg-emerald-50 transition-colors"
+                        >
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
+                            <FileText className="h-4 w-4" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="truncate text-[0.8rem] font-bold text-slate-700 group-hover:text-emerald-700">
+                              {b.ket_batch}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </label>
 
               {/* Scan Type */}
@@ -470,116 +608,109 @@ const SewingPositioningPage = memo(() => {
 
           </section>
 
-          {/* ── RIGHT: Check Batch Layout ── */}
-          <section className={cn(glassCard, 'animate-fade-in-up delay-2 p-5 sm:p-6')}>
+          <section className={cn(glassCard, 'animate-fade-in-up delay-2 p-5 sm:p-6 flex flex-col h-full min-h-0')}>
             {/* Accent bar top */}
             <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-t-2xl" />
 
-            <div className={sectionTitle}>
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25">
-                <Search className="h-4 w-4" />
+            <div className="flex items-center justify-between">
+              <div className={sectionTitle}>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25">
+                  <Users className="h-4 w-4" />
+                </div>
+                Operator Batch Terdaftar
               </div>
-              Check Batch Layout
+              <button
+                type="button"
+                onClick={() => void fetchOpAccess()}
+                disabled={loadingOpAccess}
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-blue-600 disabled:opacity-50"
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5', loadingOpAccess && 'animate-spin')} />
+                {loadingOpAccess ? 'Refresh...' : 'Refresh'}
+              </button>
             </div>
-            <p className="mt-1 mb-5 text-xs text-slate-400">
-              GET <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[0.65rem] font-semibold text-slate-600">/api/prep/batch_layout</code>
+            <p className="mt-1 mb-5 text-xs text-slate-400 shrink-0">
+              GET <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[0.65rem] font-semibold text-slate-600">/api/prep/op_access</code>
             </p>
 
-            {/* Search input */}
-            <label className={labelBase}>
-              <span className={labelText}>
-                <ScanLine className="h-3 w-3 text-emerald-500" /> RFID User
-              </span>
-              <div className="flex gap-2">
-                <input
-                  id="field-rfid-search"
-                  type="text"
-                  value={rfidSearch}
-                  onChange={(e) => {
-                    setRfidSearch(e.target.value);
-                    setSearchError(null);
-                  }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') void handleSearch(); }}
-                  className={cn(inputBase, 'flex-1')}
-                  placeholder="Contoh: 0015117752"
-                />
-                <button
-                  id="btn-search"
-                  type="button"
-                  onClick={() => void handleSearch()}
-                  disabled={searching}
-                  className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition-all duration-200 hover:shadow-xl hover:shadow-emerald-500/30 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.97] disabled:opacity-60 disabled:pointer-events-none"
-                >
-                  {searching ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Search className="h-4 w-4 transition-transform group-hover:scale-110" />
-                  )}
-                  Cari
-                </button>
-              </div>
-            </label>
-
             {/* Error */}
-            {searchError && (
-              <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-red-200/80 bg-red-50/80 px-4 py-3 backdrop-blur-sm">
+            {opAccessError && (
+              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-red-200/80 bg-red-50/80 px-4 py-3 backdrop-blur-sm shrink-0">
                 <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
-                <p className="text-sm font-medium text-red-700">{searchError}</p>
+                <p className="text-sm font-medium text-red-700">{opAccessError}</p>
               </div>
             )}
 
-            {/* Result Card */}
-            {layoutData && (
-              <div className="mt-5 rounded-xl border border-slate-200/60 bg-gradient-to-br from-slate-50/80 to-white/90 p-4 animate-fade-in-up">
-                <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                  Batch Layout Data
-                </div>
-                <div className="divide-y divide-slate-100/80">
-                  {kv('Batch Layout ID', layoutData.batch_layout_id)}
-                  {kv('Nama', layoutData.nama, true)}
-                  {kv('NIK', <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold">{layoutData.nik}</code>)}
-                  {kv('RFID User', <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold">{layoutData.rfid_user}</code>)}
-                  {kv('Branch', layoutData.branch)}
-                  {kv('Line', layoutData.line)}
-                  {kv('Batch', layoutData.batch)}
-                  {kv('Ket Batch', layoutData.ket_batch)}
-                  {kv('Status', (
-                    <span className={cn(
-                      'inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.68rem] font-bold',
-                      layoutData.isDone === 0
-                        ? 'bg-blue-500/15 text-blue-800'
-                        : 'bg-emerald-500/15 text-emerald-800'
-                    )}>
-                      {layoutData.isDone === 0 ? 'Belum Selesai' : 'Selesai'}
-                    </span>
-                  ))}
-                  {kv('Timestamp', new Date(layoutData.timestamp).toLocaleString('id-ID'))}
-                </div>
+            {/* Table Container - Bulletproof scroll wrapper */}
+            <div className="relative flex-1 min-h-0 w-full mt-2">
+              <div className="absolute inset-0 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
+                <div className="overflow-x-auto overflow-y-auto flex-1">
+                <table className="w-full text-left text-sm text-slate-600">
+                  <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm text-xs font-semibold uppercase text-slate-500 shadow-[0_1px_0_rgba(203,213,225,0.6)]">
+                    <tr>
+                      <th className="px-4 py-3 whitespace-nowrap">Operator</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Line</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Batch</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Scan</th>
+                      <th className="px-4 py-3 whitespace-nowrap text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loadingOpAccess && opAccessList.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-10 text-center">
+                          <Loader2 className="mx-auto h-6 w-6 animate-spin text-slate-300" />
+                          <p className="mt-2 text-xs text-slate-500">Memuat data...</p>
+                        </td>
+                      </tr>
+                    ) : opAccessList.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-10 text-center">
+                          <Users className="mx-auto h-8 w-8 text-slate-300" />
+                          <p className="mt-2 text-xs font-medium text-slate-500">Belum ada operator terdaftar</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      opAccessList.map((op) => (
+                        <tr key={op.id} className="transition-colors hover:bg-slate-50/50">
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-slate-800">{op.operator_name}</div>
+                            <div className="text-[0.65rem] text-slate-500 mt-0.5">NIK: {op.nik} • RFID: {op.rfid_user}</div>
+                          </td>
+                          <td className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap">{op.line_no}</td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-700">{op.batch_no}</div>
+                            {op.ket_batch && (
+                              <div className="text-[0.65rem] font-medium uppercase text-slate-400 mt-0.5">{op.ket_batch}</div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={cn(
+                              'inline-flex items-center rounded-full px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wider',
+                              op.scan_type.toLowerCase() === 'in' ? 'bg-blue-100 text-blue-700' : 
+                              op.scan_type.toLowerCase() === 'out' ? 'bg-amber-100 text-amber-700' :
+                              'bg-slate-100 text-slate-700'
+                            )}>
+                              {op.scan_type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-center">
+                            <span className={cn(
+                              'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[0.65rem] font-bold',
+                              op.is_active === 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                            )}>
+                              <span className={cn('h-1.5 w-1.5 rounded-full', op.is_active === 1 ? 'bg-emerald-500' : 'bg-red-500')} />
+                              {op.is_active === 1 ? 'Aktif' : 'Nonaktif'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
-
-            {/* Empty state */}
-            {hasSearched && !searching && !searchError && !layoutData && (
-              <div className="mt-8 flex flex-col items-center gap-3 py-6 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100/80">
-                  <Search className="h-6 w-6 text-slate-400" />
-                </div>
-                <p className="text-sm font-medium text-slate-500">Data batch layout tidak ditemukan</p>
-                <p className="text-xs text-slate-400">Coba gunakan RFID user yang berbeda</p>
-              </div>
-            )}
-
-            {/* Initial empty state */}
-            {!hasSearched && !layoutData && (
-              <div className="mt-8 flex flex-col items-center gap-3 py-6 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100/60">
-                  <ScanLine className="h-6 w-6 text-emerald-400" />
-                </div>
-                <p className="text-sm font-medium text-slate-500">Masukkan RFID User untuk mencari data batch layout</p>
-                <p className="text-xs text-slate-400">Menampilkan record terbaru dari tabel batch_layout</p>
-              </div>
-            )}
+            </div>
+            </div>
           </section>
         </div>
       </div>

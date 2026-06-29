@@ -37,7 +37,7 @@ export const useSewingBatchDashboardQuery = (
 ) => {
   return useQuery<SewingDashboardResponse>({
     queryKey: ['sewing-batch-dashboard', line, style, wo, tanggalfrom, tanggalto],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const params = new URLSearchParams();
       if (line) params.append('line', line);
       if (style) params.append('style', style);
@@ -54,6 +54,7 @@ export const useSewingBatchDashboardQuery = (
       const response = await fetch(url, {
         method: 'GET',
         headers,
+        signal,
       });
 
       if (!response.ok) {
@@ -62,8 +63,8 @@ export const useSewingBatchDashboardQuery = (
 
       return response.json();
     },
-    refetchInterval: 10000,
-    staleTime: 5000,
+    refetchInterval: 1000,
+    staleTime: 1000,
     retry: 2,
   });
 };

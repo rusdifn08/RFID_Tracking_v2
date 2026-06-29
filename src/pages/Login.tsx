@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,6 +7,8 @@ import { useLogin, useAuth } from '../hooks/useAuth';
 // Import background - jika background.png tersedia, ganti import ini
 import backgroundImage from '../assets/aksen.svg';
 import loginSvg from '../assets/login.svg';
+import { updateUserData } from '../config/api';
+import { productionLinesMJL, productionLinesCLN } from '../data/production_line';
 
 // Catatan: Jika Anda memiliki file background.png di folder assets,
 // ganti baris di atas dengan: import backgroundImage from '../assets/background.png';
@@ -23,6 +25,85 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function Login() {
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+
+    // Edit User States
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [updateMessage, setUpdateMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
+
+    // Fields to edit
+    const [editLine, setEditLine] = useState('');
+    const [editRfid, setEditRfid] = useState('');
+
+    const [updatedUserData, setUpdatedUserData] = useState<any>(null);
+    const [progress, setProgress] = useState(100);
+
+    useEffect(() => {
+        if (updatedUserData) {
+            setProgress(100);
+            const interval = setInterval(() => {
+                setProgress(prev => Math.max(0, prev - (100 / 300)));
+            }, 10);
+            const timeout = setTimeout(() => {
+                setUpdatedUserData(null);
+                setIsEditModalOpen(false);
+                setUpdateMessage({ type: '', text: '' });
+            }, 3000);
+            return () => {
+                clearInterval(interval);
+                clearTimeout(timeout);
+            };
+        }
+    }, [updatedUserData]);
+
+    const lineOptions = useMemo(() => {
+        const mjlLines = productionLinesMJL
+            .filter(line => line.id !== 111 && line.line)
+            .map(line => line.line!)
+            .filter((line, index, self) => self.indexOf(line) === index)
+            .sort((a, b) => parseInt(a) - parseInt(b));
+
+        const clnLines = productionLinesCLN
+            .filter(line => line.id !== 0 && line.line)
+            .map(line => line.line!)
+            .filter((line, index, self) => self.indexOf(line) === index)
+            .sort((a, b) => parseInt(a) - parseInt(b));
+
+        const allLines = [...new Set([...mjlLines, ...clnLines])].sort((a, b) => parseInt(a) - parseInt(b));
+        return allLines;
+    }, []);
+
+    const handleUpdateUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editRfid.trim() || !editLine) return;
+        setIsUpdating(true);
+        setUpdateMessage({ type: '', text: '' });
+
+        try {
+            const res = await updateUserData({
+                rfid_user: editRfid,
+                line: editLine
+            });
+
+            if (res.success) {
+                setUpdateMessage({ type: 'success', text: (res as any).message || 'Data user berhasil diperbarui!' });
+                if (res.data) {
+                    setUpdatedUserData(res.data);
+                }
+                setEditRfid('');
+                setEditLine('');
+            } else {
+                setUpdateMessage({ type: 'error', text: res.error || 'Gagal memperbarui data user' });
+            }
+        } catch (err) {
+            setUpdateMessage({
+                type: 'error',
+                text: err instanceof Error ? err.message : 'Terjadi kesalahan saat memperbarui user'
+            });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
     const navigate = useNavigate();
     const location = useLocation();
     const loginMutation = useLogin();
@@ -154,7 +235,7 @@ export default function Login() {
                             {/* Sub-title */}
                             <div className="text-center mb-3 sm:mb-4 md:mb-5">
                                 <p className="text-xs sm:text-sm md:text-base text-gray-600 px-2">
-                                    Hey, Enter the NIK & Password registered with GCC or HRIS to enter your account.
+                                    Hey, Enter the NIK & Password registered with your account.
                                 </p>
                             </div>
 
@@ -271,20 +352,165 @@ export default function Login() {
                                     </button>
                                 </div>
 
-                                {/* Forgot Password Block - Centered */}
-                                <div className="w-full text-center pt-2">
-                                    <a
-                                        href="https://gcc.gistexgarmenindonesia.com:7186/forget-password"
-                                        className="text-xs sm:text-sm text-gray-600 hover:text-gray-900 hover:underline transition-colors"
-                                    >
-                                        Forgot Password..?
-                                    </a>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
+                                 {/* Forgot Password Block - Centered */}
+                                 <div className="w-full text-center pt-2 flex flex-col gap-2">
+                                     <a
+                                         href="https://gcc.gistexgarmenindonesia.com:7186/forget-password"
+                                         className="text-xs sm:text-sm text-gray-600 hover:text-gray-900 hover:underline transition-colors"
+                                     >
+                                         Forgot Password..?
+                                     </a>
+                                     <div>
+                                         <button
+                                             type="button"
+                                             onClick={() => {
+                                                 setIsEditModalOpen(true);
+                                                 setEditRfid('');
+                                                 setEditLine('');
+                                                 setUpdateMessage({ type: '', text: '' });
+                                                 setUpdatedUserData(null);
+                                             }}
+                                             className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors bg-transparent border-none cursor-pointer focus:outline-none"
+                                         >
+                                             Edit User
+                                         </button>
+                                     </div>
+                                 </div>
+                             </form>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+
+             {/* Edit User Modal */}
+             {isEditModalOpen && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-all">
+                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden animate-fade-in max-h-[90vh] flex flex-col">
+                         {/* Modal Header */}
+                         <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center">
+                             <h3 className="text-lg font-bold">Edit User Account</h3>
+                             <button
+                                 onClick={() => setIsEditModalOpen(false)}
+                                 className="text-white/80 hover:text-white transition-colors text-xl font-semibold focus:outline-none"
+                             >
+                                 ✕
+                             </button>
+                         </div>
+
+                         {/* Modal Body */}
+                         <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                             {/* Success/Error Update Messages */}
+                             {!updatedUserData && updateMessage.text && (
+                                 <div className={`p-3 border-l-4 rounded-lg text-xs ${
+                                     updateMessage.type === 'success' 
+                                         ? 'bg-green-50 border-green-500 text-green-700' 
+                                         : 'bg-red-50 border-red-500 text-red-700'
+                                 }`}>
+                                     {updateMessage.text}
+                                 </div>
+                             )}
+
+                             {/* Render Success Popup or Edit Form */}
+                             {updatedUserData ? (
+                                 <div className="flex flex-col items-center justify-center py-6 text-center animate-fade-in">
+                                     <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                                         <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                         </svg>
+                                     </div>
+                                     <h4 className="text-xl font-bold text-gray-900 mb-2">Update Berhasil!</h4>
+                                     <div className="bg-gray-50 rounded-xl border border-gray-100 p-5 w-full text-left text-sm space-y-3 mb-6 shadow-sm">
+                                         <div className="flex justify-between border-b border-gray-200 pb-2">
+                                             <span className="text-gray-500 font-semibold">Nama:</span>
+                                             <span className="text-gray-900 font-bold">{updatedUserData.nama}</span>
+                                         </div>
+                                         <div className="flex justify-between border-b border-gray-200 pb-2">
+                                             <span className="text-gray-500 font-semibold">NIK:</span>
+                                             <span className="text-gray-900 font-bold">{updatedUserData.nik}</span>
+                                         </div>
+                                         <div className="flex justify-between border-b border-gray-200 pb-2">
+                                             <span className="text-gray-500 font-semibold">RFID:</span>
+                                             <span className="text-gray-900 font-bold">{updatedUserData.rfid_user}</span>
+                                         </div>
+                                         <div className="flex justify-between border-b border-gray-200 pb-2">
+                                             <span className="text-gray-500 font-semibold">Line Lama:</span>
+                                             <span className="text-gray-900 font-bold">{updatedUserData.line_sebelumnya}</span>
+                                         </div>
+                                         <div className="flex justify-between">
+                                             <span className="text-gray-500 font-semibold">Line Baru:</span>
+                                             <span className="text-blue-600 font-bold">{updatedUserData.line_baru}</span>
+                                         </div>
+                                     </div>
+                                     
+                                     {/* Progress Bar Timer */}
+                                     <div className="w-full bg-gray-200 rounded-full h-2 mb-2 overflow-hidden">
+                                         <div 
+                                             className="bg-green-500 h-2 rounded-full transition-all duration-75 ease-linear" 
+                                             style={{ width: `${progress}%` }}
+                                         ></div>
+                                     </div>
+                                     <p className="text-xs text-gray-400 mt-2">Menutup otomatis dalam 3 detik...</p>
+                                 </div>
+                             ) : (
+                                 <form onSubmit={handleUpdateUser} className="space-y-4 pt-2 border-t border-gray-100">
+                                     <div className="flex flex-col gap-4">
+                                         {/* RFID User */}
+                                         <div>
+                                             <label className="block text-xs font-semibold text-gray-700 mb-1">RFID User</label>
+                                             <input
+                                                 type="text"
+                                                 required
+                                                 value={editRfid}
+                                                 onChange={(e) => setEditRfid(e.target.value)}
+                                                 placeholder="Masukkan RFID User"
+                                                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                                             />
+                                         </div>
+
+                                         {/* Line */}
+                                         <div>
+                                             <label className="block text-xs font-semibold text-gray-700 mb-1">Line</label>
+                                             <select
+                                                 required
+                                                 value={editLine}
+                                                 onChange={(e) => setEditLine(e.target.value)}
+                                                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white cursor-pointer"
+                                             >
+                                                 <option value="">Pilih Line</option>
+                                                 {lineOptions.map(opt => (
+                                                     <option key={opt} value={opt}>{opt}</option>
+                                                 ))}
+                                             </select>
+                                         </div>
+                                     </div>
+
+                                     {/* Save Button */}
+                                     <div className="pt-4 flex justify-end gap-2 border-t border-gray-100">
+                                         <button
+                                             type="button"
+                                             onClick={() => {
+                                                 setEditRfid('');
+                                                 setEditLine('');
+                                                 setUpdateMessage({ type: '', text: '' });
+                                             }}
+                                             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+                                         >
+                                             Reset
+                                         </button>
+                                         <button
+                                             type="submit"
+                                             disabled={isUpdating}
+                                             className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-1"
+                                         >
+                                             {isUpdating ? 'Menyimpan...' : 'Simpan Perubahan'}
+                                         </button>
+                                     </div>
+                                 </form>
+                             )}
+                         </div>
+                     </div>
+                 </div>
+             )}
+         </div>
+     );
+ }

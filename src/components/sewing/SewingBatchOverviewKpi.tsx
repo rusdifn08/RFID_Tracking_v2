@@ -15,7 +15,7 @@ const KPI_THEMES: Record<string, OverviewStatTheme> = {
     watermark: 'text-blue-500/[0.12]',
   },
   finishBatch: {
-    shell: 'border-emerald-200/90 bg-gradient-to-br from-blue-50 via-sky-50/90 to-white',
+    shell: 'border-blue-200/90 bg-gradient-to-br from-blue-50 via-sky-50/90 to-white',
     label: 'text-slate-600',
     value: 'text-blue-600',
     sub: 'text-blue-500/75',
@@ -24,7 +24,7 @@ const KPI_THEMES: Record<string, OverviewStatTheme> = {
     watermark: 'text-blue-500/[0.12]',
   },
   wip: {
-    shell: 'border-amber-200/90 bg-gradient-to-br from-blue-50 via-sky-50/90 to-white',
+    shell: 'border-blue-200/90 bg-gradient-to-br from-blue-50 via-sky-50/90 to-white',
     label: 'text-slate-600',
     value: 'text-blue-600',
     sub: 'text-blue-500/75',
@@ -33,7 +33,7 @@ const KPI_THEMES: Record<string, OverviewStatTheme> = {
     watermark: 'text-blue-500/[0.12]',
   },
   efficiencyPct: {
-    shell: 'border-violet-200/90 bg-gradient-to-br from-blue-50 via-sky-50/90 to-white',
+    shell: 'border-blue-200/90 bg-gradient-to-br from-blue-50 via-sky-50/90 to-white',
     label: 'text-slate-600',
     value: 'text-blue-600',
     sub: 'text-blue-500/75',
@@ -66,7 +66,7 @@ const KPI_ITEMS: {
     },
     {
       key: 'wip',
-      label: 'WIP Berjalan',
+      label: 'WIP',
       description: 'Bundle yang masih di proses.',
       unit: 'Bundle',
       icon: TriangleAlert,

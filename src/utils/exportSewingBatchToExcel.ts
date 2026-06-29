@@ -23,7 +23,6 @@ export async function exportSewingBatchToExcel(
     color: string;
   },
   batches: any[],
-  pcsPerBundle: number,
   dateFrom: string,
   dateTo: string
 ): Promise<void> {
@@ -138,7 +137,6 @@ export async function exportSewingBatchToExcel(
       const bundleIn = b.in || 0;
       const bundleOut = b.out || 0;
       const wipBundle = Math.max(0, bundleIn - bundleOut);
-      const targetPcs = bundleIn * pcsPerBundle;
       const outputPcs = b.output_pcs || 0;
       const percentageVal = bundleIn > 0 ? `${Math.round((bundleOut / bundleIn) * 100)}%` : '0%';
 

@@ -110,3 +110,11 @@ export function filterVisibleProductionLines<T extends { id: number }>(
  * true = badge disembunyikan, hanya tampil default "Bundle-N".
  */
 export const HIDE_SEWING_BATCH_HIGHLIGHT_BADGES = true;
+
+// --- Supply Sewing Card ---
+/**
+ * Flag untuk menyembunyikan atau menampilkan status "Coming Soon" pada card Supply Sewing
+ * true = Tampilkan "Soon" dan nonaktifkan tombol
+ * false = Tampilkan tombol normal
+ */
+export const COMINGSOON_SUPPLY_SEWING = false;
