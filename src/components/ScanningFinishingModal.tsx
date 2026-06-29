@@ -1,16 +1,21 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { X, CheckCircle2, Loader2, LogIn, LogOut, User, ClipboardList, Hash, Package, Users, Palette, Ruler, BadgeCheck, Info, Tags } from 'lucide-react';
-import { dryroomCheckIn, dryroomCheckOut, foldingCheckIn, foldingCheckOut, rejectRoomCheckIn, rejectRoomCheckOut, rejectRoomScrap, API_BASE_URL, getDefaultHeaders, getActiveUsers, getScanningDryroomOperator, type ScanningDryroomLastScan } from '../config/api';
+import { dryroomCheckIn, dryroomCheckOut, dryroomUrgent, foldingCheckIn, foldingCheckOut, foldingUrgent, rejectRoomCheckIn, rejectRoomCheckOut, rejectRoomScrap, API_BASE_URL, getDefaultHeaders, getActiveUsers, getScanningDryroomOperator, type ScanningDryroomLastScan } from '../config/api';
 
 // Sound effect paths - file ada di root assets folder
 const successSoundPath = '/assets/succes.mp3';
 const errorSoundPath = '/assets/error.mp3';
 
+type FinishingScanAction = 'checkin' | 'checkout' | 'urgent';
+
+const finishingActionLabel = (action: FinishingScanAction, custom?: string) =>
+    custom || (action === 'checkin' ? 'Check In' : action === 'checkout' ? 'Check Out' : 'Urgent');
+
 interface ScanningFinishingModalProps {
     isOpen: boolean;
     onClose: () => void;
     type: 'dryroom' | 'folding' | 'reject'; // Tipe finishing: dryroom, folding, atau reject
-    defaultAction?: 'checkin' | 'checkout'; // Default action saat modal dibuka
+    defaultAction?: FinishingScanAction; // Default action saat modal dibuka
     autoSubmit?: boolean; // Auto submit saat Enter tanpa perlu click
     tableNumber?: number; // Nomor table (optional)
     nik?: string; // NIK user (folding: check in & checkout; optional jika ada di session)
@@ -30,7 +35,7 @@ interface ScannedItem {
     timestamp: Date;
     status: 'success' | 'error';
     message?: string;
-    action?: 'checkin' | 'checkout'; // Action yang dilakukan
+    action?: FinishingScanAction; // Action yang dilakukan
     wo?: string;
     item?: string;
     color?: string;
@@ -57,14 +62,14 @@ export default function ScanningFinishingModal({
     const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
     const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-    const [selectedAction, setSelectedAction] = useState<'checkin' | 'checkout'>(defaultAction);
+    const [selectedAction, setSelectedAction] = useState<FinishingScanAction>(defaultAction);
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const successAudioRef = useRef<HTMLAudioElement | null>(null);
     const errorAudioRef = useRef<HTMLAudioElement | null>(null);
     const rfidInputRef = useRef<string>(''); // Ref untuk menyimpan nilai rfidInput terbaru
-    const selectedActionRef = useRef<'checkin' | 'checkout'>(defaultAction); // Ref untuk menyimpan selectedAction terbaru
+    const selectedActionRef = useRef<FinishingScanAction>(defaultAction); // Ref untuk menyimpan selectedAction terbaru
     const dryroomModalWasOpenRef = useRef(false);
     const [dryroomBaselineSnapshot, setDryroomBaselineSnapshot] = useState({ checkin: 0, checkout: 0 });
     /** Panel Check In / Check Out terpisah (operator + detail scan terakhir) dari scanning_dryroom.json */
@@ -75,6 +80,7 @@ export default function ScanningFinishingModal({
     }>({ nama_operator: '', nik_operator: '', last_scan: null });
 
     const isDryroomDashboardLayout = type === 'dryroom' && dryroomDashboardMode && !compact;
+    const isSingleActionMode = isDryroomDashboardLayout || defaultAction === 'urgent';
 
     const sessionUser = useMemo(() => {
         try {
@@ -91,7 +97,7 @@ export default function ScanningFinishingModal({
     }, [isOpen]);
 
     const refreshDryroomPanel = useCallback(
-        async (modeOverride?: 'checkin' | 'checkout') => {
+        async (modeOverride?: FinishingScanAction) => {
             const mode = modeOverride ?? selectedAction;
             try {
                 const res = await getScanningDryroomOperator(mode);
@@ -147,7 +153,11 @@ export default function ScanningFinishingModal({
 
     /** Ringkasan dryroom dashboard: angka real-time saat buka modal + scan sukses di sesi ini */
     const dryroomActiveBaseline =
-        selectedAction === 'checkin' ? dryroomBaselineSnapshot.checkin : dryroomBaselineSnapshot.checkout;
+        selectedAction === 'checkin'
+            ? dryroomBaselineSnapshot.checkin
+            : selectedAction === 'checkout'
+              ? dryroomBaselineSnapshot.checkout
+              : 0;
     const dryroomDisplayTotal = isDryroomDashboardLayout
         ? dryroomActiveBaseline + successScanCount
         : successScanCount;
@@ -252,7 +262,9 @@ export default function ScanningFinishingModal({
         }
     })();
     const hasDryroomAccess = type !== 'dryroom' || ['DRYROOM', 'ROBOTIC'].includes(userPart);
-    const hasFoldingCheckInAccess = !(type === 'folding' && defaultAction === 'checkin') || ['FOLDING', 'ROBOTIC'].includes(userPart);
+    const hasFoldingCheckInAccess =
+        !(type === 'folding' && (defaultAction === 'checkin' || defaultAction === 'urgent')) ||
+        ['FOLDING', 'ROBOTIC'].includes(userPart);
     const hasScanAccess = hasDryroomAccess && hasFoldingCheckInAccess;
     const isScanDisabled = isProcessing || !hasScanAccess;
 
@@ -469,7 +481,7 @@ export default function ScanningFinishingModal({
             const timestamp = new Date();
             playSound('error');
             const accessMessage = type === 'dryroom'
-                ? 'Akses ditolak. Hanya bagian DRYROOM atau ROBOTIC yang bisa Check In/Check Out Dryroom.'
+                ? 'Akses ditolak. Hanya bagian DRYROOM atau ROBOTIC yang bisa Check In/Check Out/Urgent Dryroom.'
                 : 'Akses ditolak. Hanya bagian FOLDING atau ROBOTIC yang bisa Check In Folding.';
             setScannedItems(prev => {
                 const newItems: ScannedItem[] = [...prev, {
@@ -503,7 +515,7 @@ export default function ScanningFinishingModal({
                     rfid: trimmedRfid,
                     timestamp,
                     status: 'error' as const,
-                    message: `RFID sudah di-${currentAction === 'checkin' ? 'Check In' : 'Check Out'} dalam session ini (Duplikasi)`,
+                    message: `RFID sudah di-${finishingActionLabel(currentAction)} dalam session ini (Duplikasi)`,
                     action: currentAction
                 }];
                 return newItems.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
@@ -527,11 +539,13 @@ export default function ScanningFinishingModal({
                 const bodyNik = nik?.trim() || (sessionUser.nik !== '—' ? sessionUser.nik : '') || undefined;
                 if (currentAction === 'checkin') {
                     response = await dryroomCheckIn(trimmedRfid, bodyNik);
-                } else {
+                } else if (currentAction === 'checkout') {
                     response = await dryroomCheckOut(trimmedRfid, bodyNik);
+                } else {
+                    response = await dryroomUrgent(trimmedRfid, bodyNik);
                 }
             } else if (type === 'folding') {
-                if (currentAction === 'checkin') {
+                if (currentAction === 'checkin' || currentAction === 'urgent') {
                     const bodyNik =
                         nik?.trim() || (sessionUser.nik !== '—' ? sessionUser.nik : '') || undefined;
                     const trimmedBodyNik = bodyNik?.trim();
@@ -540,7 +554,10 @@ export default function ScanningFinishingModal({
                             'NIK user tidak tersedia. Pastikan sudah login dengan akun yang memiliki NIK valid.'
                         );
                     }
-                    response = await foldingCheckIn(trimmedRfid, trimmedBodyNik);
+                    response =
+                        currentAction === 'urgent'
+                            ? await foldingUrgent(trimmedRfid, trimmedBodyNik)
+                            : await foldingCheckIn(trimmedRfid, trimmedBodyNik);
                 } else {
                     // Untuk checkout, kirim NIK dan table number jika ada
                     // Validasi: NIK harus ada dan valid untuk checkout folding
@@ -627,7 +644,7 @@ export default function ScanningFinishingModal({
                 // Response berhasil
                 const message = (responseData?.message && typeof responseData.message === 'string')
                     ? responseData.message
-                    : `${currentAction === 'checkin' ? 'Check In' : 'Check Out'} berhasil`;
+                    : `${finishingActionLabel(currentAction)} berhasil`;
 
                 // Play success sound
                 playSound('success');
@@ -711,7 +728,7 @@ export default function ScanningFinishingModal({
     }, [selectedAction]);
 
     // Wrapper function untuk setSelectedAction yang juga update ref
-    const updateSelectedAction = (action: 'checkin' | 'checkout') => {
+    const updateSelectedAction = (action: FinishingScanAction) => {
         setSelectedAction(action);
         selectedActionRef.current = action;
     };
@@ -776,7 +793,7 @@ export default function ScanningFinishingModal({
                         📡 Scanning {theme.name}
                     </h2>
                     <p className="text-xs xs:text-sm font-medium" style={{ color: '#475569' }}>
-                        Scan RFID untuk {customActionLabel || (selectedAction === 'checkin' ? 'Check In' : 'Check Out')}{tableNumber ? ` Table ${tableNumber}` : ''}
+                        Scan RFID untuk {finishingActionLabel(selectedAction, customActionLabel)}{tableNumber ? ` Table ${tableNumber}` : ''}
                     </p>
                     {autoSubmit && !tableNumber && (
                         <div className="mt-1 px-2 py-0.5 rounded-md inline-block text-[10px] font-semibold"
@@ -790,7 +807,7 @@ export default function ScanningFinishingModal({
                                 border: `1px solid ${selectedAction === 'checkin' ? '#22c55e' : '#ef4444'}40`
                             }}
                         >
-                            Mode: {customActionLabel || (selectedAction === 'checkin' ? 'Check In' : 'Check Out')}
+                            Mode: {finishingActionLabel(selectedAction, customActionLabel)}
                         </div>
                     )}
 
@@ -810,7 +827,7 @@ export default function ScanningFinishingModal({
                 </div>
 
                 {/* Action Selection Buttons - Hidden jika autoSubmit aktif */}
-                {!autoSubmit && (
+                {!autoSubmit && !isSingleActionMode && (
                     <div className="mb-2 flex flex-wrap gap-2 xs:gap-2.5 sm:gap-3">
                         <button
                             onClick={() => updateSelectedAction('checkin')}
@@ -1114,7 +1131,7 @@ export default function ScanningFinishingModal({
                                                         background: isError ? '#FEE2E2' : theme.bgGradient
                                                     }}
                                                 >
-                                                    {item.action === 'checkin' ? 'Check In' : 'Check Out'}
+                                                    {finishingActionLabel(item.action || 'checkin')}
                                                 </span>
                                                 <span
                                                     className="text-xs font-medium px-2 py-0.5 rounded-md inline-block"
@@ -1246,7 +1263,7 @@ export default function ScanningFinishingModal({
                                 {isDryroomDashboardLayout ? '📡 Scanning Station Dryroom' : `📡 Scanning ${theme.name}`}
                             </h2>
                             <p className="text-xs xs:text-sm font-medium" style={{ color: '#475569' }}>
-                                Scan RFID untuk {customActionLabel || (selectedAction === 'checkin' ? 'Check In' : 'Check Out')}
+                                Scan RFID untuk {finishingActionLabel(selectedAction, customActionLabel)}
                             </p>
                             {autoSubmit && !isDryroomDashboardLayout && (
                                 <div className="mt-1 px-2 py-0.5 rounded-md inline-block text-[10px] font-semibold"
@@ -1260,7 +1277,7 @@ export default function ScanningFinishingModal({
                                         border: `1px solid ${selectedAction === 'checkin' ? '#22c55e' : '#ef4444'}40`
                                     }}
                                 >
-                                    Mode: {customActionLabel || (selectedAction === 'checkin' ? 'Check In' : 'Check Out')}
+                                    Mode: {finishingActionLabel(selectedAction, customActionLabel)}
                                 </div>
                             )}
                             {tableNumber && (
@@ -1294,12 +1311,15 @@ export default function ScanningFinishingModal({
                                         <span className="text-xs font-bold uppercase tracking-wide">Operator</span>
                                     </div>
                                     <span
-                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${selectedAction === 'checkin'
-                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                            : 'bg-sky-100 text-sky-900 border border-sky-200'
-                                            }`}
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                            selectedAction === 'checkin'
+                                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                                : selectedAction === 'urgent'
+                                                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                                  : 'bg-sky-100 text-sky-900 border border-sky-200'
+                                        }`}
                                     >
-                                        {selectedAction === 'checkin' ? 'Check In' : 'Check Out'}
+                                        {finishingActionLabel(selectedAction)}
                                     </span>
                                 </div>
                                 <p className="text-sm font-semibold text-slate-900 leading-snug">{dryroomOperatorDisplay.name}</p>
@@ -1440,7 +1460,7 @@ export default function ScanningFinishingModal({
                     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
 
                     {/* Action Selection Buttons - Hidden jika autoSubmit aktif */}
-                    {!autoSubmit && !isDryroomDashboardLayout && (
+                    {!autoSubmit && !isSingleActionMode && (
                     <div className="mb-2 flex flex-wrap gap-2 xs:gap-2.5 sm:gap-3">
                             <button
                                 onClick={() => updateSelectedAction('checkin')}
@@ -1762,7 +1782,7 @@ export default function ScanningFinishingModal({
                                                             background: isError ? '#FEE2E2' : theme.bgGradient
                                                         }}
                                                     >
-                                                        {item.action === 'checkin' ? 'Check In' : 'Check Out'}
+                                                        {finishingActionLabel(item.action || 'checkin')}
                                                     </span>
                                                     <span
                                                         className="text-xs font-medium px-2 py-0.5 rounded-md inline-block"
