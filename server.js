@@ -70,23 +70,27 @@ if (args.includes('cln')) {
     CURRENT_ENV = 'GCC';
 } else if (ENV_OVERRIDE === 'MJL' || ENV_OVERRIDE === 'MJL2' || ENV_OVERRIDE === 'CLN' || ENV_OVERRIDE === 'GCC') {
     CURRENT_ENV = ENV_OVERRIDE;
-} else if (process.env.BACKEND_IP) {
-    BACKEND_IP = process.env.BACKEND_IP;
-    CURRENT_ENV = BACKEND_IP === '10.5.0.106' ? 'MJL' : 'CLN';
 } else {
 }
 
+// dev-all: -ipbackend mengoverride IP preset per environment
+if (process.env.BACKEND_IP) {
+    BACKEND_IP = process.env.BACKEND_IP;
+}
+
 // Port untuk proxy server - berbeda per environment agar bisa run bersamaan
-// MJL: 8000, MJL2: 8001, CLN: 8000
-let PORT = process.env.PORT || 8000;
-if (CURRENT_ENV === 'MJL2') {
-    PORT = 8001; // Port berbeda untuk MJL2 agar bisa run bersamaan dengan MJL
+// MJL: 8000, MJL2: 8001, CLN: 8000 — override: PROXY_PORT (-portproxy via dev-all)
+let PORT;
+if (process.env.PROXY_PORT) {
+    PORT = Number(process.env.PROXY_PORT);
+} else if (CURRENT_ENV === 'MJL2') {
+    PORT = 8001;
 } else if (CURRENT_ENV === 'GCC') {
-    PORT = 8002; // Port untuk GCC (bersamaan dengan MJL/MJL2/CLN)
+    PORT = 8002;
 } else if (CURRENT_ENV === 'MJL') {
-    PORT = 8000; // Port untuk MJL
+    PORT = 8000;
 } else {
-    PORT = 8000; // Port untuk CLN (default)
+    PORT = Number(process.env.PORT) || 8000;
 }
 
 /** Port Vite dev — dari VITE_DEV_SERVER_PORT (dev-all) atau default per environment */
@@ -1829,7 +1833,7 @@ async function checkApiConnection() {
  */
 async function checkWebSocketConnection() {
     const startTime = Date.now();
-    const wsUrl = `ws://${BACKEND_IP}:${BACKEND_PORT}/ws/wira-dashboard`;
+    const wsUrl = `ws://${BACKEND_IP}:${BACKEND_PORT}/ws/wira`;
 
     return new Promise((resolve) => {
         let resolved = false;
@@ -2011,7 +2015,7 @@ app.get('/api/health/check', async (req, res) => {
                 ...apiResult
             },
             websocket: {
-                url: `ws://${BACKEND_IP}:${BACKEND_PORT}/ws/wira-dashboard`,
+                url: `ws://${BACKEND_IP}:${BACKEND_PORT}/ws/wira`,
                 ...wsResult
             }
         },
@@ -3209,6 +3213,11 @@ app.use('/api/gcc/cutting', async (req, res, next) => {
     const endpointPath = `/api/gcc/cutting${req.path === '/' ? '' : req.path}`;
     const host = resolveGccCutting9000Host(endpointPath);
     return forwardToGccCuttingService9000(req, res, endpointPath, host);
+});
+
+/** GET /api/homedashboard — dashboard cutting home (:9000). */
+app.get('/api/homedashboard/tracking', async (req, res) => {
+    return forwardToGccCuttingService9000(req, res, '/api/homedashboard/tracking', GCC_CUTTING_SERVICE_107);
 });
 
 /** GET /api/homedashboard — dashboard cutting home (:9000). */

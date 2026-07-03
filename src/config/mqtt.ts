@@ -1,7 +1,7 @@
 /**
  * Konfigurasi MQTT Broker saja (animasi login success).
  * - Hanya MQTT broker yang diseragamkan: 10.5.0.106 untuk MJL, MJL2, CLN.
- * - WebSocket aplikasi (wira-dashboard, dll.) TIDAK diubah; tetap pakai api.ts
+ * - WebSocket aplikasi (wira, dll.) TIDAK diubah; tetap pakai api.ts
  *   (getBackendIP / getWSBaseUrl per environment).
  * - getMqttWsUrl dipakai oleh klien MQTT di browser untuk konek ke broker MQTT
  *   (protokol MQTT over WebSocket), bukan WebSocket aplikasi.

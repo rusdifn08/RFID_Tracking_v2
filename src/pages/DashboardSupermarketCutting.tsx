@@ -78,6 +78,11 @@ function lokasiFromLastStatus(last?: string | null): string {
     return last.replace(/_/g, ' ');
 }
 
+function cellStr(v?: string | null): string {
+    const s = v?.trim();
+    return s ? s : '—';
+}
+
 function StationStatusCard({
     title,
     value,
@@ -517,6 +522,11 @@ export default function DashboardSupermarketCutting() {
                                                 <tr className="text-slate-600" style={{ fontSize: MARKET_TYPO.tableHeader }}>
                                                     <th className="text-left font-bold px-3 py-2.5 whitespace-nowrap">RFID Bundle</th>
                                                     <th className="text-left font-bold px-3 py-2.5 whitespace-nowrap">WO</th>
+                                                    <th className="text-left font-bold px-3 py-2.5 whitespace-nowrap">Style</th>
+                                                    <th className="text-left font-bold px-3 py-2.5 whitespace-nowrap">Buyer</th>
+                                                    <th className="text-left font-bold px-3 py-2.5 whitespace-nowrap">Item</th>
+                                                    <th className="text-left font-bold px-3 py-2.5 whitespace-nowrap">Color</th>
+                                                    <th className="text-left font-bold px-3 py-2.5 whitespace-nowrap">Size</th>
                                                     <th className="text-right font-bold px-3 py-2.5 whitespace-nowrap">QTY</th>
                                                     <th className="text-left font-bold px-3 py-2.5 whitespace-nowrap">Line</th>
                                                     <th className="text-left font-bold px-3 py-2.5 whitespace-nowrap">Lokasi</th>
@@ -527,7 +537,7 @@ export default function DashboardSupermarketCutting() {
                                                 {tableItemsFromApi ? (
                                                     tableItemsFromApi.length === 0 ? (
                                                         <tr>
-                                                            <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
+                                                            <td colSpan={11} className="px-3 py-6 text-center text-slate-500">
                                                                 Belum ada data supermarket (API).
                                                             </td>
                                                         </tr>
@@ -538,9 +548,14 @@ export default function DashboardSupermarketCutting() {
                                                                 className="hover:bg-sky-50/40"
                                                             >
                                                                 <td className="px-3 py-2.5 font-mono font-semibold text-slate-900 whitespace-nowrap">
-                                                                    {it.rfid_bundles?.trim() || '—'}
+                                                                    {cellStr(it.rfid_bundles || it.rfid_garment)}
                                                                 </td>
-                                                                <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{it.wo?.trim() ? it.wo.trim() : '—'}</td>
+                                                                <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(it.wo)}</td>
+                                                                <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(it.style)}</td>
+                                                                <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(it.buyer)}</td>
+                                                                <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(it.item)}</td>
+                                                                <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(it.color)}</td>
+                                                                <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(it.size)}</td>
                                                                 <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">{safeNum(it.qty)}</td>
                                                                 <td className="px-3 py-2.5 whitespace-nowrap">{it.line != null && String(it.line).trim() !== '' ? String(it.line).trim() : '—'}</td>
                                                                 <td className="px-3 py-2.5 whitespace-nowrap">{lokasiFromLastStatus(it.last_status)}</td>
@@ -552,15 +567,20 @@ export default function DashboardSupermarketCutting() {
                                                     )
                                                 ) : storeRows.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
+                                                        <td colSpan={11} className="px-3 py-6 text-center text-slate-500">
                                                             Belum ada data supermarket.
                                                         </td>
                                                     </tr>
                                                 ) : (
                                                     storeRows.map((r, idx) => (
                                                         <tr key={`${r.rfid_garment || 'x'}-${r.at || idx}-${idx}`} className="hover:bg-sky-50/40">
-                                                            <td className="px-3 py-2.5 font-mono font-semibold text-slate-900 whitespace-nowrap">{r.rfid_garment || '—'}</td>
-                                                            <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{r.wo?.trim() ? r.wo.trim() : '—'}</td>
+                                                            <td className="px-3 py-2.5 font-mono font-semibold text-slate-900 whitespace-nowrap">{cellStr(r.rfid_garment)}</td>
+                                                            <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(r.wo)}</td>
+                                                            <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(r.style)}</td>
+                                                            <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(r.buyer)}</td>
+                                                            <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(r.item)}</td>
+                                                            <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(r.color)}</td>
+                                                            <td className="px-3 py-2.5 text-slate-800 whitespace-nowrap">{cellStr(r.size)}</td>
                                                             <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">{safeNum(r.qty)}</td>
                                                             <td className="px-3 py-2.5 whitespace-nowrap">{r.line?.trim() ? r.line.trim() : '—'}</td>
                                                             <td className="px-3 py-2.5 whitespace-nowrap">{r.location?.trim() ? r.location.trim() : '—'}</td>

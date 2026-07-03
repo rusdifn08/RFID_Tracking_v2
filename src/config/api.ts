@@ -17,6 +17,11 @@ import { getApiBaseUrl } from '../utils/network';
 // MJL: 8000, MJL2: 8001, CLN: 8000
 // Deteksi port proxy berdasarkan port frontend
 const getProxyPort = (): number => {
+    const fromEnv = import.meta.env.VITE_NODE_PROXY_PORT;
+    if (fromEnv != null && String(fromEnv).trim() !== '') {
+        const n = Number(fromEnv);
+        if (Number.isFinite(n) && n > 0) return n;
+    }
     if (typeof window === 'undefined') return 8000;
     const currentPort = window.location.port;
     // Port 5174 = MJL2 → proxy port 8001
@@ -106,7 +111,7 @@ export const WS_BASE_URL = getWSBaseUrl();
 // Menggunakan function untuk mendapatkan URL secara dinamis berdasarkan environment
 export const getWiraDashboardWSUrl = (): string => {
     const backendIP = getBackendIP();
-    const wsUrl = `ws://${backendIP}:${BACKEND_WS_PORT}/ws/wira-dashboard`;
+    const wsUrl = `ws://${backendIP}:${BACKEND_WS_PORT}/ws/wira`;
 
     if (isDevelopment && typeof window !== 'undefined') {
         console.log(`🔧 [WIRA WS CONFIG] Development mode - WIRA_DASHBOARD_WS_URL: ${wsUrl}`);
@@ -549,21 +554,50 @@ export interface HomeDashboardItem {
     last_status?: string;
     wo?: string;
     style?: string;
+    buyer?: string;
+    item?: string;
     warna?: string;
     size?: string;
     qty_batch?: number;
     line?: string | number;
     lokasi?: string;
+    tanggal?: string;
+    createdAt?: string;
+    created_at?: string;
+    output_time?: string;
+    updated_at?: string;
+    waktu?: string;
+    at?: string;
     [key: string]: unknown;
 }
+
+export type HomeDashboardQueryParams = {
+    tanggalfrom?: string;
+    tanggalto?: string;
+};
 
 /**
  * GET — snapshot dashboard cutting command center (`/api/homedashboard`).
  * Browser: same-origin `/api/homedashboard`. Prod/dev override: `VITE_GCC_HOME_DASHBOARD_URL`.
  */
-export async function getHomeDashboard(): Promise<ApiResponse<HomeDashboardItem[]>> {
+export async function getHomeDashboard(params?: HomeDashboardQueryParams): Promise<ApiResponse<HomeDashboardItem[]>> {
     try {
-        const url = resolveGccHomeDashboardUrl();
+        let url = resolveGccHomeDashboardUrl();
+        if (params?.tanggalfrom != null || params?.tanggalto != null) {
+            let u: URL;
+            try {
+                u = new URL(url);
+            } catch {
+                u = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+            }
+            if (params.tanggalfrom != null && String(params.tanggalfrom).trim() !== '') {
+                u.searchParams.set('tanggalfrom', String(params.tanggalfrom).trim());
+            }
+            if (params.tanggalto != null && String(params.tanggalto).trim() !== '') {
+                u.searchParams.set('tanggalto', String(params.tanggalto).trim());
+            }
+            url = u.toString();
+        }
         const res = await fetch(url, {
             method: 'GET',
             headers: getGccCuttingBundlesRequestHeaders(),
@@ -598,6 +632,129 @@ export async function getHomeDashboard(): Promise<ApiResponse<HomeDashboardItem[
         return {
             success: false,
             error: e instanceof Error ? e.message : 'Gagal memuat home dashboard',
+        };
+    }
+}
+
+/** Satu baris WIP dari GET `/api/homedashboard/tracking`. */
+export interface HomeDashboardTrackingItem {
+    wip_status?: string;
+    id_bundles?: number;
+    rfid_bundles?: string;
+    barcode?: string;
+    wo?: string;
+    style?: string;
+    item?: string;
+    buyer?: string;
+    warna?: string;
+    size?: string;
+    qty_output?: number | null;
+    last_time_output?: string | null;
+    qty_good?: number | null;
+    last_time_good?: string | null;
+    qty_reject?: number | null;
+    last_time_reject?: string | null;
+    qty_repair?: number | null;
+    last_time_repair?: string | null;
+    qty_smarket_in?: number | null;
+    last_time_smarket_in?: string | null;
+    qty_smarket_out?: number | null;
+    last_time_smarket_out?: string | null;
+    qty_sewing?: number | null;
+    last_time_sewing?: string | null;
+    updated_at?: string | null;
+    line?: string | number | null;
+    [key: string]: unknown;
+}
+
+export interface HomeDashboardTrackingBuckets {
+    bundle?: HomeDashboardTrackingItem[];
+    qc?: HomeDashboardTrackingItem[];
+    smarket?: HomeDashboardTrackingItem[];
+    supply_sewing?: HomeDashboardTrackingItem[];
+    sewing?: HomeDashboardTrackingItem[];
+}
+
+export interface HomeDashboardTrackingResponse {
+    code?: number;
+    status?: string;
+    message?: string;
+    count?: {
+        bundle?: number;
+        qc?: number;
+        smarket?: number;
+        supply_sewing?: number;
+        sewing?: number;
+    };
+    data?: HomeDashboardTrackingBuckets;
+}
+
+export type HomeDashboardTrackingQueryParams = {
+    wo?: string;
+    style?: string;
+};
+
+/** Resolve URL GET WIP tracking (`/api/homedashboard/tracking`, service :9000). */
+export function resolveGccHomeDashboardTrackingUrl(): string {
+    const base = resolveGccHomeDashboardUrl().replace(/\/$/, '');
+    return base.endsWith('/tracking') ? base : `${base}/tracking`;
+}
+
+/**
+ * GET — WIP bundle per posisi (`/api/homedashboard/tracking`).
+ * Query opsional: `wo`, `style`.
+ */
+export async function getHomeDashboardTracking(
+    params?: HomeDashboardTrackingQueryParams,
+): Promise<ApiResponse<HomeDashboardTrackingResponse>> {
+    try {
+        let url = resolveGccHomeDashboardTrackingUrl();
+        if (params?.wo != null || params?.style != null) {
+            let u: URL;
+            try {
+                u = new URL(url);
+            } catch {
+                u = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+            }
+            if (params.wo != null && String(params.wo).trim() !== '') {
+                u.searchParams.set('wo', String(params.wo).trim());
+            }
+            if (params.style != null && String(params.style).trim() !== '') {
+                u.searchParams.set('style', String(params.style).trim());
+            }
+            url = u.toString();
+        }
+        const res = await fetch(url, {
+            method: 'GET',
+            headers: getGccCuttingBundlesRequestHeaders(),
+            cache: 'no-store',
+        });
+        const text = await res.text();
+        let json: unknown = null;
+        try {
+            json = text.replace(/^\uFEFF/, '').trim() ? JSON.parse(text) : null;
+        } catch {
+            return { success: false, error: 'Respons tracking home dashboard bukan JSON' };
+        }
+        const body = json as HomeDashboardTrackingResponse;
+        const st = String(body.status || '').toLowerCase();
+        const okByBody =
+            !(typeof body.code === 'number' && body.code >= 400) &&
+            (body.code === 200 || st === 'success' || body.data != null);
+        if (!res.ok || !okByBody) {
+            const msg =
+                body.message ||
+                body.status ||
+                (typeof body.code === 'number' ? `code ${body.code}` : null) ||
+                `HTTP ${res.status}`;
+            return { success: false, error: String(msg), data: body, status: res.status };
+        }
+        return { success: true, data: body, status: res.status };
+    } catch (e) {
+        return {
+            success: false,
+            error: e instanceof Error ? e.message : 'Gagal memuat home dashboard tracking',
+            status: 500,
         };
     }
 }
@@ -3278,7 +3435,13 @@ export interface GccSmarketDashboardItem {
     tanggal?: string;
     id_bundles?: number;
     rfid_bundles?: string;
+    rfid_garment?: string;
     wo?: string;
+    style?: string | null;
+    buyer?: string | null;
+    item?: string | null;
+    color?: string | null;
+    size?: string | null;
     qty_output?: number;
     qty_good?: number;
     qty_smarket_in?: number;

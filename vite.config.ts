@@ -251,7 +251,9 @@ export default defineConfig(({ mode, command }) => {
     (command === 'serve' ? getPrimaryLanIPv4() : undefined)
 
   const devServerPort = Number(env.VITE_DEV_SERVER_PORT || 5173) || 5173
-  const nodeProxyPort = devServerPort === 5174 ? 8001 : devServerPort === 5175 ? 8002 : 8000
+  const nodeProxyPort =
+    Number(env.VITE_NODE_PROXY_PORT) ||
+    (devServerPort === 5174 ? 8001 : devServerPort === 5175 ? 8002 : 8000)
   // MJL2: server.js di 10.6.0.99:8001; MJL/CLN: localhost (dev:all di mesin yang sama)
   const nodeProxyHost = env.VITE_NODE_PROXY_HOST || (devServerPort === 5174 ? '10.6.0.99' : '127.0.0.1')
 

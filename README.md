@@ -48,18 +48,24 @@ Tambahkan `--` lalu flag port. Jika tidak diisi, dipakai default per environment
 
 ```bash
 # MJL — contoh semua flag
-npm run dev:all:mjl -- -portfrontend 5173 -portbackend 7000 -portbackendgcc 9000
+npm run dev:all:mjl -- -portfrontend 5173 -portbackend 7000 -portbackendgcc 9000 -portproxy 8000
 
 # MJL2 — port frontend custom (mis. 5175)
-npm run dev:all:mjl2 -- -portfrontend 5175 -portbackend 7001 -portbackendgcc 9000
+npm run dev:all:mjl2 -- -portfrontend 5175 -portbackend 7001 -portbackendgcc 9000 -portproxy 8001
+
+# MJL — IP backend custom (API + GCC)
+npm run dev:all:mjl -- -ipbackend 10.5.0.109 -ipgcc 10.5.0.109
 
 # Format alternatif dengan =
-npm run dev:all:mjl -- -portfrontend=5180 -portbackend=7000
+npm run dev:all:mjl -- -portfrontend=5180 -portbackend=7000 -portproxy=8010 -ipbackend=10.5.0.109
 ```
 
 | Flag | Default | Keterangan |
 |------|---------|------------|
 | `-portfrontend` | 5173 / 5174 / 5175 | Port Vite (browser) |
+| `-portproxy` | 8000 / 8001 / 8002 | Port proxy Node (`server.js`) |
+| `-ipbackend` | per environment | IP Backend API (mis. MJL `10.5.0.106`) |
+| `-ipgcc` | `10.5.0.107` | IP host GCC / Sewing |
 | `-portbackend` | 7000 | Port API backend Django (`/wira`, `/garment`, dll.) |
 | `-portbackendgcc` | 9000 | Port service GCC Cutting & Sewing (`10.5.0.107`) |
 
@@ -150,5 +156,5 @@ Dokumentasi rinci route ada di `server.js`.
 | `npm run server` | Proxy server CLN |
 | `npm run server:cln` / `server:mjl` / `server:mjl2` / `server:gcc` | Proxy per environment |
 | `npm run dev:all` | Proxy + Vite (CLN) via `scripts/dev-all.mjs` |
-| `npm run dev:all:cln` / `dev:all:mjl` / `dev:all:mjl2` / `dev:all:gcc` | Proxy + Vite per environment; dukung flag `-portfrontend`, `-portbackend`, `-portbackendgcc` |
+| `npm run dev:all:cln` / `dev:all:mjl` / `dev:all:mjl2` / `dev:all:gcc` | Proxy + Vite per environment; dukung flag `-portfrontend`, `-portproxy`, `-ipbackend`, `-ipgcc`, `-portbackend`, `-portbackendgcc` |
 | `npm run preview` | Preview build production |

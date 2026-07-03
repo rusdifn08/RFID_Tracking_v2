@@ -18,6 +18,12 @@ import {
     Ruler,
     Minus,
     Plus,
+    CalendarRange,
+    Search,
+    X,
+    Filter,
+    Layers,
+    Route,
 } from 'lucide-react';
 import {
     inputRfidCuttingBundle,
@@ -26,7 +32,12 @@ import {
     postCuttingStoreScan,
     postCuttingSupplySewingScan,
     getHomeDashboard,
+    getHomeDashboardTracking,
     type HomeDashboardItem,
+    type HomeDashboardTrackingBuckets,
+    type HomeDashboardTrackingItem,
+    type CuttingScanStateDoc,
+    type CuttingScanHistoryEntry,
 } from '../../../config/api';
 import { COMINGSOON_SUPPLY_SEWING } from '../../../config/hide';
 import { useAuth } from '../../../hooks/useAuth';
@@ -35,7 +46,94 @@ import CuttingScanStationModal, { type CuttingScanSessionRow } from './CuttingSc
 import QcScanStationHost from './QcScanStationHost';
 
 const QUERY_SCAN = ['cutting-scan-state'] as const;
-const QUERY_HOME_DASH = ['cutting-home-dashboard'] as const;
+const QUERY_HOME_DASH_BASE = 'cutting-home-dashboard' as const;
+const QUERY_HOME_TRACKING_BASE = 'cutting-home-dashboard-tracking' as const;
+
+function ymdTodayLocal(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function formatYmdIdLabel(ymd: string): string {
+    const [y, mo, da] = ymd.split('-').map((x) => Number(x));
+    if (!y || !mo || !da) return ymd;
+    const d = new Date(y, mo - 1, da);
+    if (Number.isNaN(d.getTime())) return ymd;
+    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function isoToLocalYmd(iso: string): string | null {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function isoOnLocalYmdRange(iso: string | undefined, fromYmd: string, toYmd: string): boolean {
+    if (iso == null || String(iso).trim() === '') return false;
+    const ymd = isoToLocalYmd(String(iso));
+    if (!ymd) return false;
+    return ymd >= fromYmd && ymd <= toYmd;
+}
+
+function homeItemRawTimestamp(item: HomeDashboardItem): string | undefined {
+    const candidates = [
+        item.tanggal,
+        item.createdAt,
+        item.created_at,
+        item.output_time,
+        item.updated_at,
+        item.waktu,
+        item.at,
+    ];
+    for (const c of candidates) {
+        if (c == null || String(c).trim() === '') continue;
+        if (!Number.isNaN(Date.parse(String(c)))) return String(c);
+    }
+    return undefined;
+}
+
+function homeItemInDateRange(item: HomeDashboardItem, fromYmd: string, toYmd: string): boolean {
+    const ts = homeItemRawTimestamp(item);
+    if (!ts) return true;
+    return isoOnLocalYmdRange(ts, fromYmd, toYmd);
+}
+
+function formatRowTime(ts: unknown): string {
+    if (ts == null || ts === '' || ts === '—') return '—';
+    const d = new Date(String(ts));
+    if (Number.isNaN(d.getTime())) return String(ts);
+    return d.toLocaleString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function filterCuttingScanStateByDateRange(doc: CuttingScanStateDoc, fromYmd: string, toYmd: string): CuttingScanStateDoc {
+    const filterHist = (hist: CuttingScanHistoryEntry[]) =>
+        (hist ?? []).filter((h) => isoOnLocalYmdRange(h.at, fromYmd, toYmd));
+    const bundleHist = filterHist(doc.bundle.history);
+    const qcHist = filterHist(doc.qc.history);
+    const storeHist = filterHist(doc.store.history);
+    const supplyHist = filterHist(doc.supply.history);
+    const goodTotal = qcHist.reduce((s, h) => s + (h.good ?? 0), 0);
+    const repairTotal = qcHist.reduce((s, h) => s + (h.repair ?? 0), 0);
+    const rejectTotal = qcHist.reduce((s, h) => s + (h.reject ?? 0), 0);
+    return {
+        bundle: { count: bundleHist.length, history: bundleHist },
+        qc: { goodTotal, repairTotal, rejectTotal, history: qcHist },
+        store: { count: storeHist.length, history: storeHist },
+        supply: { count: supplyHist.length, history: supplyHist },
+    };
+}
 
 /** Normalisasi `last_status` dari GET `/api/homedashboard` untuk perbandingan. */
 function normCuttingLastStatus(s: unknown): string {
@@ -108,17 +206,19 @@ function findHomeDashboardItemForDetail(
 
 function mapHomeItemToBundleRow(item: HomeDashboardItem) {
     const qty = Math.max(1, Number(item.qty_batch ?? 1));
+    const ts = homeItemRawTimestamp(item);
     return {
         rfid: item.rfid_bundles ?? '—',
         wo: item.wo ?? '—',
         qty,
         style: item.style ?? '—',
-        buyer: '—',
-        item: '—',
+        buyer: item.buyer ?? '—',
+        item: item.item ?? '—',
         color: item.warna ?? '—',
         size: item.size ?? '—',
+        waktu: formatRowTime(ts),
         location: 'bundle',
-        timestamp: item.barcode ?? '—',
+        timestamp: ts ?? item.barcode ?? '—',
         last_status: item.last_status,
         id_bundles: item.id_bundles,
         barcode: item.barcode,
@@ -134,6 +234,7 @@ function mapHomeItemToQcRow(item: HomeDashboardItem) {
     if (st === 'GOOD') good = qty;
     else if (st === 'REPAIR') repair = qty;
     else if (st === 'REJECT') reject = qty;
+    const ts = homeItemRawTimestamp(item);
     return {
         rfid: item.rfid_bundles ?? '—',
         qty,
@@ -142,12 +243,13 @@ function mapHomeItemToQcRow(item: HomeDashboardItem) {
         reject,
         wo: item.wo ?? '—',
         style: item.style ?? '—',
-        buyer: '—',
-        item: '—',
+        buyer: item.buyer ?? '—',
+        item: item.item ?? '—',
         color: item.warna ?? '—',
         size: item.size ?? '—',
+        waktu: formatRowTime(ts),
         location: 'quality_control',
-        timestamp: item.barcode ?? '—',
+        timestamp: ts ?? item.barcode ?? '—',
         last_status: item.last_status,
         id_bundles: item.id_bundles,
         barcode: item.barcode,
@@ -165,6 +267,7 @@ function mapHomeItemToStoreRow(item: HomeDashboardItem) {
               : String(item.lokasi ?? item.last_status ?? '—');
     const lineStr =
         item.line != null && String(item.line).trim() !== '' ? String(item.line) : '—';
+    const ts = homeItemRawTimestamp(item);
     return {
         rfid: item.rfid_bundles ?? '—',
         wo: item.wo ?? '—',
@@ -172,16 +275,232 @@ function mapHomeItemToStoreRow(item: HomeDashboardItem) {
         line: lineStr,
         lokasi,
         style: item.style ?? '—',
-        buyer: '—',
-        item: '—',
+        buyer: item.buyer ?? '—',
+        item: item.item ?? '—',
         color: item.warna ?? '—',
         size: item.size ?? '—',
+        waktu: formatRowTime(ts),
         location: 'supermarket',
-        timestamp: item.barcode ?? '—',
+        timestamp: ts ?? item.barcode ?? '—',
         last_status: item.last_status,
         id_bundles: item.id_bundles,
         barcode: item.barcode,
     };
+}
+
+type TrackingBucketKey = 'bundle' | 'qc' | 'smarket' | 'supply_sewing';
+
+function trackingBucketRawTimestamp(item: HomeDashboardTrackingItem, bucket: TrackingBucketKey): string | undefined {
+    const pickLatest = (...ts: (string | null | undefined)[]) => {
+        let best: { t: string; ms: number } | null = null;
+        for (const raw of ts) {
+            if (raw == null || String(raw).trim() === '') continue;
+            const ms = Date.parse(String(raw));
+            if (Number.isNaN(ms)) continue;
+            if (!best || ms > best.ms) best = { t: String(raw), ms };
+        }
+        return best?.t;
+    };
+    switch (bucket) {
+        case 'bundle':
+            return pickLatest(item.last_time_output, item.updated_at);
+        case 'qc':
+            return pickLatest(item.last_time_good, item.last_time_repair, item.last_time_reject, item.updated_at);
+        case 'smarket':
+            return pickLatest(item.last_time_smarket_in, item.last_time_smarket_out, item.updated_at);
+        case 'supply_sewing':
+            return pickLatest(item.last_time_smarket_out, item.last_time_sewing, item.updated_at);
+    }
+}
+
+function mapTrackingItemToBundleRow(item: HomeDashboardTrackingItem) {
+    const qty = Math.max(1, Number(item.qty_output ?? 0) || 1);
+    const ts = trackingBucketRawTimestamp(item, 'bundle');
+    return {
+        rfid: item.rfid_bundles ?? '—',
+        wo: item.wo ?? '—',
+        qty,
+        style: item.style ?? '—',
+        buyer: item.buyer ?? '—',
+        item: item.item ?? '—',
+        color: item.warna ?? '—',
+        size: item.size ?? '—',
+        waktu: formatRowTime(ts),
+        location: 'bundle',
+        timestamp: ts ?? '—',
+        wip_status: item.wip_status,
+        id_bundles: item.id_bundles,
+        barcode: item.barcode,
+    };
+}
+
+function mapTrackingItemToQcRow(item: HomeDashboardTrackingItem) {
+    const good = Math.max(0, Number(item.qty_good ?? 0));
+    const repair = Math.max(0, Number(item.qty_repair ?? 0));
+    const reject = Math.max(0, Number(item.qty_reject ?? 0));
+    const qty = good + repair + reject || Math.max(1, Number(item.qty_output ?? 0) || 1);
+    const ts = trackingBucketRawTimestamp(item, 'qc');
+    return {
+        rfid: item.rfid_bundles ?? '—',
+        qty,
+        good,
+        repair,
+        reject,
+        wo: item.wo ?? '—',
+        style: item.style ?? '—',
+        buyer: item.buyer ?? '—',
+        item: item.item ?? '—',
+        color: item.warna ?? '—',
+        size: item.size ?? '—',
+        waktu: formatRowTime(ts),
+        location: 'quality_control',
+        timestamp: ts ?? '—',
+        wip_status: item.wip_status,
+        id_bundles: item.id_bundles,
+        barcode: item.barcode,
+    };
+}
+
+function mapTrackingItemToStoreRow(item: HomeDashboardTrackingItem) {
+    const qty = Math.max(1, Number(item.qty_smarket_in ?? item.qty_good ?? item.qty_output ?? 0) || 1);
+    const ts = trackingBucketRawTimestamp(item, 'smarket');
+    const lineStr = item.line != null && String(item.line).trim() !== '' ? String(item.line) : '—';
+    return {
+        rfid: item.rfid_bundles ?? '—',
+        wo: item.wo ?? '—',
+        qty,
+        line: lineStr,
+        lokasi: 'Supermarket',
+        style: item.style ?? '—',
+        buyer: item.buyer ?? '—',
+        item: item.item ?? '—',
+        color: item.warna ?? '—',
+        size: item.size ?? '—',
+        waktu: formatRowTime(ts),
+        location: 'supermarket',
+        timestamp: ts ?? '—',
+        wip_status: item.wip_status,
+        id_bundles: item.id_bundles,
+        barcode: item.barcode,
+    };
+}
+
+function mapTrackingItemToSupplyRow(item: HomeDashboardTrackingItem) {
+    const qty = Math.max(1, Number(item.qty_smarket_out ?? item.qty_output ?? 0) || 1);
+    const ts = trackingBucketRawTimestamp(item, 'supply_sewing');
+    const lineStr = item.line != null && String(item.line).trim() !== '' ? String(item.line) : '—';
+    const locRaw = String(item.lokasi ?? '').trim();
+    return {
+        rfid: item.rfid_bundles ?? '—',
+        wo: item.wo ?? '—',
+        line: lineStr,
+        gm: locRaw || '—',
+        qty,
+        style: item.style ?? '—',
+        buyer: item.buyer ?? '—',
+        item: item.item ?? '—',
+        color: item.warna ?? '—',
+        size: item.size ?? '—',
+        waktu: formatRowTime(ts),
+        location: 'supply_sewing',
+        timestamp: ts ?? '—',
+        wip_status: item.wip_status,
+        id_bundles: item.id_bundles,
+        barcode: item.barcode,
+    };
+}
+
+function flattenTrackingBuckets(data: HomeDashboardTrackingBuckets | undefined): HomeDashboardTrackingItem[] {
+    if (!data) return [];
+    return [
+        ...(data.bundle ?? []),
+        ...(data.qc ?? []),
+        ...(data.smarket ?? []),
+        ...(data.supply_sewing ?? []),
+    ];
+}
+
+function findTrackingItemForDetail(
+    data: HomeDashboardTrackingBuckets | undefined,
+    row: CuttingTableRow,
+): HomeDashboardTrackingItem | undefined {
+    if (!data) return undefined;
+    const rfid = String(row.rfid ?? '').trim();
+    if (!rfid) return undefined;
+    const same = flattenTrackingBuckets(data).filter((it) => String(it.rfid_bundles ?? '').trim() === rfid);
+    if (!same.length) return undefined;
+    const rowId = row.id_bundles;
+    if (rowId != null && rowId !== '' && !Number.isNaN(Number(rowId))) {
+        const byId = same.filter((it) => Number(it.id_bundles) === Number(rowId));
+        if (byId.length >= 1) return byId[0];
+    }
+    const ws = String(row.wip_status ?? '').trim();
+    if (ws) {
+        const byWs = same.filter((it) => String(it.wip_status ?? '').trim() === ws);
+        if (byWs.length >= 1) return byWs[0];
+    }
+    return same[0];
+}
+
+function resolveTrackingSearchParams(search: string): { wo?: string; style?: string } {
+    const q = search.trim();
+    if (!q) return {};
+    if (/^\d+$/.test(q)) return { wo: q };
+    return { style: q };
+}
+
+/** Field detail modal dari satu baris respons GET `/api/homedashboard/tracking`. */
+function trackingItemToFields(
+    item: HomeDashboardTrackingItem,
+    fmt: (v: unknown) => string,
+): { label: string; value: string }[] {
+    const order: { key: string; label: string }[] = [
+        { key: 'wip_status', label: 'WIP Status' },
+        { key: 'rfid_bundles', label: 'RFID Bundle' },
+        { key: 'id_bundles', label: 'ID Bundles' },
+        { key: 'barcode', label: 'Barcode' },
+        { key: 'wo', label: 'WO' },
+        { key: 'style', label: 'Style' },
+        { key: 'buyer', label: 'Buyer' },
+        { key: 'item', label: 'Item' },
+        { key: 'warna', label: 'Warna' },
+        { key: 'size', label: 'Size' },
+        { key: 'qty_output', label: 'Qty Output' },
+        { key: 'last_time_output', label: 'Last Time Output' },
+        { key: 'qty_good', label: 'Qty Good' },
+        { key: 'last_time_good', label: 'Last Time Good' },
+        { key: 'qty_repair', label: 'Qty Repair' },
+        { key: 'last_time_repair', label: 'Last Time Repair' },
+        { key: 'qty_reject', label: 'Qty Reject' },
+        { key: 'last_time_reject', label: 'Last Time Reject' },
+        { key: 'qty_smarket_in', label: 'Qty Smarket In' },
+        { key: 'last_time_smarket_in', label: 'Last Time Smarket In' },
+        { key: 'qty_smarket_out', label: 'Qty Smarket Out' },
+        { key: 'last_time_smarket_out', label: 'Last Time Smarket Out' },
+        { key: 'qty_sewing', label: 'Qty Sewing' },
+        { key: 'last_time_sewing', label: 'Last Time Sewing' },
+        { key: 'updated_at', label: 'Updated At' },
+    ];
+    const shown = new Set<string>();
+    const out: { label: string; value: string }[] = [];
+    for (const { key, label } of order) {
+        shown.add(key);
+        const v = (item as Record<string, unknown>)[key];
+        const s = fmt(v);
+        if (s !== '—') out.push({ label, value: s });
+    }
+    for (const [k, v] of Object.entries(item)) {
+        if (shown.has(k)) continue;
+        if (typeof v === 'object' && v !== null) continue;
+        const s = fmt(v);
+        if (s === '—') continue;
+        const pretty = k
+            .split('_')
+            .map((p) => (p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : ''))
+            .join(' ');
+        out.push({ label: pretty || k, value: s });
+    }
+    return out;
 }
 
 /** Field detail modal dari satu baris respons GET `/api/homedashboard`. */
@@ -249,31 +568,207 @@ function readCuttingOperator(): { name: string; nik: string } {
     }
 }
 
-/** Judul kartu ala ChartCard — tanpa capitalize otomatis agar singkatan (mis. QC Cutting) tetap benar. */
+const CUTTING_TABLE_HEADER_FS = 'clamp(0.62rem, 0.5rem + 0.35vmin, 0.78rem)' as const;
+const CUTTING_TABLE_BODY_FS = 'clamp(0.68rem, 0.55rem + 0.4vmin, 0.85rem)' as const;
+
+/** Judul kartu — ukuran lebih besar agar mudah dibaca management. */
 function CuttingStageTitle({ children }: { children: string }) {
     return (
         <h2
-            className="font-semibold text-gray-900 tracking-tight group-hover:text-blue-700 transition-colors flex-1 min-w-0 truncate"
-            style={{ fontSize: 'clamp(0.875rem, 1.2vw + 0.5rem, 1.125rem)', fontWeight: 600 }}
+            className="font-extrabold text-slate-900 tracking-tight group-hover:text-blue-700 transition-colors min-w-0 truncate uppercase"
+            style={{ fontSize: 'clamp(0.95rem, 0.75rem + 0.65vmin, 1.2rem)', letterSpacing: '0.06em' }}
         >
             {children}
         </h2>
     );
 }
 
-function CuttingStageHeader({ title, action }: { title: string; action: ReactNode }) {
+function CuttingStageHeader({
+    title,
+    action,
+    count,
+    countClassName = 'bg-slate-900',
+}: {
+    title: string;
+    action: ReactNode;
+    count?: number;
+    countClassName?: string;
+}) {
+    const countFs = 'clamp(0.95rem, 0.75rem + 0.65vmin, 1.2rem)';
     return (
         <div className="flex w-full min-w-0 items-center justify-between gap-2">
-            <CuttingStageTitle>{title}</CuttingStageTitle>
+            <div className="flex min-w-0 items-center gap-2.5">
+                <CuttingStageTitle>{title}</CuttingStageTitle>
+                {count != null ? (
+                    <span
+                        className={`inline-flex min-h-[1.85rem] min-w-[2.5rem] shrink-0 items-center justify-center rounded px-3 font-extrabold text-white tabular-nums leading-none shadow-sm ${countClassName}`}
+                        style={{ fontSize: countFs }}
+                        title="Jumlah data"
+                    >
+                        {count}
+                    </span>
+                ) : null}
+            </div>
             <div className="flex shrink-0 items-center self-center">{action}</div>
         </div>
     );
 }
 
 const CUTTING_STAGE_CHART_CARD_CLASS =
-    'min-h-0 h-full flex flex-col py-1.5 bg-gradient-to-b from-white via-white to-sky-50/20 shadow-[0_10px_22px_rgba(2,132,199,0.08)] hover:shadow-[0_14px_28px_rgba(2,132,199,0.15)] transition-all duration-300 max-lg:h-auto max-lg:min-h-[12.5rem] max-lg:flex-none';
+    'min-h-0 h-full flex flex-col py-2 bg-gradient-to-b from-white via-white to-slate-50/50 shadow-[0_10px_24px_rgba(15,23,42,0.07)] hover:shadow-[0_14px_30px_rgba(15,23,42,0.11)] transition-all duration-300 border-2 max-lg:h-auto max-lg:min-h-[14rem] max-lg:flex-none';
 
 type ScanningModalId = 'bundle' | 'qc' | 'store' | 'supply';
+type StageFilterId = ScanningModalId;
+
+function uniqueStylesFromRows(rows: CuttingTableRow[]): string[] {
+    const set = new Set<string>();
+    for (const r of rows) {
+        const s = String(r.style ?? '').trim();
+        if (s && s !== '—') set.add(s);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'id'));
+}
+
+function cuttingTableEmptyText(
+    searchQuery: string,
+    stageStyleFilter: string,
+    trackingLoadFailed?: boolean,
+): string {
+    if (trackingLoadFailed) return 'Gagal memuat data tracking';
+    if (searchQuery.trim() || stageStyleFilter.trim()) return 'Tidak ada data cocok';
+    return 'Belum ada data';
+}
+
+function filterRowsByStyle(rows: CuttingTableRow[], styleFilter: string): CuttingTableRow[] {
+    const sf = styleFilter.trim();
+    if (!sf) return rows;
+    return rows.filter((r) => String(r.style ?? '').trim() === sf);
+}
+
+function applyStageTableFilters(rows: CuttingTableRow[], styleFilter: string, search: string): CuttingTableRow[] {
+    return sortTableRowsNewestFirst(filterRowsBySearch(filterRowsByStyle(rows, styleFilter), search));
+}
+
+function StyleFilterButton({
+    accent,
+    value,
+    options,
+    onChange,
+}: {
+    accent: 'emerald' | 'sky' | 'amber' | 'violet';
+    value: string;
+    options: string[];
+    onChange: (next: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+    const active = value.trim() !== '';
+
+    useEffect(() => {
+        if (!open) return;
+        const onDoc = (e: MouseEvent) => {
+            const el = ref.current;
+            if (el && !el.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, [open]);
+
+    const cls =
+        accent === 'emerald'
+            ? active
+                ? 'bg-emerald-600 text-white border-emerald-600'
+                : 'bg-emerald-50 text-emerald-800 border-emerald-200/90 hover:bg-emerald-100'
+            : accent === 'sky'
+              ? active
+                  ? 'bg-sky-600 text-white border-sky-600'
+                  : 'bg-sky-50 text-sky-800 border-sky-200/90 hover:bg-sky-100'
+              : accent === 'amber'
+                ? active
+                    ? 'bg-amber-600 text-white border-amber-600'
+                    : 'bg-amber-50 text-amber-900 border-amber-200/90 hover:bg-amber-100'
+                : active
+                  ? 'bg-violet-600 text-white border-violet-600'
+                  : 'bg-violet-50 text-violet-900 border-violet-200/90 hover:bg-violet-100';
+
+    return (
+        <div className="relative" ref={ref}>
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen((v) => !v);
+                }}
+                className={`inline-flex items-center gap-1 font-bold tracking-wide px-2 py-1.5 rounded border shadow-sm shrink-0 transition-all ${cls}`}
+                style={{
+                    fontFamily: 'Poppins, sans-serif',
+                    fontSize: 'clamp(0.65rem, 0.75vw + 0.32rem, 0.78rem)',
+                }}
+                title={active ? `Filter Style: ${value}` : 'Filter Style'}
+            >
+                <Filter className="w-3 h-3 shrink-0" strokeWidth={2.4} />
+                <span className="whitespace-nowrap">Style</span>
+            </button>
+            {open ? (
+                <div
+                    className="absolute right-0 top-full z-[70] mt-1 w-[min(100vw-2rem,11rem)] max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg shadow-slate-900/10"
+                    role="listbox"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        type="button"
+                        className={`block w-full px-2.5 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${!active ? 'text-sky-700 bg-sky-50/80' : 'text-slate-600'}`}
+                        onClick={() => {
+                            onChange('');
+                            setOpen(false);
+                        }}
+                    >
+                        Semua Style
+                    </button>
+                    {options.length === 0 ? (
+                        <p className="px-2.5 py-2 text-[0.65rem] text-slate-400">Belum ada style</p>
+                    ) : (
+                        options.map((opt) => (
+                            <button
+                                key={opt}
+                                type="button"
+                                className={`block w-full px-2.5 py-1.5 text-left text-xs font-semibold truncate hover:bg-slate-50 ${value === opt ? 'text-sky-700 bg-sky-50/80' : 'text-slate-700'}`}
+                                title={opt}
+                                onClick={() => {
+                                    onChange(opt);
+                                    setOpen(false);
+                                }}
+                            >
+                                {opt}
+                            </button>
+                        ))
+                    )}
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+function StageCardActions({
+    accent,
+    styleValue,
+    styleOptions,
+    onStyleChange,
+    scanButton,
+}: {
+    accent: 'emerald' | 'sky' | 'amber' | 'violet';
+    styleValue: string;
+    styleOptions: string[];
+    onStyleChange: (v: string) => void;
+    scanButton: ReactNode;
+}) {
+    return (
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <StyleFilterButton accent={accent} value={styleValue} options={styleOptions} onChange={onStyleChange} />
+            {scanButton}
+        </div>
+    );
+}
 
 function ScanningButton({
     accent,
@@ -298,10 +793,10 @@ function ScanningButton({
                 e.stopPropagation();
                 onClick();
             }}
-            className={`inline-flex items-center gap-1.5 font-semibold tracking-wide px-2.5 py-1 rounded-md border shadow-[0_1px_3px_rgba(2,6,23,0.08)] shrink-0 transition-all duration-300 hover:-translate-y-[1px] ${cls}`}
+            className={`inline-flex items-center gap-1.5 font-bold tracking-wide px-3 py-1.5 rounded-lg border shadow-sm shrink-0 transition-all duration-300 hover:-translate-y-[1px] ${cls}`}
             style={{
                 fontFamily: 'Poppins, sans-serif',
-                fontSize: 'clamp(0.64rem, 0.82vw + 0.34rem, 0.79rem)',
+                fontSize: 'clamp(0.72rem, 0.85vw + 0.38rem, 0.88rem)',
             }}
         >
             <ScanLine className="w-3.5 h-3.5" strokeWidth={2.4} />
@@ -311,6 +806,153 @@ function ScanningButton({
 }
 
 type CuttingTableRow = Record<string, string | number | null | undefined>;
+
+function rowMatchesWoStyleSearch(row: CuttingTableRow, query: string): boolean {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    const wo = String(row.wo ?? '').toLowerCase();
+    const style = String(row.style ?? '').toLowerCase();
+    return wo.includes(q) || style.includes(q);
+}
+
+function filterRowsBySearch(rows: CuttingTableRow[], query: string): CuttingTableRow[] {
+    if (!query.trim()) return rows;
+    return rows.filter((r) => rowMatchesWoStyleSearch(r, query));
+}
+
+function topFieldByCount(rows: CuttingTableRow[], key: 'style' | 'wo'): string {
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+        const v = String(r[key] ?? '').trim();
+        if (!v || v === '—') continue;
+        counts.set(v, (counts.get(v) ?? 0) + 1);
+    }
+    let best = '—';
+    let bestN = 0;
+    for (const [k, n] of counts) {
+        if (n > bestN) {
+            best = k;
+            bestN = n;
+        }
+    }
+    return best;
+}
+
+const TOOLBAR_CTRL_H = 'h-10' as const;
+
+type CuttingDataViewMode = 'rekap' | 'flow';
+
+function DataViewSwitch({
+    value,
+    onChange,
+}: {
+    value: CuttingDataViewMode;
+    onChange: (mode: CuttingDataViewMode) => void;
+}) {
+    const baseBtn =
+        'inline-flex h-full items-center justify-center gap-1.5 rounded-md px-2.5 sm:px-3 text-[0.62rem] sm:text-[0.65rem] font-extrabold uppercase tracking-[0.08em] whitespace-nowrap transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-1';
+    return (
+        <div
+            className={`inline-flex shrink-0 items-center gap-0.5 rounded-lg bg-gradient-to-b from-slate-100 to-slate-200/80 p-0.5 ring-1 ring-slate-200/90 shadow-[inset_0_1px_2px_rgba(15,23,42,0.06)] ${TOOLBAR_CTRL_H}`}
+            role="group"
+            aria-label="Mode tampilan data bundle"
+        >
+            <button
+                type="button"
+                onClick={() => onChange('rekap')}
+                className={`${baseBtn} ${
+                    value === 'rekap'
+                        ? 'bg-gradient-to-b from-white to-sky-50 text-sky-800 shadow-[0_2px_6px_rgba(2,132,199,0.18)] ring-1 ring-sky-200/80'
+                        : 'text-slate-500 hover:bg-white/40 hover:text-slate-700'
+                }`}
+                title="Rekap bundle — GET /api/homedashboard"
+                aria-pressed={value === 'rekap'}
+            >
+                <Layers className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
+                <span>Recap Bundle</span>
+            </button>
+            <button
+                type="button"
+                onClick={() => onChange('flow')}
+                className={`${baseBtn} ${
+                    value === 'flow'
+                        ? 'bg-gradient-to-b from-white to-violet-50 text-violet-800 shadow-[0_2px_6px_rgba(109,40,217,0.16)] ring-1 ring-violet-200/80'
+                        : 'text-slate-500 hover:bg-white/40 hover:text-slate-700'
+                }`}
+                title="Tracking bundle — GET /api/homedashboard/tracking"
+                aria-pressed={value === 'flow'}
+            >
+                <Route className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={2.25} aria-hidden />
+                <span>Tracking Bundle</span>
+            </button>
+        </div>
+    );
+}
+
+function ToolbarMiniCard({
+    label,
+    value,
+    valueClassName = 'text-slate-900',
+    title,
+}: {
+    label: string;
+    value: string | number;
+    valueClassName?: string;
+    title?: string;
+}) {
+    return (
+        <div
+            className={`inline-flex items-center gap-2 rounded-lg border border-slate-200/90 bg-white px-3 shadow-sm ${TOOLBAR_CTRL_H} min-w-0`}
+            title={title}
+        >
+            <span className="text-[0.62rem] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">{label}</span>
+            <span className={`text-sm font-extrabold tabular-nums truncate max-w-[7.5rem] sm:max-w-[9rem] ${valueClassName}`}>
+                {value}
+            </span>
+        </div>
+    );
+}
+
+type WireTableColumn = {
+    key: string;
+    label: string;
+    className?: string;
+    /** Kolom penting — bold / highlight agar mudah dipindai management. */
+    emphasis?: 'primary' | 'metric' | 'good' | 'repair' | 'reject' | 'accent';
+};
+
+/** Kolom garment tambahan setelah Style. */
+const GARMENT_TAIL_COLUMNS: WireTableColumn[] = [
+    { key: 'buyer', label: 'Buyer' },
+    { key: 'item', label: 'Item' },
+    { key: 'color', label: 'Color' },
+    { key: 'size', label: 'Size', emphasis: 'accent' },
+];
+
+const COL_WAKTU_SCAN: WireTableColumn = { key: 'waktu', label: 'Waktu Scan' };
+const COL_RFID: WireTableColumn = { key: 'rfid', label: 'RFID Bundle', emphasis: 'primary' };
+const COL_WO: WireTableColumn = { key: 'wo', label: 'Work Order', emphasis: 'accent' };
+const COL_STYLE: WireTableColumn = { key: 'style', label: 'Style', emphasis: 'accent' };
+const COL_QTY: WireTableColumn = { key: 'qty', label: 'QTY', emphasis: 'metric', className: 'text-right' };
+
+function wireCellClass(emphasis?: WireTableColumn['emphasis']): string {
+    switch (emphasis) {
+        case 'primary':
+            return 'font-mono font-extrabold text-slate-900';
+        case 'metric':
+            return 'font-extrabold tabular-nums text-sky-800 bg-sky-50/80 text-right';
+        case 'good':
+            return 'font-extrabold tabular-nums text-emerald-800 bg-emerald-50 text-right';
+        case 'repair':
+            return 'font-extrabold tabular-nums text-amber-800 bg-amber-50 text-right';
+        case 'reject':
+            return 'font-extrabold tabular-nums text-rose-800 bg-rose-50 text-right';
+        case 'accent':
+            return 'font-bold text-slate-800';
+        default:
+            return 'text-slate-700';
+    }
+}
 
 function parseTableRowTime(ts: unknown): number {
     if (ts == null || ts === '' || ts === '—') return 0;
@@ -337,7 +979,7 @@ function WireTable({
     onRowClick,
     showRowNo = true,
 }: {
-    columns: { key: string; label: string; className?: string }[];
+    columns: WireTableColumn[];
     rows: CuttingTableRow[];
     emptyText: string;
     onRowClick?: (row: CuttingTableRow) => void;
@@ -346,28 +988,30 @@ function WireTable({
     const colSpan = columns.length + (showRowNo ? 1 : 0);
     return (
         <div
-            className="flex-1 min-h-0 max-lg:min-h-[9rem] overflow-auto rounded-b-xl touch-pan-y"
+            className="flex-1 min-h-0 max-lg:min-h-[10rem] overflow-x-auto overflow-y-auto rounded-b-xl touch-pan-x touch-pan-y border border-slate-100/80 bg-white"
             onClick={(e) => {
-                /* Bubble phase: jangan pakai onClickCapture + stopPropagation — itu memblokir event sampai ke <tr>.
-                   Hentikan bubble ke ChartCard (navigasi QC/Supermarket) setelah target menangani klik. */
                 const target = e.target as HTMLElement | null;
                 if (target?.closest('table, thead, tbody, tr, th, td')) {
                     e.stopPropagation();
                 }
             }}
         >
-            <table className="w-full text-left border-collapse text-[10px] bg-white">
-                <thead className="bg-gradient-to-r from-sky-50/70 to-white sticky top-0 z-[1] backdrop-blur-sm">
-                    <tr className="border-b border-sky-100">
+            <table className="w-max min-w-full text-left border-collapse bg-white" style={{ fontSize: CUTTING_TABLE_BODY_FS }}>
+                <thead className="bg-slate-100/90 sticky top-0 z-[1] backdrop-blur-sm">
+                    <tr className="border-b-2 border-slate-200">
                         {showRowNo && (
-                            <th className="px-1 py-1 w-8 min-w-[2rem] font-semibold text-slate-500 uppercase tracking-wide text-center">
+                            <th
+                                className="px-2 py-2 w-9 min-w-[2.25rem] font-bold text-slate-600 uppercase tracking-wide text-center"
+                                style={{ fontSize: CUTTING_TABLE_HEADER_FS }}
+                            >
                                 No
                             </th>
                         )}
                         {columns.map((c) => (
                             <th
                                 key={c.key}
-                                className={`px-1.5 py-1 font-semibold text-slate-500 uppercase tracking-wide ${c.className ?? ''}`}
+                                className={`px-2 py-2 font-bold text-slate-600 uppercase tracking-wide ${c.className ?? ''}`}
+                                style={{ fontSize: CUTTING_TABLE_HEADER_FS }}
                             >
                                 {c.label}
                             </th>
@@ -377,7 +1021,7 @@ function WireTable({
                 <tbody>
                     {rows.length === 0 ? (
                         <tr>
-                            <td colSpan={colSpan} className="px-2 py-4 text-center text-slate-400 italic">
+                            <td colSpan={colSpan} className="px-3 py-8 text-center text-slate-400 font-medium">
                                 {emptyText}
                             </td>
                         </tr>
@@ -385,7 +1029,9 @@ function WireTable({
                         rows.map((row, i) => (
                             <tr
                                 key={i}
-                                className={`border-b border-slate-100/80 hover:bg-sky-50/60 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+                                className={`border-b border-slate-100 transition-colors ${
+                                    i === 0 ? 'bg-sky-50/70' : i % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'
+                                } hover:bg-sky-100/50 ${onRowClick ? 'cursor-pointer' : ''}`}
                                 onClick={
                                     onRowClick
                                         ? (e) => {
@@ -397,12 +1043,16 @@ function WireTable({
                                 title={onRowClick ? 'Klik untuk lihat detail data' : undefined}
                             >
                                 {showRowNo && (
-                                    <td className="px-1 py-1 text-center text-slate-600 font-bold tabular-nums text-[10px] w-8 min-w-[2rem]">
+                                    <td className="px-2 py-2 text-center text-slate-500 font-bold tabular-nums w-9 min-w-[2.25rem]">
                                         {rows.length - i}
                                     </td>
                                 )}
                                 {columns.map((c) => (
-                                    <td key={c.key} className={`px-1.5 py-1 text-slate-700 truncate max-w-0 ${c.className ?? ''}`} title={String(row[c.key] ?? '')}>
+                                    <td
+                                        key={c.key}
+                                        className={`px-2 py-2 whitespace-nowrap ${wireCellClass(c.emphasis)} ${c.className ?? ''}`}
+                                        title={String(row[c.key] ?? '')}
+                                    >
                                         {row[c.key] ?? '—'}
                                     </td>
                                 ))}
@@ -451,6 +1101,72 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     const queryClient = useQueryClient();
     const successAudioRef = useRef<HTMLAudioElement | null>(null);
     const errorAudioRef = useRef<HTMLAudioElement | null>(null);
+    const filterPanelRef = useRef<HTMLDivElement>(null);
+
+    const [dateFrom, setDateFrom] = useState(ymdTodayLocal);
+    const [dateTo, setDateTo] = useState(ymdTodayLocal);
+    const [draftFrom, setDraftFrom] = useState(ymdTodayLocal);
+    const [draftTo, setDraftTo] = useState(ymdTodayLocal);
+    const [filterOpen, setFilterOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [stageStyleFilters, setStageStyleFilters] = useState<Record<StageFilterId, string>>({
+        bundle: '',
+        qc: '',
+        store: '',
+        supply: '',
+    });
+
+    const setStageStyleFilter = useCallback((stage: StageFilterId, value: string) => {
+        setStageStyleFilters((prev) => ({ ...prev, [stage]: value }));
+    }, []);
+
+    const [dataViewMode, setDataViewMode] = useState<CuttingDataViewMode>('rekap');
+    /** Rekap = GET /api/homedashboard. Tracking = GET /api/homedashboard/tracking. */
+    const useRekapData = homeDashboardApi && dataViewMode === 'rekap';
+    const useTrackingData = homeDashboardApi && dataViewMode === 'flow';
+
+    const trackingSearchParams = useMemo(() => resolveTrackingSearchParams(searchQuery), [searchQuery]);
+
+    useEffect(() => {
+        if (!filterOpen) return;
+        const onDoc = (e: MouseEvent) => {
+            const el = filterPanelRef.current;
+            if (el && !el.contains(e.target as Node)) setFilterOpen(false);
+        };
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, [filterOpen]);
+
+    const openFilterPanel = () => {
+        setDraftFrom(dateFrom);
+        setDraftTo(dateTo);
+        setFilterOpen(true);
+    };
+
+    const applyDateFilter = () => {
+        let a = draftFrom;
+        let b = draftTo;
+        if (a > b) [a, b] = [b, a];
+        setDateFrom(a);
+        setDateTo(b);
+        setFilterOpen(false);
+    };
+
+    const resetDateFilterToday = () => {
+        const t = ymdTodayLocal();
+        setDraftFrom(t);
+        setDraftTo(t);
+        setDateFrom(t);
+        setDateTo(t);
+        setFilterOpen(false);
+    };
+
+    const dateFilterLabel =
+        dateFrom === dateTo ? formatYmdIdLabel(dateFrom) : `${formatYmdIdLabel(dateFrom)} – ${formatYmdIdLabel(dateTo)}`;
+
+    const filterActive =
+        searchQuery.trim() !== '' || dateFrom !== ymdTodayLocal() || dateTo !== ymdTodayLocal();
+
     const scanQuery = useQuery({
         queryKey: QUERY_SCAN,
         queryFn: async () => {
@@ -461,24 +1177,48 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         refetchInterval: 12_000,
     });
     const homeDashQuery = useQuery({
-        queryKey: QUERY_HOME_DASH,
+        queryKey: [QUERY_HOME_DASH_BASE, dateFrom, dateTo] as const,
         queryFn: async () => {
-            const r = await getHomeDashboard();
+            const r = await getHomeDashboard({ tanggalfrom: dateFrom, tanggalto: dateTo });
             if (!r.success || !r.data) throw new Error(r.error || 'Gagal memuat home dashboard');
             return r.data;
         },
-        enabled: homeDashboardApi,
+        enabled: useRekapData,
         refetchInterval: 12_000,
+        placeholderData: (prev) => prev,
     });
+    const homeTrackingQuery = useQuery({
+        queryKey: [QUERY_HOME_TRACKING_BASE, trackingSearchParams.wo, trackingSearchParams.style] as const,
+        queryFn: async () => {
+            const r = await getHomeDashboardTracking(trackingSearchParams);
+            if (!r.success || !r.data) throw new Error(r.error || 'Gagal memuat home dashboard tracking');
+            return r.data;
+        },
+        enabled: useTrackingData,
+        refetchInterval: 12_000,
+        placeholderData: (prev) => prev,
+    });
+    const trackingBuckets = homeTrackingQuery.data?.data;
+    const trackingLoadFailed = useTrackingData && homeTrackingQuery.isError;
     const doc = scanQuery.data;
     const displayDoc = useMemo(() => {
         if (!doc) return undefined;
-        if (!filterTablesToToday || homeDashboardApi) return doc;
-        return filterCuttingScanStateToLocalToday(doc);
-    }, [doc, filterTablesToToday, homeDashboardApi]);
+        if (homeDashboardApi) {
+            return filterCuttingScanStateByDateRange(doc, dateFrom, dateTo);
+        }
+        if (filterTablesToToday && dateFrom === ymdTodayLocal() && dateTo === ymdTodayLocal()) {
+            return filterCuttingScanStateToLocalToday(doc);
+        }
+        return filterCuttingScanStateByDateRange(doc, dateFrom, dateTo);
+    }, [doc, filterTablesToToday, homeDashboardApi, dateFrom, dateTo]);
+
+    const homeItemsFiltered = useMemo(() => {
+        const items = homeDashQuery.data ?? [];
+        return items.filter((it) => homeItemInDateRange(it, dateFrom, dateTo));
+    }, [homeDashQuery.data, dateFrom, dateTo]);
 
     useEffect(() => {
-        if (!homeDashboardApi || !onHomeDashboardCounts || !homeDashQuery.data) return;
+        if (!useRekapData || !onHomeDashboardCounts || !homeDashQuery.data) return;
         const items = homeDashQuery.data;
         const qcStatuses = new Set(['GOOD', 'REPAIR', 'REJECT']);
         const storeStatuses = new Set(['IN_SMARKET', 'OUT_SMARKET', 'IN_SUPERMARKET', 'OUT_SUPERMARKET']);
@@ -492,7 +1232,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             else if (storeStatuses.has(s)) store += 1;
         }
         onHomeDashboardCounts({ bundle, qc, store });
-    }, [homeDashboardApi, homeDashQuery.data, onHomeDashboardCounts]);
+    }, [useRekapData, homeDashQuery.data, onHomeDashboardCounts]);
 
     useEffect(() => {
         successAudioRef.current = new Audio(successSoundPath);
@@ -573,7 +1313,19 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     const openDetailFromRow = useCallback(
         (stage: string, row: CuttingTableRow) => {
             const rfidKey = String(row.rfid ?? '').trim();
-            if (homeDashboardApi && rfidKey) {
+            if (useTrackingData && rfidKey) {
+                const trackingItem = findTrackingItemForDetail(trackingBuckets, row);
+                if (trackingItem) {
+                    setTableDetail({
+                        open: true,
+                        title: `Detail Data — ${stage}`,
+                        subtitle: 'Data dari API Home Dashboard Tracking (/api/homedashboard/tracking)',
+                        fields: trackingItemToFields(trackingItem, formatFieldValue),
+                    });
+                    return;
+                }
+            }
+            if (useRekapData && rfidKey) {
                 const homeItem = findHomeDashboardItemForDetail(homeDashQuery.data, row);
                 if (homeItem) {
                     const fields = homeDashboardItemToFields(homeItem, formatFieldValue);
@@ -615,7 +1367,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 fields,
             });
         },
-        [formatFieldValue, homeDashboardApi, homeDashQuery.data]
+        [formatFieldValue, useRekapData, useTrackingData, homeDashQuery.data, trackingBuckets]
     );
 
     useEffect(() => {
@@ -815,7 +1567,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 });
                 if (!res.success) return { ok: false, error: res.error || 'Gagal proses supply sewing' };
                 void queryClient.invalidateQueries({ queryKey: QUERY_SCAN });
-                if (homeDashboardApi) void queryClient.invalidateQueries({ queryKey: QUERY_HOME_DASH });
+                if (homeDashboardApi) void queryClient.invalidateQueries({ queryKey: QUERY_HOME_DASH_BASE });
                 return { ok: true, message: res.data?.message };
             } catch (e) {
                 return { ok: false, error: e instanceof Error ? e.message : 'Gagal' };
@@ -890,16 +1642,21 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     }, [modalSupplyRfid, modalSupplyLineNum, modalSupplyQty, modalSupplyLocation, operator.nik, submitSupply, playSound]);
 
     const qcRows = useMemo(() => {
-        if (homeDashboardApi) {
-            const items = homeDashQuery.data;
-            if (!items?.length) return [];
-            const qcStatuses = new Set(['GOOD', 'REPAIR', 'REJECT']);
-            return items
-                .filter((it) => qcStatuses.has(normCuttingLastStatus(it.last_status)))
-                .slice(0, 24)
-                .map(mapHomeItemToQcRow);
+        if (homeDashboardApi && useTrackingData) {
+            const items = trackingBuckets?.qc ?? [];
+            return items.map(mapTrackingItemToQcRow);
         }
-        return (displayDoc?.qc.history ?? []).slice(0, 24).map((h) => ({
+        if (homeDashboardApi) {
+            if (useRekapData) {
+                if (!homeItemsFiltered.length) return [];
+                const qcStatuses = new Set(['GOOD', 'REPAIR', 'REJECT']);
+                return homeItemsFiltered
+                    .filter((it) => qcStatuses.has(normCuttingLastStatus(it.last_status)))
+                    .map(mapHomeItemToQcRow);
+            }
+            return [];
+        }
+        return (displayDoc?.qc.history ?? []).map((h) => ({
             rfid: h.rfid_garment,
             qty: (h.good ?? 0) + (h.repair ?? 0) + (h.reject ?? 0),
             good: h.good ?? 0,
@@ -911,26 +1668,51 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             item: h.item ?? '—',
             color: h.color ?? '—',
             size: h.size ?? '—',
+            waktu: formatRowTime(h.at),
             location: h.location ?? 'quality_control',
             timestamp: h.at ?? '—',
         }));
-    }, [homeDashboardApi, homeDashQuery.data, displayDoc]);
+    }, [homeDashboardApi, useTrackingData, useRekapData, trackingBuckets, homeItemsFiltered, displayDoc, dateFrom, dateTo]);
+
+    const filteredQcRows = useMemo(
+        () =>
+            applyStageTableFilters(
+                qcRows.map((r) => ({
+                    ...r,
+                    qty: String(r.qty),
+                    good: String(r.good),
+                    repair: String(r.repair),
+                    reject: String(r.reject),
+                })),
+                stageStyleFilters.qc,
+                searchQuery,
+            ),
+        [qcRows, searchQuery, stageStyleFilters.qc],
+    );
 
     const totalQcServerCount = useMemo(
-        () => (homeDashboardApi ? qcRows.length : (displayDoc?.qc.history?.length ?? qcRows.length)),
-        [homeDashboardApi, qcRows.length, displayDoc?.qc.history?.length]
+        () =>
+            useTrackingData
+                ? (homeTrackingQuery.data?.count?.qc ?? qcRows.length)
+                : useRekapData
+                  ? qcRows.length
+                  : (displayDoc?.qc.history?.length ?? qcRows.length),
+        [useTrackingData, useRekapData, homeTrackingQuery.data?.count?.qc, qcRows.length, displayDoc?.qc.history?.length],
     );
 
     const bundleRows = useMemo(() => {
+        if (homeDashboardApi && useTrackingData) {
+            const items = trackingBuckets?.bundle ?? [];
+            return items.map(mapTrackingItemToBundleRow);
+        }
         if (homeDashboardApi) {
-            const items = homeDashQuery.data;
-            if (!items?.length) return [];
-            return items
+            if (!useRekapData) return [];
+            if (!homeItemsFiltered.length) return [];
+            return homeItemsFiltered
                 .filter((it) => normCuttingLastStatus(it.last_status) === 'OUTPUT_BUNDLE')
-                .slice(0, 50)
                 .map(mapHomeItemToBundleRow);
         }
-        return (displayDoc?.bundle?.history ?? []).slice(0, 50).map((h) => ({
+        return (displayDoc?.bundle?.history ?? []).map((h) => ({
             rfid: h.rfid_garment,
             wo: h.wo ?? '—',
             qty: Math.max(1, Number(h.qty ?? 1)),
@@ -939,32 +1721,41 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             item: h.item ?? '—',
             color: h.color ?? '—',
             size: h.size ?? '—',
+            waktu: formatRowTime(h.at),
             location: h.location ?? 'bundle',
             timestamp: h.at ?? '—',
         }));
-    }, [homeDashboardApi, homeDashQuery.data, displayDoc]);
+    }, [homeDashboardApi, useTrackingData, useRekapData, trackingBuckets, homeItemsFiltered, displayDoc, dateFrom, dateTo]);
+
+    const filteredBundleRows = useMemo(
+        () => applyStageTableFilters(bundleRows.map((r) => ({ ...r, qty: String(r.qty) })), stageStyleFilters.bundle, searchQuery),
+        [bundleRows, searchQuery, stageStyleFilters.bundle],
+    );
 
     useEffect(() => {
         onBundleMetrics?.(bundleRows.length);
     }, [bundleRows.length, onBundleMetrics]);
 
     const storeRows = useMemo(() => {
+        if (homeDashboardApi && useTrackingData) {
+            const items = trackingBuckets?.smarket ?? [];
+            return items.map(mapTrackingItemToStoreRow);
+        }
         if (homeDashboardApi) {
-            const items = homeDashQuery.data;
-            if (!items?.length) return [];
+            if (!useRekapData) return [];
+            if (!homeItemsFiltered.length) return [];
             const storeStatuses = new Set(['IN_SMARKET', 'OUT_SMARKET', 'IN_SUPERMARKET', 'OUT_SUPERMARKET']);
-            return items
+            return homeItemsFiltered
                 .filter((it) => storeStatuses.has(normCuttingLastStatus(it.last_status)))
-                .slice(0, 24)
                 .map(mapHomeItemToStoreRow);
         }
-        return (displayDoc?.store.history ?? []).slice(0, 24).map((h) => {
+        return (displayDoc?.store.history ?? []).map((h) => {
             const locRaw = (h.location ?? '').trim();
             const isCheckout = h.checkout === true || locRaw === 'checkout';
             const lokasi = isCheckout
                 ? locRaw === 'checkout' || !locRaw
                     ? 'Check-out'
-                    : `Check-out Â· ${locRaw}`
+                    : `Check-out · ${locRaw}`
                 : locRaw === 'supermarket' || locRaw === ''
                   ? 'Supermarket'
                   : locRaw;
@@ -980,14 +1771,25 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 item: h.item ?? '—',
                 color: h.color ?? '—',
                 size: h.size ?? '—',
+                waktu: formatRowTime(h.at),
                 location: h.location ?? 'supermarket',
                 timestamp: h.at ?? '—',
             };
         });
-    }, [homeDashboardApi, homeDashQuery.data, displayDoc]);
+    }, [homeDashboardApi, useTrackingData, useRekapData, trackingBuckets, homeItemsFiltered, displayDoc, dateFrom, dateTo]);
+
+    const filteredStoreRows = useMemo(
+        () => applyStageTableFilters(storeRows.map((r) => ({ ...r, qty: String(r.qty) })), stageStyleFilters.store, searchQuery),
+        [storeRows, searchQuery, stageStyleFilters.store],
+    );
 
     const supplyRows = useMemo(() => {
-        return (displayDoc?.supply.history ?? []).slice(0, 24).map((h) => ({
+        if (homeDashboardApi && useTrackingData) {
+            const items = trackingBuckets?.supply_sewing ?? [];
+            return items.map(mapTrackingItemToSupplyRow);
+        }
+        if (homeDashboardApi && !useRekapData) return [];
+        return (displayDoc?.supply.history ?? []).map((h) => ({
             rfid: h.rfid_garment,
             wo: h.wo ?? '—',
             line: h.line ?? '—',
@@ -998,14 +1800,47 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             item: h.item ?? '—',
             color: h.color ?? '—',
             size: h.size ?? '—',
+            waktu: formatRowTime(h.at),
             location: h.location ?? 'supply_sewing',
             timestamp: h.at ?? '—',
         }));
-    }, [displayDoc]);
+    }, [displayDoc, homeDashboardApi, useTrackingData, useRekapData, trackingBuckets, dateFrom, dateTo]);
+
+    const filteredSupplyRows = useMemo(
+        () => applyStageTableFilters(supplyRows.map((r) => ({ ...r, qty: String(r.qty) })), stageStyleFilters.supply, searchQuery),
+        [supplyRows, searchQuery, stageStyleFilters.supply],
+    );
+
+    const bundleStyleOptions = useMemo(() => uniqueStylesFromRows(bundleRows.map((r) => ({ ...r, qty: String(r.qty) }))), [bundleRows]);
+    const qcStyleOptions = useMemo(() => uniqueStylesFromRows(qcRows), [qcRows]);
+    const storeStyleOptions = useMemo(() => uniqueStylesFromRows(storeRows.map((r) => ({ ...r, qty: String(r.qty) }))), [storeRows]);
+    const supplyStyleOptions = useMemo(() => uniqueStylesFromRows(supplyRows), [supplyRows]);
+
+    const toolbarSummary = useMemo(() => {
+        const totalBundleAll =
+            filteredBundleRows.length +
+            filteredQcRows.length +
+            filteredStoreRows.length +
+            filteredSupplyRows.length;
+        const allRows: CuttingTableRow[] = [
+            ...filteredBundleRows,
+            ...filteredQcRows,
+            ...filteredStoreRows,
+            ...filteredSupplyRows,
+        ];
+        return {
+            totalBundleAll,
+            topStyle: topFieldByCount(allRows, 'style'),
+            topWo: topFieldByCount(allRows, 'wo'),
+        };
+    }, [filteredBundleRows, filteredQcRows, filteredStoreRows, filteredSupplyRows]);
 
     const invalidate = useCallback(() => {
         void queryClient.invalidateQueries({ queryKey: QUERY_SCAN });
-        if (homeDashboardApi) void queryClient.invalidateQueries({ queryKey: QUERY_HOME_DASH });
+        if (homeDashboardApi) {
+            void queryClient.invalidateQueries({ queryKey: [QUERY_HOME_DASH_BASE] });
+            void queryClient.invalidateQueries({ queryKey: [QUERY_HOME_TRACKING_BASE] });
+        }
     }, [queryClient, homeDashboardApi]);
 
     const bundleLeftColumn = useMemo(() => {
@@ -1101,7 +1936,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                   second: '2-digit',
               })
             : '—';
-        const totalSt = homeDashboardApi ? storeRows.length : (displayDoc?.store.history?.length ?? storeRows.length);
+        const totalSt = useRekapData ? storeRows.length : (displayDoc?.store.history?.length ?? storeRows.length);
         return (
             <>
                 <div className="rounded-xl border-2 border-amber-200/90 bg-white p-3 shadow-sm">
@@ -1138,7 +1973,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 </div>
             </>
         );
-    }, [operator, storeSessionLog, storeRows, displayDoc?.store.history?.length, homeDashboardApi]);
+    }, [operator, storeSessionLog, storeRows, displayDoc?.store.history?.length, useRekapData]);
 
     const supplyLeftColumn = useMemo(() => {
         const lastOk = supplySessionLog.find((s) => s.ok);
@@ -1175,7 +2010,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                             <User className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
                             <span className="text-[10px] font-bold uppercase tracking-wider">Operator</span>
                         </div>
-                        <span className="text-[9px] font-bold text-white bg-violet-500 px-2 py-0.5 rounded-full shrink-0">Supply Sewing</span>
+                        <span className="text-[9px] font-bold text-white bg-violet-500 px-2 py-0.5 rounded-full shrink-0">Terima Sewing</span>
                     </div>
                     <div className="text-sm font-bold text-slate-900 leading-tight break-words">{operator.name}</div>
                     <div className="text-[10px] text-slate-500 mt-0.5">NIK: {operator.nik}</div>
@@ -1215,7 +2050,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             style={{ fontSize: STORE_FORM_FS }}
         >
             <div className="font-semibold text-violet-900" style={{ fontSize: STORE_FORM_LABEL_FS }}>
-                Supply Sewing — isi sebelum scan
+                Terima Sewing — isi sebelum scan
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 min-w-0">
                 <div className="min-w-0">
@@ -1396,22 +2231,151 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     );
 
     return (
-        <div
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 flex-1 min-h-0 min-w-0 max-lg:flex-none max-lg:min-h-0 max-lg:auto-rows-min"
-            style={{ gap: 'clamp(0.25rem, 0.6vw + 0.15rem, 0.625rem)' }}
-        >
-            {/* Bundle — pengisian WO / style / color hanya lewat popup Scanning; kartu = ChartCard ala Distribusi Data */}
+        <div className="flex flex-col flex-1 min-h-0 min-w-0 h-full gap-2">
+            <div className="shrink-0 flex flex-nowrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-gradient-to-r from-slate-50 to-white px-2.5 py-2 shadow-sm overflow-x-auto">
+                <div className="flex flex-nowrap items-center gap-2 min-w-0 shrink-0">
+                    <ToolbarMiniCard
+                        label="Total All Bundle"
+                        value={toolbarSummary.totalBundleAll}
+                        valueClassName="text-violet-700"
+                        title="Jumlah total baris Bundle + QC + Supermarket + Terima Sewing"
+                    />
+                    <ToolbarMiniCard
+                        label="Style Terbanyak"
+                        value={toolbarSummary.topStyle}
+                        valueClassName="text-sky-700"
+                        title="Style dengan jumlah kemunculan terbanyak"
+                    />
+                    <ToolbarMiniCard
+                        label="WO Terbanyak"
+                        value={toolbarSummary.topWo}
+                        valueClassName="text-emerald-700"
+                        title="Work Order dengan jumlah kemunculan terbanyak"
+                    />
+                </div>
+
+                <div className="flex flex-nowrap items-center gap-2 ml-auto shrink-0 justify-end">
+                    {homeDashboardApi ? (
+                        <DataViewSwitch value={dataViewMode} onChange={setDataViewMode} />
+                    ) : null}
+                    <div className={`relative w-[9.5rem] sm:w-[10.5rem] ${TOOLBAR_CTRL_H}`}>
+                        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" aria-hidden />
+                        <input
+                            type="search"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Cari WO / Style"
+                            className={`w-full rounded-md border bg-white pl-7 pr-7 text-xs font-medium text-slate-800 shadow-inner placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200 ${TOOLBAR_CTRL_H} ${
+                                searchQuery.trim() ? 'border-sky-400 ring-1 ring-sky-200/70' : 'border-slate-200'
+                            }`}
+                        />
+                        {searchQuery ? (
+                            <button
+                                type="button"
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                                aria-label="Hapus pencarian"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        ) : null}
+                    </div>
+
+                    <div className="relative" ref={filterPanelRef}>
+                        <button
+                            type="button"
+                            onClick={() => (filterOpen ? setFilterOpen(false) : openFilterPanel())}
+                            className={`relative inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 text-[0.7rem] font-bold shadow-sm ring-1 transition hover:bg-sky-50/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${TOOLBAR_CTRL_H} ${
+                                filterActive
+                                    ? 'border-sky-400 text-sky-900 ring-sky-200/80'
+                                    : 'border-sky-200/90 text-sky-800 ring-slate-900/5 hover:border-sky-400'
+                            }`}
+                            title={filterActive ? 'Filter aktif — klik untuk ubah tanggal' : 'Filter rentang tanggal semua data dashboard'}
+                            aria-label={filterActive ? 'Filter aktif' : 'Filter tanggal'}
+                        >
+                            {filterActive ? (
+                                <span
+                                    className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white"
+                                    aria-hidden
+                                />
+                            ) : null}
+                            <CalendarRange className="h-4 w-4 text-sky-600 shrink-0" aria-hidden />
+                            <span className="whitespace-nowrap">{dateFilterLabel}</span>
+                        </button>
+                    {filterOpen ? (
+                        <div
+                            className="absolute right-0 top-full z-[60] mt-1.5 w-[min(100vw-1.5rem,17.5rem)] rounded-xl border border-slate-200/90 bg-white p-3 shadow-lg shadow-slate-900/10 ring-1 ring-slate-900/5"
+                            role="dialog"
+                            aria-label="Filter tanggal dashboard cutting"
+                        >
+                            <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-400 mb-2">Rentang tanggal</p>
+                            <div className="space-y-2">
+                                <label className="block">
+                                    <span className="text-[0.7rem] font-medium text-slate-600">Dari</span>
+                                    <input
+                                        type="date"
+                                        value={draftFrom}
+                                        onChange={(e) => setDraftFrom(e.target.value)}
+                                        className="mt-0.5 w-full rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-1.5 text-sm text-slate-800 shadow-inner focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                                    />
+                                </label>
+                                <label className="block">
+                                    <span className="text-[0.7rem] font-medium text-slate-600">Sampai</span>
+                                    <input
+                                        type="date"
+                                        value={draftTo}
+                                        onChange={(e) => setDraftTo(e.target.value)}
+                                        className="mt-0.5 w-full rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-1.5 text-sm text-slate-800 shadow-inner focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                                    />
+                                </label>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={applyDateFilter}
+                                    className="flex-1 min-w-[5rem] rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                                >
+                                    Terapkan
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={resetDateFilterToday}
+                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                >
+                                    Hari ini
+                                </button>
+                            </div>
+                        </div>
+                    ) : null}
+                    </div>
+                </div>
+            </div>
+
+            <div
+                className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-2 flex-1 min-h-0 min-w-0 max-lg:auto-rows-min"
+                style={{ gap: 'clamp(0.5rem, 0.8vw + 0.25rem, 0.875rem)' }}
+            >
             <ChartCard
                 title={
                     <CuttingStageHeader
                         title="Bundle"
+                        count={filteredBundleRows.length}
+                        countClassName="bg-emerald-600"
                         action={
-                            <ScanningButton
+                            <StageCardActions
                                 accent="emerald"
-                                onClick={() => {
-                                    setModalBundleScanningQty(qtyNext);
-                                    setScanningModal('bundle');
-                                }}
+                                styleValue={stageStyleFilters.bundle}
+                                styleOptions={bundleStyleOptions}
+                                onStyleChange={(v) => setStageStyleFilter('bundle', v)}
+                                scanButton={
+                                    <ScanningButton
+                                        accent="emerald"
+                                        onClick={() => {
+                                            setModalBundleScanningQty(qtyNext);
+                                            setScanningModal('bundle');
+                                        }}
+                                    />
+                                }
                             />
                         }
                     />
@@ -1420,79 +2384,100 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 iconColor="#047857"
                 iconBgColor="#d1fae5"
                 onClick={() => navigate('/dashboard-bundle-cutting')}
-                className={CUTTING_STAGE_CHART_CARD_CLASS}
+                className={`${CUTTING_STAGE_CHART_CARD_CLASS} !border-emerald-200/90`}
             >
                 <WireTable
                     columns={[
-                        { key: 'rfid', label: 'RFID Bundle' },
-                        { key: 'wo', label: 'Work Order' },
-                        { key: 'qty', label: 'QTY' },
+                        COL_WAKTU_SCAN,
+                        COL_RFID,
+                        COL_WO,
+                        COL_STYLE,
+                        ...GARMENT_TAIL_COLUMNS,
+                        COL_QTY,
                     ]}
-                    rows={sortTableRowsNewestFirst(bundleRows.map((r) => ({ ...r, qty: String(r.qty) })))}
-                    emptyText="Belum ada data"
+                    rows={filteredBundleRows}
+                    emptyText={cuttingTableEmptyText(searchQuery, stageStyleFilters.bundle, trackingLoadFailed)}
                     onRowClick={(row) => openDetailFromRow('Bundle', row)}
                 />
             </ChartCard>
 
             <ChartCard
-                title={<CuttingStageHeader title="Quality Control" action={<ScanningButton accent="sky" onClick={() => setScanningModal('qc')} />} />}
+                title={
+                    <CuttingStageHeader
+                        title="Quality Control"
+                        count={filteredQcRows.length}
+                        countClassName="bg-sky-600"
+                        action={
+                            <StageCardActions
+                                accent="sky"
+                                styleValue={stageStyleFilters.qc}
+                                styleOptions={qcStyleOptions}
+                                onStyleChange={(v) => setStageStyleFilter('qc', v)}
+                                scanButton={<ScanningButton accent="sky" onClick={() => setScanningModal('qc')} />}
+                            />
+                        }
+                    />
+                }
                 icon={ClipboardCheck}
                 iconColor="#0369a1"
                 iconBgColor="#e0f2fe"
                 onClick={() => navigate('/dashboard-qc-cutting')}
-                className={CUTTING_STAGE_CHART_CARD_CLASS}
+                className={`${CUTTING_STAGE_CHART_CARD_CLASS} !border-sky-200/90`}
             >
                 <WireTable
                     columns={[
-                        { key: 'rfid', label: 'RFID Bundle' },
-                        { key: 'qty', label: 'QTY' },
-                        { key: 'good', label: 'Good' },
-                        { key: 'repair', label: 'Repair' },
-                        { key: 'reject', label: 'Reject' },
+                        COL_WAKTU_SCAN,
+                        COL_RFID,
+                        COL_WO,
+                        COL_STYLE,
+                        COL_QTY,
+                        { key: 'good', label: 'Good', emphasis: 'good', className: 'text-right' },
+                        { key: 'repair', label: 'Repair', emphasis: 'repair', className: 'text-right' },
+                        { key: 'reject', label: 'Reject', emphasis: 'reject', className: 'text-right' },
+                        ...GARMENT_TAIL_COLUMNS,
                     ]}
-                    rows={sortTableRowsNewestFirst(
-                        qcRows.map((r) => ({
-                            rfid: r.rfid,
-                            qty: String(r.qty),
-                            good: String(r.good),
-                            repair: String(r.repair),
-                            reject: String(r.reject),
-                            wo: r.wo,
-                            style: r.style,
-                            buyer: r.buyer,
-                            item: r.item,
-                            color: r.color,
-                            size: r.size,
-                            location: r.location,
-                            timestamp: r.timestamp,
-                            id_bundles: r.id_bundles,
-                            last_status: r.last_status,
-                            barcode: r.barcode,
-                        })),
-                    )}
-                    emptyText="Belum ada data"
+                    rows={filteredQcRows}
+                    emptyText={cuttingTableEmptyText(searchQuery, stageStyleFilters.qc, trackingLoadFailed)}
                     onRowClick={(row) => openDetailFromRow('Quality Control', row)}
                 />
             </ChartCard>
 
             <ChartCard
-                title={<CuttingStageHeader title="Supermarket" action={<ScanningButton accent="amber" onClick={() => setScanningModal('store')} />} />}
+                title={
+                    <CuttingStageHeader
+                        title="Supermarket"
+                        count={filteredStoreRows.length}
+                        countClassName="bg-amber-600"
+                        action={
+                            <StageCardActions
+                                accent="amber"
+                                styleValue={stageStyleFilters.store}
+                                styleOptions={storeStyleOptions}
+                                onStyleChange={(v) => setStageStyleFilter('store', v)}
+                                scanButton={<ScanningButton accent="amber" onClick={() => setScanningModal('store')} />}
+                            />
+                        }
+                    />
+                }
                 icon={Warehouse}
                 iconColor="#b45309"
                 iconBgColor="#fef3c7"
                 onClick={() => navigate('/dashboard-supermarket-cutting')}
-                className={CUTTING_STAGE_CHART_CARD_CLASS}
+                className={`${CUTTING_STAGE_CHART_CARD_CLASS} !border-amber-200/90`}
             >
                 <WireTable
                     columns={[
-                        { key: 'rfid', label: 'RFID Bundle' },
-                        { key: 'wo', label: 'Work Order' },
-                        { key: 'qty', label: 'QTY' },
-                        { key: 'line', label: 'Line' },
-                        { key: 'lokasi', label: 'Lokasi' },
+                        COL_WAKTU_SCAN,
+                        COL_RFID,
+                        COL_WO,
+                        COL_STYLE,
+                        { key: 'lokasi', label: 'Lokasi', emphasis: 'accent' },
+                        ...GARMENT_TAIL_COLUMNS,
+                        COL_QTY,
+                        { key: 'line', label: 'Line', emphasis: 'accent' },
                     ]}
-                    rows={sortTableRowsNewestFirst(storeRows.map((r) => ({ ...r, qty: String(r.qty) })))}
-                    emptyText="Belum ada data"
+                    rows={filteredStoreRows}
+                    emptyText={cuttingTableEmptyText(searchQuery, stageStyleFilters.store, trackingLoadFailed)}
                     onRowClick={(row) => openDetailFromRow('Supermarket', row)}
                 />
             </ChartCard>
@@ -1500,10 +2485,18 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             <ChartCard
                 title={
                     <CuttingStageHeader
-                        title="Supply Sewing"
+                        title="Terima Sewing"
+                        count={filteredSupplyRows.length}
+                        countClassName="bg-violet-600"
                         action={
                             isSupplySewingEnabled ? (
-                                <ScanningButton accent="violet" onClick={() => setScanningModal('supply')} />
+                                <StageCardActions
+                                    accent="violet"
+                                    styleValue={stageStyleFilters.supply}
+                                    styleOptions={supplyStyleOptions}
+                                    onStyleChange={(v) => setStageStyleFilter('supply', v)}
+                                    scanButton={<ScanningButton accent="violet" onClick={() => setScanningModal('supply')} />}
+                                />
                             ) : (
                                 <span className="text-[9px] px-2 py-1 rounded-md border border-slate-300 text-slate-500 bg-slate-100/90 font-semibold">
                                     Soon
@@ -1516,7 +2509,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 iconColor="#5b21b6"
                 iconBgColor="#ede9fe"
                 onClick={isSupplySewingEnabled ? () => navigate('/dashboard-supply-sewing-cutting') : undefined}
-                className={`${CUTTING_STAGE_CHART_CARD_CLASS} relative group ${isSupplySewingEnabled ? '' : 'grayscale saturate-0 !border-slate-300 !from-slate-100 !via-slate-100 !to-slate-200/60 shadow-[0_8px_18px_rgba(15,23,42,0.06)]'}`}
+                className={`${CUTTING_STAGE_CHART_CARD_CLASS} relative group ${isSupplySewingEnabled ? '!border-violet-200/90' : 'grayscale saturate-0 !border-slate-300 !from-slate-100 !via-slate-100 !to-slate-200/60 shadow-[0_8px_18px_rgba(15,23,42,0.06)]'}`}
             >
                 {!isSupplySewingEnabled && (
                     <div className="absolute inset-0 z-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/40 backdrop-blur-[1px] cursor-not-allowed">
@@ -1527,14 +2520,17 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 )}
                 <WireTable
                     columns={[
-                        { key: 'rfid', label: 'RFID Bundle' },
-                        { key: 'wo', label: 'Work Order' },
-                        { key: 'line', label: 'Line' },
-                        { key: 'gm', label: 'Location' },
+                        COL_WAKTU_SCAN,
+                        COL_RFID,
+                        COL_WO,
+                        COL_STYLE,
+                        COL_QTY,
+                        { key: 'line', label: 'Line', emphasis: 'accent' },
+                        { key: 'gm', label: 'Location', emphasis: 'accent' },
                     ]}
-                    rows={sortTableRowsNewestFirst(supplyRows)}
-                    emptyText="Belum ada data"
-                    onRowClick={isSupplySewingEnabled ? (row) => openDetailFromRow('Supply Sewing', row) : undefined}
+                    rows={filteredSupplyRows}
+                    emptyText={cuttingTableEmptyText(searchQuery, stageStyleFilters.supply, trackingLoadFailed)}
+                    onRowClick={isSupplySewingEnabled ? (row) => openDetailFromRow('Terima Sewing', row) : undefined}
                 />
                 <div className="px-1.5 py-0.5 border-t border-gray-50 shrink-0 flex justify-end bg-white/90">
                     <button
@@ -1550,6 +2546,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     </button>
                 </div>
             </ChartCard>
+            </div>
 
             {tableDetail.open ? (
                 <div className="fixed inset-0 z-[1250] flex items-center justify-center bg-slate-900/45 backdrop-blur-[1px] p-3">
@@ -1623,10 +2620,10 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             <CuttingScanStationModal
                 isOpen={scanningModal === 'supply'}
                 onClose={() => setScanningModal(null)}
-                title="Station Supply Sewing"
+                title="Station Terima Sewing"
                 subtitle="Scan RFID"
                 accent="violet"
-                stageBadge="Supply Sewing"
+                stageBadge="Terima Sewing"
                 busy={busySu}
                 leftColumn={supplyLeftColumn}
                 formSection={supplyFormSection}
