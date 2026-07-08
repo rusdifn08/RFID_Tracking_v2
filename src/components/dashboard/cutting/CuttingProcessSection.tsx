@@ -39,7 +39,7 @@ import {
     type CuttingScanStateDoc,
     type CuttingScanHistoryEntry,
 } from '../../../config/api';
-import { COMINGSOON_SUPPLY_SEWING } from '../../../config/hide';
+import { COMINGSOON_SUPPLY_SEWING, HIDE_CUTTING_CARD_FILTERS } from '../../../config/hide';
 import { useAuth } from '../../../hooks/useAuth';
 import ChartCard from '../ChartCard';
 import CuttingScanStationModal, { type CuttingScanSessionRow } from './CuttingScanStationModal';
@@ -111,7 +111,6 @@ function formatRowTime(ts: unknown): string {
     return d.toLocaleString('id-ID', {
         day: '2-digit',
         month: 'short',
-        year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
     });
@@ -226,14 +225,31 @@ function mapHomeItemToBundleRow(item: HomeDashboardItem) {
 }
 
 function mapHomeItemToQcRow(item: HomeDashboardItem) {
-    const qty = Math.max(1, Number(item.qty_batch ?? 1));
-    const st = normCuttingLastStatus(item.last_status);
-    let good = 0;
-    let repair = 0;
-    let reject = 0;
-    if (st === 'GOOD') good = qty;
-    else if (st === 'REPAIR') repair = qty;
-    else if (st === 'REJECT') reject = qty;
+    // Use actual qty from API if available, fallback to deriving from last_status
+    const hasActualQty =
+        item.qty_good != null || item.qty_repair != null || item.qty_reject != null;
+    const good = hasActualQty
+        ? Math.max(0, Number(item.qty_good ?? 0))
+        : (() => {
+              const st = normCuttingLastStatus(item.last_status);
+              return st === 'GOOD' ? Math.max(1, Number(item.qty_batch ?? 1)) : 0;
+          })();
+    const repair = hasActualQty
+        ? Math.max(0, Number(item.qty_repair ?? 0))
+        : (() => {
+              const st = normCuttingLastStatus(item.last_status);
+              return st === 'REPAIR' ? Math.max(1, Number(item.qty_batch ?? 1)) : 0;
+          })();
+    const reject = hasActualQty
+        ? Math.max(0, Number(item.qty_reject ?? 0))
+        : (() => {
+              const st = normCuttingLastStatus(item.last_status);
+              return st === 'REJECT' ? Math.max(1, Number(item.qty_batch ?? 1)) : 0;
+          })();
+    const qty =
+        good + repair + reject > 0
+            ? good + repair + reject
+            : Math.max(1, Number(item.qty_batch ?? 1));
     const ts = homeItemRawTimestamp(item);
     return {
         rfid: item.rfid_bundles ?? '—',
@@ -261,9 +277,9 @@ function mapHomeItemToStoreRow(item: HomeDashboardItem) {
     const st = normCuttingLastStatus(item.last_status);
     const lokasi =
         st === 'IN_SMARKET' || st === 'IN_SUPERMARKET'
-            ? 'Masuk Supermarket'
+            ? 'In SMarket'
             : st === 'OUT_SMARKET' || st === 'OUT_SUPERMARKET'
-              ? 'Keluar Supermarket'
+              ? 'Out SMarket'
               : String(item.lokasi ?? item.last_status ?? '—');
     const lineStr =
         item.line != null && String(item.line).trim() !== '' ? String(item.line) : '—';
@@ -288,7 +304,7 @@ function mapHomeItemToStoreRow(item: HomeDashboardItem) {
     };
 }
 
-type TrackingBucketKey = 'bundle' | 'qc' | 'smarket' | 'supply_sewing';
+type TrackingBucketKey = 'bundle' | 'qc' | 'smarket' | 'sewing';
 
 function trackingBucketRawTimestamp(item: HomeDashboardTrackingItem, bucket: TrackingBucketKey): string | undefined {
     const pickLatest = (...ts: (string | null | undefined)[]) => {
@@ -308,7 +324,7 @@ function trackingBucketRawTimestamp(item: HomeDashboardTrackingItem, bucket: Tra
             return pickLatest(item.last_time_good, item.last_time_repair, item.last_time_reject, item.updated_at);
         case 'smarket':
             return pickLatest(item.last_time_smarket_in, item.last_time_smarket_out, item.updated_at);
-        case 'supply_sewing':
+        case 'sewing':
             return pickLatest(item.last_time_smarket_out, item.last_time_sewing, item.updated_at);
     }
 }
@@ -387,7 +403,7 @@ function mapTrackingItemToStoreRow(item: HomeDashboardTrackingItem) {
 
 function mapTrackingItemToSupplyRow(item: HomeDashboardTrackingItem) {
     const qty = Math.max(1, Number(item.qty_smarket_out ?? item.qty_output ?? 0) || 1);
-    const ts = trackingBucketRawTimestamp(item, 'supply_sewing');
+    const ts = trackingBucketRawTimestamp(item, 'sewing');
     const lineStr = item.line != null && String(item.line).trim() !== '' ? String(item.line) : '—';
     const locRaw = String(item.lokasi ?? '').trim();
     return {
@@ -416,7 +432,7 @@ function flattenTrackingBuckets(data: HomeDashboardTrackingBuckets | undefined):
         ...(data.bundle ?? []),
         ...(data.qc ?? []),
         ...(data.smarket ?? []),
-        ...(data.supply_sewing ?? []),
+        ...(data.sewing ?? []),
     ];
 }
 
@@ -591,7 +607,7 @@ function CuttingStageHeader({
 }: {
     title: string;
     action: ReactNode;
-    count?: number;
+    count?: ReactNode;
     countClassName?: string;
 }) {
     const countFs = 'clamp(0.95rem, 0.75rem + 0.65vmin, 1.2rem)';
@@ -600,13 +616,17 @@ function CuttingStageHeader({
             <div className="flex min-w-0 items-center gap-2.5">
                 <CuttingStageTitle>{title}</CuttingStageTitle>
                 {count != null ? (
-                    <span
-                        className={`inline-flex min-h-[1.85rem] min-w-[2.5rem] shrink-0 items-center justify-center rounded px-3 font-extrabold text-white tabular-nums leading-none shadow-sm ${countClassName}`}
-                        style={{ fontSize: countFs }}
-                        title="Jumlah data"
-                    >
-                        {count}
-                    </span>
+                    typeof count === 'number' || typeof count === 'string' ? (
+                        <span
+                            className={`inline-flex min-h-[1.85rem] min-w-[2.5rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm ${countClassName}`}
+                            style={{ fontSize: countFs }}
+                            title="Jumlah data"
+                        >
+                            {count}
+                        </span>
+                    ) : (
+                        count
+                    )
                 ) : null}
             </div>
             <div className="flex shrink-0 items-center self-center">{action}</div>
@@ -615,15 +635,15 @@ function CuttingStageHeader({
 }
 
 const CUTTING_STAGE_CHART_CARD_CLASS =
-    'min-h-0 h-full flex flex-col py-2 bg-gradient-to-b from-white via-white to-slate-50/50 shadow-[0_10px_24px_rgba(15,23,42,0.07)] hover:shadow-[0_14px_30px_rgba(15,23,42,0.11)] transition-all duration-300 border-2 max-lg:h-auto max-lg:min-h-[14rem] max-lg:flex-none';
+    'min-h-0 h-full flex flex-col py-2 bg-gradient-to-b from-white via-white to-slate-50/50 shadow-[0_10px_24px_rgba(15,23,42,0.07)] hover:shadow-[0_14px_30px_rgba(15,23,42,0.11)] transition-all duration-300 border-2 max-lg:h-[22rem] max-lg:min-h-[14rem] max-lg:flex-none';
 
 type ScanningModalId = 'bundle' | 'qc' | 'store' | 'supply';
 type StageFilterId = ScanningModalId;
 
-function uniqueStylesFromRows(rows: CuttingTableRow[]): string[] {
+function uniqueFieldsFromRows(rows: CuttingTableRow[], key: 'wo' | 'style' | 'buyer'): string[] {
     const set = new Set<string>();
     for (const r of rows) {
-        const s = String(r.style ?? '').trim();
+        const s = String(r[key] ?? '').trim();
         if (s && s !== '—') set.add(s);
     }
     return [...set].sort((a, b) => a.localeCompare(b, 'id'));
@@ -631,48 +651,162 @@ function uniqueStylesFromRows(rows: CuttingTableRow[]): string[] {
 
 function cuttingTableEmptyText(
     searchQuery: string,
-    stageStyleFilter: string,
+    globalFilterVal: string,
     trackingLoadFailed?: boolean,
 ): string {
     if (trackingLoadFailed) return 'Gagal memuat data tracking';
-    if (searchQuery.trim() || stageStyleFilter.trim()) return 'Tidak ada data cocok';
+    if (searchQuery.trim() || globalFilterVal.trim()) return 'Tidak ada data cocok';
     return 'Belum ada data';
 }
 
-function filterRowsByStyle(rows: CuttingTableRow[], styleFilter: string): CuttingTableRow[] {
-    const sf = styleFilter.trim();
-    if (!sf) return rows;
-    return rows.filter((r) => String(r.style ?? '').trim() === sf);
+function filterRowsByGlobalCategory(rows: CuttingTableRow[], cat: 'wo' | 'style' | 'buyer', val: string): CuttingTableRow[] {
+    const fv = val.trim();
+    if (!fv) return rows;
+    return rows.filter((r) => String(r[cat] ?? '').trim() === fv);
 }
 
-function applyStageTableFilters(rows: CuttingTableRow[], styleFilter: string, search: string): CuttingTableRow[] {
-    return sortTableRowsNewestFirst(filterRowsBySearch(filterRowsByStyle(rows, styleFilter), search));
+function getStatusNode(timestampStr: string | number | undefined | null, useTrackingData: boolean, row?: CuttingTableRow, nextStageRfids?: Set<string>): ReactNode {
+    const renderBadge = (text: string, colorClass: string, dotClass: string, bgClass: string, borderClass: string) => (
+        <div className="flex justify-center">
+            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider border shadow-sm ${bgClass} ${colorClass} ${borderClass}`}>
+                <span className="relative flex h-2 w-2 shrink-0">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotClass}`}></span>
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${dotClass}`}></span>
+                </span>
+                {text}
+            </span>
+        </div>
+    );
+
+    if (!useTrackingData) {
+        let statusText = 'IN';
+        let colorClass = 'text-sky-700';
+        let bgClass = 'bg-sky-50';
+        let borderClass = 'border-sky-200';
+        let dotClass = 'bg-sky-500';
+
+        const rawLoc = String(row?.lokasi ?? '').toLowerCase();
+        const rawStatus = String(row?.last_status ?? '').toLowerCase();
+        const rfid = String(row?.rfid ?? '');
+        
+        let isOut = false;
+        if (nextStageRfids && rfid && nextStageRfids.has(rfid)) {
+            isOut = true;
+        } else if (row?.location === 'supermarket') {
+            if (rawLoc.includes('keluar') || rawLoc.includes('out') || rawStatus.includes('out')) {
+                isOut = true;
+            }
+        }
+
+        if (isOut) {
+            statusText = 'OUT';
+            colorClass = 'text-amber-700';
+            bgClass = 'bg-amber-50';
+            borderClass = 'border-amber-200';
+            dotClass = 'bg-amber-500';
+        }
+
+        return renderBadge(statusText, colorClass, dotClass, bgClass, borderClass);
+    }
+
+    if (!timestampStr || timestampStr === '—') {
+        return renderBadge('NORMAL', 'text-emerald-700', 'bg-emerald-500', 'bg-emerald-50', 'border-emerald-200');
+    }
+    const t = new Date(timestampStr).getTime();
+    if (Number.isNaN(t)) {
+        return renderBadge('NORMAL', 'text-emerald-700', 'bg-emerald-500', 'bg-emerald-50', 'border-emerald-200');
+    }
+    const diffMs = Date.now() - t;
+    const diffHours = diffMs / (1000 * 60 * 60);
+    
+    if (diffHours >= 24) {
+        return renderBadge('DANGER', 'text-rose-700', 'bg-rose-600', 'bg-rose-50', 'border-rose-200');
+    }
+    if (diffHours >= 4) {
+        return renderBadge('WARNING', 'text-amber-700', 'bg-amber-500', 'bg-amber-50', 'border-amber-200');
+    }
+    return renderBadge('NORMAL', 'text-emerald-700', 'bg-emerald-500', 'bg-emerald-50', 'border-emerald-200');
 }
 
-function StyleFilterButton({
+function getStagnantNode(timestampStr: string | number | undefined | null): ReactNode {
+    if (!timestampStr || timestampStr === '—') {
+        return <div className="text-center text-slate-400 font-medium">—</div>;
+    }
+    const t = new Date(timestampStr).getTime();
+    if (Number.isNaN(t)) {
+        return <div className="text-center text-slate-400 font-medium">—</div>;
+    }
+    const diffMs = Math.max(0, Date.now() - t);
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    
+    let text = '';
+    if (hours > 0) text += `${hours} H `;
+    text += `${mins} M`;
+
+    let colorClass = 'text-emerald-600';
+    if (hours >= 24) {
+        colorClass = 'text-rose-600';
+    } else if (hours >= 4) {
+        colorClass = 'text-amber-600';
+    }
+    
+    return <div className={`text-center font-extrabold tabular-nums ${colorClass}`}>{text.trim()}</div>;
+}
+
+function applyStageTableFilters(rows: CuttingTableRow[], cat: 'wo' | 'style' | 'buyer', val: string, search: string, useTrackingData: boolean, nextStageRfids?: Set<string>): CuttingTableRow[] {
+    const filtered = sortTableRowsNewestFirst(filterRowsBySearch(filterRowsByGlobalCategory(rows, cat, val), search));
+    return filtered.map(row => {
+        let buyerText = String(row.buyer ?? '');
+        if (buyerText.length > 15) {
+            buyerText = buyerText.substring(0, 15) + '...';
+        }
+        return {
+            ...row,
+            buyer_ui: buyerText,
+            status_ui: getStatusNode(row.timestamp, useTrackingData, row, nextStageRfids),
+            stagnant_ui: getStagnantNode(row.timestamp)
+        };
+    });
+}
+
+function GlobalFilterDropdown({
     accent,
+    category,
     value,
-    options,
     onChange,
+    woOptions,
+    styleOptions,
+    buyerOptions,
 }: {
     accent: 'emerald' | 'sky' | 'amber' | 'violet';
+    category: 'wo' | 'style' | 'buyer';
     value: string;
-    options: string[];
-    onChange: (next: string) => void;
+    onChange: (cat: 'wo' | 'style' | 'buyer', val: string) => void;
+    woOptions: string[];
+    styleOptions: string[];
+    buyerOptions: string[];
 }) {
     const [open, setOpen] = useState(false);
+    const [tab, setTab] = useState<'wo' | 'style' | 'buyer'>(category || 'wo');
     const ref = useRef<HTMLDivElement>(null);
     const active = value.trim() !== '';
 
     useEffect(() => {
         if (!open) return;
         const onDoc = (e: MouseEvent) => {
-            const el = ref.current;
-            if (el && !el.contains(e.target as Node)) setOpen(false);
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
         };
         document.addEventListener('mousedown', onDoc);
         return () => document.removeEventListener('mousedown', onDoc);
     }, [open]);
+
+    useEffect(() => {
+        if (open && value) {
+            setTab(category);
+        }
+    }, [open, category, value]);
 
     const cls =
         accent === 'emerald'
@@ -691,6 +825,8 @@ function StyleFilterButton({
                   ? 'bg-violet-600 text-white border-violet-600'
                   : 'bg-violet-50 text-violet-900 border-violet-200/90 hover:bg-violet-100';
 
+    const options = tab === 'wo' ? woOptions : tab === 'style' ? styleOptions : buyerOptions;
+
     return (
         <div className="relative" ref={ref}>
             <button
@@ -704,67 +840,99 @@ function StyleFilterButton({
                     fontFamily: 'Poppins, sans-serif',
                     fontSize: 'clamp(0.65rem, 0.75vw + 0.32rem, 0.78rem)',
                 }}
-                title={active ? `Filter Style: ${value}` : 'Filter Style'}
+                title={active ? `Filter ${category.toUpperCase()}: ${value}` : 'Filter'}
             >
                 <Filter className="w-3 h-3 shrink-0" strokeWidth={2.4} />
-                <span className="whitespace-nowrap">Style</span>
+                <span className="whitespace-nowrap">FILTER</span>
             </button>
             {open ? (
                 <div
-                    className="absolute right-0 top-full z-[70] mt-1 w-[min(100vw-2rem,11rem)] max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg shadow-slate-900/10"
-                    role="listbox"
+                    className="absolute right-0 top-full z-[70] mt-1 w-[min(100vw-2rem,14rem)] flex flex-col rounded-md border border-slate-200 bg-white shadow-lg shadow-slate-900/10"
+                    role="dialog"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <button
-                        type="button"
-                        className={`block w-full px-2.5 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${!active ? 'text-sky-700 bg-sky-50/80' : 'text-slate-600'}`}
-                        onClick={() => {
-                            onChange('');
-                            setOpen(false);
-                        }}
-                    >
-                        Semua Style
-                    </button>
-                    {options.length === 0 ? (
-                        <p className="px-2.5 py-2 text-[0.65rem] text-slate-400">Belum ada style</p>
-                    ) : (
-                        options.map((opt) => (
+                    <div className="flex border-b border-slate-100">
+                        {(['wo', 'style', 'buyer'] as const).map((t) => (
                             <button
-                                key={opt}
+                                key={t}
                                 type="button"
-                                className={`block w-full px-2.5 py-1.5 text-left text-xs font-semibold truncate hover:bg-slate-50 ${value === opt ? 'text-sky-700 bg-sky-50/80' : 'text-slate-700'}`}
-                                title={opt}
-                                onClick={() => {
-                                    onChange(opt);
-                                    setOpen(false);
-                                }}
+                                className={`flex-1 py-1.5 text-[0.65rem] font-bold uppercase tracking-wider ${
+                                    tab === t ? 'bg-slate-50 text-sky-600 border-b-2 border-sky-500' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                                }`}
+                                onClick={() => setTab(t)}
                             >
-                                {opt}
+                                {t}
                             </button>
-                        ))
-                    )}
+                        ))}
+                    </div>
+                    <div className="max-h-48 overflow-y-auto py-1">
+                        <button
+                            type="button"
+                            className={`block w-full px-2.5 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${!active || category !== tab ? 'text-sky-700 bg-sky-50/80' : 'text-slate-600'}`}
+                            onClick={() => {
+                                onChange(tab, '');
+                                setOpen(false);
+                            }}
+                        >
+                            Semua {tab.toUpperCase()}
+                        </button>
+                        {options.length === 0 ? (
+                            <p className="px-2.5 py-2 text-[0.65rem] text-slate-400">Belum ada data</p>
+                        ) : (
+                            options.map((opt) => (
+                                <button
+                                    key={opt}
+                                    type="button"
+                                    className={`block w-full px-2.5 py-1.5 text-left text-xs font-semibold truncate hover:bg-slate-50 ${active && category === tab && value === opt ? 'text-sky-700 bg-sky-50/80' : 'text-slate-700'}`}
+                                    title={opt}
+                                    onClick={() => {
+                                        onChange(tab, opt);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    {opt}
+                                </button>
+                            ))
+                        )}
+                    </div>
                 </div>
             ) : null}
         </div>
     );
 }
 
-function StageCardActions({
+function CardFilterActions({
     accent,
-    styleValue,
+    filterCategory,
+    filterValue,
+    onFilterChange,
+    woOptions,
     styleOptions,
-    onStyleChange,
+    buyerOptions,
     scanButton,
 }: {
     accent: 'emerald' | 'sky' | 'amber' | 'violet';
-    styleValue: string;
+    filterCategory: 'wo' | 'style' | 'buyer';
+    filterValue: string;
+    onFilterChange: (cat: 'wo' | 'style' | 'buyer', val: string) => void;
+    woOptions: string[];
     styleOptions: string[];
-    onStyleChange: (v: string) => void;
+    buyerOptions: string[];
     scanButton: ReactNode;
 }) {
     return (
         <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-            <StyleFilterButton accent={accent} value={styleValue} options={styleOptions} onChange={onStyleChange} />
+            {!HIDE_CUTTING_CARD_FILTERS && (
+                <GlobalFilterDropdown 
+                    accent={accent}
+                    category={filterCategory}
+                    value={filterValue}
+                    onChange={onFilterChange}
+                    woOptions={woOptions}
+                    styleOptions={styleOptions}
+                    buyerOptions={buyerOptions}
+                />
+            )}
             {scanButton}
         </div>
     );
@@ -800,19 +968,20 @@ function ScanningButton({
             }}
         >
             <ScanLine className="w-3.5 h-3.5" strokeWidth={2.4} />
-            <span>Scan</span>
+            <span>SCAN</span>
         </button>
     );
 }
 
-type CuttingTableRow = Record<string, string | number | null | undefined>;
+type CuttingTableRow = Record<string, any>;
 
 function rowMatchesWoStyleSearch(row: CuttingTableRow, query: string): boolean {
     const q = query.trim().toLowerCase();
     if (!q) return true;
     const wo = String(row.wo ?? '').toLowerCase();
     const style = String(row.style ?? '').toLowerCase();
-    return wo.includes(q) || style.includes(q);
+    const buyer = String(row.buyer ?? '').toLowerCase();
+    return wo.includes(q) || style.includes(q) || buyer.includes(q);
 }
 
 function filterRowsBySearch(rows: CuttingTableRow[], query: string): CuttingTableRow[] {
@@ -921,19 +1090,18 @@ type WireTableColumn = {
     emphasis?: 'primary' | 'metric' | 'good' | 'repair' | 'reject' | 'accent';
 };
 
-/** Kolom garment tambahan setelah Style. */
-const GARMENT_TAIL_COLUMNS: WireTableColumn[] = [
-    { key: 'buyer', label: 'Buyer' },
-    { key: 'item', label: 'Item' },
-    { key: 'color', label: 'Color' },
-    { key: 'size', label: 'Size', emphasis: 'accent' },
-];
+const COL_BUYER: WireTableColumn = { key: 'buyer_ui', label: 'Buyer', className: 'text-center' };
+const COL_ITEM: WireTableColumn = { key: 'item', label: 'Item' };
+const COL_COLOR: WireTableColumn = { key: 'color', label: 'Color' };
+const COL_SIZE: WireTableColumn = { key: 'size', label: 'Size', emphasis: 'accent' };
+const COL_STATUS: WireTableColumn = { key: 'status_ui', label: 'Status', className: 'text-center' };
 
-const COL_WAKTU_SCAN: WireTableColumn = { key: 'waktu', label: 'Waktu Scan' };
-const COL_RFID: WireTableColumn = { key: 'rfid', label: 'RFID Bundle', emphasis: 'primary' };
-const COL_WO: WireTableColumn = { key: 'wo', label: 'Work Order', emphasis: 'accent' };
+const COL_WAKTU_SCAN: WireTableColumn = { key: 'waktu', label: 'Waktu Scan', className: 'text-center' };
+const COL_RFID: WireTableColumn = { key: 'rfid', label: 'RFID Bundle', emphasis: 'primary', className: 'text-center' };
+const COL_WO: WireTableColumn = { key: 'wo', label: 'WO', emphasis: 'accent', className: 'text-center' };
 const COL_STYLE: WireTableColumn = { key: 'style', label: 'Style', emphasis: 'accent' };
 const COL_QTY: WireTableColumn = { key: 'qty', label: 'QTY', emphasis: 'metric', className: 'text-right' };
+const COL_STAGNANT: WireTableColumn = { key: 'stagnant_ui', label: 'STAGNANT', emphasis: 'accent', className: 'text-center bg-slate-50/60' };
 
 function wireCellClass(emphasis?: WireTableColumn['emphasis']): string {
     switch (emphasis) {
@@ -987,8 +1155,15 @@ function WireTable({
 }) {
     const colSpan = columns.length + (showRowNo ? 1 : 0);
     return (
+        <>
+        <style>{`
+            .mini-scrollbar::-webkit-scrollbar { height: 5px; width: 5px; }
+            .mini-scrollbar::-webkit-scrollbar-track { background: transparent; }
+            .mini-scrollbar::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.5); border-radius: 10px; }
+            .mini-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.9); }
+        `}</style>
         <div
-            className="flex-1 min-h-0 max-lg:min-h-[10rem] overflow-x-auto overflow-y-auto rounded-b-xl touch-pan-x touch-pan-y border border-slate-100/80 bg-white"
+            className="mini-scrollbar absolute inset-0 w-full h-full overflow-x-auto overflow-y-auto rounded-b-xl touch-pan-x touch-pan-y border border-slate-100/80 bg-white"
             onClick={(e) => {
                 const target = e.target as HTMLElement | null;
                 if (target?.closest('table, thead, tbody, tr, th, td')) {
@@ -1001,7 +1176,7 @@ function WireTable({
                     <tr className="border-b-2 border-slate-200">
                         {showRowNo && (
                             <th
-                                className="px-2 py-2 w-9 min-w-[2.25rem] font-bold text-slate-600 uppercase tracking-wide text-center"
+                                className="px-2 py-1.5 w-9 min-w-[2.25rem] font-bold text-slate-600 uppercase tracking-wide text-center"
                                 style={{ fontSize: CUTTING_TABLE_HEADER_FS }}
                             >
                                 No
@@ -1010,7 +1185,7 @@ function WireTable({
                         {columns.map((c) => (
                             <th
                                 key={c.key}
-                                className={`px-2 py-2 font-bold text-slate-600 uppercase tracking-wide ${c.className ?? ''}`}
+                                className={`px-2 py-1.5 font-bold text-slate-600 uppercase tracking-wide ${c.className ?? ''}`}
                                 style={{ fontSize: CUTTING_TABLE_HEADER_FS }}
                             >
                                 {c.label}
@@ -1043,14 +1218,14 @@ function WireTable({
                                 title={onRowClick ? 'Klik untuk lihat detail data' : undefined}
                             >
                                 {showRowNo && (
-                                    <td className="px-2 py-2 text-center text-slate-500 font-bold tabular-nums w-9 min-w-[2.25rem]">
+                                    <td className="px-2 py-1 text-center text-slate-500 font-bold tabular-nums w-9 min-w-[2.25rem]">
                                         {rows.length - i}
                                     </td>
                                 )}
                                 {columns.map((c) => (
                                     <td
                                         key={c.key}
-                                        className={`px-2 py-2 whitespace-nowrap ${wireCellClass(c.emphasis)} ${c.className ?? ''}`}
+                                        className={`px-2 py-1 whitespace-nowrap ${wireCellClass(c.emphasis)} ${c.className ?? ''}`}
                                         title={String(row[c.key] ?? '')}
                                     >
                                         {row[c.key] ?? '—'}
@@ -1062,6 +1237,7 @@ function WireTable({
                 </tbody>
             </table>
         </div>
+        </>
     );
 }
 
@@ -1109,15 +1285,12 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     const [draftTo, setDraftTo] = useState(ymdTodayLocal);
     const [filterOpen, setFilterOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [stageStyleFilters, setStageStyleFilters] = useState<Record<StageFilterId, string>>({
-        bundle: '',
-        qc: '',
-        store: '',
-        supply: '',
-    });
+    const [globalFilterCat, setGlobalFilterCat] = useState<'wo' | 'style' | 'buyer'>('style');
+    const [globalFilterVal, setGlobalFilterVal] = useState<string>('');
 
-    const setStageStyleFilter = useCallback((stage: StageFilterId, value: string) => {
-        setStageStyleFilters((prev) => ({ ...prev, [stage]: value }));
+    const handleGlobalFilterChange = useCallback((cat: 'wo' | 'style' | 'buyer', val: string) => {
+        setGlobalFilterCat(cat);
+        setGlobalFilterVal(val);
     }, []);
 
     const [dataViewMode, setDataViewMode] = useState<CuttingDataViewMode>('rekap');
@@ -1222,14 +1395,13 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         const items = homeDashQuery.data;
         const qcStatuses = new Set(['GOOD', 'REPAIR', 'REJECT']);
         const storeStatuses = new Set(['IN_SMARKET', 'OUT_SMARKET', 'IN_SUPERMARKET', 'OUT_SUPERMARKET']);
-        let bundle = 0;
+        let bundle = items.length;
         let qc = 0;
         let store = 0;
         for (const it of items) {
             const s = normCuttingLastStatus(it.last_status);
-            if (s === 'OUTPUT_BUNDLE') bundle += 1;
-            else if (qcStatuses.has(s)) qc += 1;
-            else if (storeStatuses.has(s)) store += 1;
+            if (qcStatuses.has(s)) qc += 1;
+            if (storeStatuses.has(s)) store += 1;
         }
         onHomeDashboardCounts({ bundle, qc, store });
     }, [useRekapData, homeDashQuery.data, onHomeDashboardCounts]);
@@ -1674,21 +1846,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         }));
     }, [homeDashboardApi, useTrackingData, useRekapData, trackingBuckets, homeItemsFiltered, displayDoc, dateFrom, dateTo]);
 
-    const filteredQcRows = useMemo(
-        () =>
-            applyStageTableFilters(
-                qcRows.map((r) => ({
-                    ...r,
-                    qty: String(r.qty),
-                    good: String(r.good),
-                    repair: String(r.repair),
-                    reject: String(r.reject),
-                })),
-                stageStyleFilters.qc,
-                searchQuery,
-            ),
-        [qcRows, searchQuery, stageStyleFilters.qc],
-    );
+
 
     const totalQcServerCount = useMemo(
         () =>
@@ -1708,9 +1866,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         if (homeDashboardApi) {
             if (!useRekapData) return [];
             if (!homeItemsFiltered.length) return [];
-            return homeItemsFiltered
-                .filter((it) => normCuttingLastStatus(it.last_status) === 'OUTPUT_BUNDLE')
-                .map(mapHomeItemToBundleRow);
+            return homeItemsFiltered.map(mapHomeItemToBundleRow);
         }
         return (displayDoc?.bundle?.history ?? []).map((h) => ({
             rfid: h.rfid_garment,
@@ -1727,10 +1883,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         }));
     }, [homeDashboardApi, useTrackingData, useRekapData, trackingBuckets, homeItemsFiltered, displayDoc, dateFrom, dateTo]);
 
-    const filteredBundleRows = useMemo(
-        () => applyStageTableFilters(bundleRows.map((r) => ({ ...r, qty: String(r.qty) })), stageStyleFilters.bundle, searchQuery),
-        [bundleRows, searchQuery, stageStyleFilters.bundle],
-    );
+
 
     useEffect(() => {
         onBundleMetrics?.(bundleRows.length);
@@ -1778,14 +1931,11 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         });
     }, [homeDashboardApi, useTrackingData, useRekapData, trackingBuckets, homeItemsFiltered, displayDoc, dateFrom, dateTo]);
 
-    const filteredStoreRows = useMemo(
-        () => applyStageTableFilters(storeRows.map((r) => ({ ...r, qty: String(r.qty) })), stageStyleFilters.store, searchQuery),
-        [storeRows, searchQuery, stageStyleFilters.store],
-    );
+
 
     const supplyRows = useMemo(() => {
         if (homeDashboardApi && useTrackingData) {
-            const items = trackingBuckets?.supply_sewing ?? [];
+            const items = trackingBuckets?.sewing ?? [];
             return items.map(mapTrackingItemToSupplyRow);
         }
         if (homeDashboardApi && !useRekapData) return [];
@@ -1806,15 +1956,105 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         }));
     }, [displayDoc, homeDashboardApi, useTrackingData, useRekapData, trackingBuckets, dateFrom, dateTo]);
 
-    const filteredSupplyRows = useMemo(
-        () => applyStageTableFilters(supplyRows.map((r) => ({ ...r, qty: String(r.qty) })), stageStyleFilters.supply, searchQuery),
-        [supplyRows, searchQuery, stageStyleFilters.supply],
+    const qcRfids = useMemo(() => new Set(qcRows.map(r => String(r.rfid))), [qcRows]);
+    const storeRfids = useMemo(() => new Set(storeRows.map(r => String(r.rfid))), [storeRows]);
+    const supplyRfids = useMemo(() => new Set(supplyRows.map(r => String(r.rfid))), [supplyRows]);
+
+    const filteredBundleRows = useMemo(
+        () => applyStageTableFilters(bundleRows.map((r) => ({ ...r, qty: String(r.qty) })), globalFilterCat, globalFilterVal, searchQuery, useTrackingData, qcRfids),
+        [bundleRows, searchQuery, globalFilterCat, globalFilterVal, useTrackingData, qcRfids],
     );
 
-    const bundleStyleOptions = useMemo(() => uniqueStylesFromRows(bundleRows.map((r) => ({ ...r, qty: String(r.qty) }))), [bundleRows]);
-    const qcStyleOptions = useMemo(() => uniqueStylesFromRows(qcRows), [qcRows]);
-    const storeStyleOptions = useMemo(() => uniqueStylesFromRows(storeRows.map((r) => ({ ...r, qty: String(r.qty) }))), [storeRows]);
-    const supplyStyleOptions = useMemo(() => uniqueStylesFromRows(supplyRows), [supplyRows]);
+    const filteredQcRows = useMemo(
+        () =>
+            applyStageTableFilters(
+                qcRows.map((r) => ({
+                    ...r,
+                    qty: String(r.qty),
+                    good: String(r.good),
+                    repair: String(r.repair),
+                    reject: String(r.reject),
+                })),
+                globalFilterCat,
+                globalFilterVal,
+                searchQuery,
+                useTrackingData,
+                storeRfids
+            ),
+        [qcRows, searchQuery, globalFilterCat, globalFilterVal, useTrackingData, storeRfids],
+    );
+
+    const qcTotals = useMemo(() => {
+        let good = 0; let repair = 0; let reject = 0;
+        for (const r of filteredQcRows) {
+            good += Number(r.good || 0);
+            repair += Number(r.repair || 0);
+            reject += Number(r.reject || 0);
+        }
+        return { good, repair, reject };
+    }, [filteredQcRows]);
+
+    const filteredStoreRows = useMemo(
+        () => applyStageTableFilters(storeRows.map((r) => ({ ...r, qty: String(r.qty) })), globalFilterCat, globalFilterVal, searchQuery, useTrackingData, supplyRfids),
+        [storeRows, searchQuery, globalFilterCat, globalFilterVal, useTrackingData, supplyRfids],
+    );
+
+    const bundleInOut = useMemo(() => {
+        let inCount = 0;
+        let outCount = 0;
+        for (const r of filteredBundleRows) {
+            if (qcRfids.has(String(r.rfid ?? ''))) outCount++;
+            else inCount++;
+        }
+        return { in: inCount, out: outCount };
+    }, [filteredBundleRows, qcRfids]);
+
+    const storeInOut = useMemo(() => {
+        let inCount = 0;
+        let outCount = 0;
+        for (const r of filteredStoreRows) {
+            const rfid = String(r.rfid ?? '');
+            const rawLoc = String(r.lokasi ?? '').toLowerCase();
+            const rawStatus = String(r.last_status ?? '').toLowerCase();
+            
+            if (supplyRfids.has(rfid)) {
+                outCount++;
+            } else if (rawLoc.includes('keluar') || rawLoc.includes('out') || rawStatus.includes('out')) {
+                outCount++;
+            } else {
+                inCount++;
+            }
+        }
+        return { in: inCount, out: outCount };
+    }, [filteredStoreRows, supplyRfids]);
+
+    const qcInOut = useMemo(() => {
+        let inCount = 0;
+        let outCount = 0;
+        for (const r of filteredQcRows) {
+            if (storeRfids.has(String(r.rfid ?? ''))) outCount++;
+            else inCount++;
+        }
+        return { in: inCount, out: outCount };
+    }, [filteredQcRows, storeRfids]);
+
+    const filteredSupplyRows = useMemo(
+        () => applyStageTableFilters(supplyRows.map((r) => ({ ...r, qty: String(r.qty) })), globalFilterCat, globalFilterVal, searchQuery, useTrackingData),
+        [supplyRows, searchQuery, globalFilterCat, globalFilterVal, useTrackingData],
+    );
+
+    const supplyInOut = useMemo(() => {
+        return { in: filteredSupplyRows.length, out: 0 };
+    }, [filteredSupplyRows.length]);
+
+    const allBaseRows = useMemo(
+        () => [...bundleRows, ...qcRows, ...storeRows, ...supplyRows],
+        [bundleRows, qcRows, storeRows, supplyRows]
+    );
+
+    const globalWoOptions = useMemo(() => uniqueFieldsFromRows(allBaseRows, 'wo'), [allBaseRows]);
+    const globalStyleOptions = useMemo(() => uniqueFieldsFromRows(allBaseRows, 'style'), [allBaseRows]);
+    const globalBuyerOptions = useMemo(() => uniqueFieldsFromRows(allBaseRows, 'buyer'), [allBaseRows]);
 
     const toolbarSummary = useMemo(() => {
         const totalBundleAll =
@@ -2232,7 +2472,7 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
 
     return (
         <div className="flex flex-col flex-1 min-h-0 min-w-0 h-full gap-2">
-            <div className="shrink-0 flex flex-nowrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-gradient-to-r from-slate-50 to-white px-2.5 py-2 shadow-sm overflow-x-auto">
+            <div className="shrink-0 flex flex-nowrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-gradient-to-r from-slate-50 to-white px-2.5 py-2 shadow-sm overflow-visible">
                 <div className="flex flex-nowrap items-center gap-2 min-w-0 shrink-0">
                     <ToolbarMiniCard
                         label="Total All Bundle"
@@ -2258,23 +2498,22 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     {homeDashboardApi ? (
                         <DataViewSwitch value={dataViewMode} onChange={setDataViewMode} />
                     ) : null}
-                    <div className={`relative w-[9.5rem] sm:w-[10.5rem] ${TOOLBAR_CTRL_H}`}>
-                        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" aria-hidden />
-                        <input
-                            type="search"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Cari WO / Style"
-                            className={`w-full rounded-md border bg-white pl-7 pr-7 text-xs font-medium text-slate-800 shadow-inner placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200 ${TOOLBAR_CTRL_H} ${
-                                searchQuery.trim() ? 'border-sky-400 ring-1 ring-sky-200/70' : 'border-slate-200'
-                            }`}
+                    <div className="flex items-center">
+                        <GlobalFilterDropdown
+                            accent="sky"
+                            category={globalFilterCat}
+                            value={globalFilterVal}
+                            onChange={handleGlobalFilterChange}
+                            woOptions={globalWoOptions}
+                            styleOptions={globalStyleOptions}
+                            buyerOptions={globalBuyerOptions}
                         />
-                        {searchQuery ? (
+                        {globalFilterVal ? (
                             <button
                                 type="button"
-                                onClick={() => setSearchQuery('')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                                aria-label="Hapus pencarian"
+                                onClick={() => handleGlobalFilterChange(globalFilterCat, '')}
+                                className="ml-1 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-rose-500 transition-colors"
+                                title="Hapus filter"
                             >
                                 <X className="h-4 w-4" />
                             </button>
@@ -2284,22 +2523,25 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                     <div className="relative" ref={filterPanelRef}>
                         <button
                             type="button"
+                            disabled={useTrackingData}
                             onClick={() => (filterOpen ? setFilterOpen(false) : openFilterPanel())}
-                            className={`relative inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 text-[0.7rem] font-bold shadow-sm ring-1 transition hover:bg-sky-50/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${TOOLBAR_CTRL_H} ${
-                                filterActive
-                                    ? 'border-sky-400 text-sky-900 ring-sky-200/80'
-                                    : 'border-sky-200/90 text-sky-800 ring-slate-900/5 hover:border-sky-400'
+                            className={`relative inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 text-[0.7rem] font-bold shadow-sm ring-1 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${TOOLBAR_CTRL_H} ${
+                                useTrackingData 
+                                    ? 'opacity-60 cursor-not-allowed bg-slate-100 text-slate-400 border-slate-200 ring-transparent'
+                                    : filterActive
+                                        ? 'border-sky-400 text-sky-900 ring-sky-200/80 hover:bg-sky-50/80'
+                                        : 'border-sky-200/90 text-sky-800 ring-slate-900/5 hover:border-sky-400 hover:bg-sky-50/80'
                             }`}
-                            title={filterActive ? 'Filter aktif — klik untuk ubah tanggal' : 'Filter rentang tanggal semua data dashboard'}
+                            title={useTrackingData ? 'Filter tanggal tidak tersedia untuk Tracking Bundle' : filterActive ? 'Filter aktif — klik untuk ubah tanggal' : 'Filter rentang tanggal semua data dashboard'}
                             aria-label={filterActive ? 'Filter aktif' : 'Filter tanggal'}
                         >
-                            {filterActive ? (
+                            {filterActive && !useTrackingData ? (
                                 <span
                                     className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white"
                                     aria-hidden
                                 />
                             ) : null}
-                            <CalendarRange className="h-4 w-4 text-sky-600 shrink-0" aria-hidden />
+                            <CalendarRange className={`h-4 w-4 shrink-0 ${useTrackingData ? 'text-slate-400' : 'text-sky-600'}`} aria-hidden />
                             <span className="whitespace-nowrap">{dateFilterLabel}</span>
                         </button>
                     {filterOpen ? (
@@ -2359,14 +2601,33 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 title={
                     <CuttingStageHeader
                         title="Bundle"
-                        count={filteredBundleRows.length}
-                        countClassName="bg-emerald-600"
+                        count={
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="inline-flex min-h-[1.85rem] min-w-[2.5rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-emerald-50 text-emerald-700" title="Qty Data">
+                                    {filteredBundleRows.length}
+                                </span>
+                                {!useTrackingData && (
+                                    <>
+                                        <span className="inline-flex min-h-[1.85rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-sky-50 text-sky-700 border border-sky-100" title="Total IN">
+                                            IN {bundleInOut.in}
+                                        </span>
+                                        <span className="inline-flex min-h-[1.85rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-amber-50 text-amber-700 border border-amber-100" title="Total OUT">
+                                            OUT {bundleInOut.out}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                        }
+                        countClassName="bg-emerald-50 text-emerald-700"
                         action={
-                            <StageCardActions
+                            <CardFilterActions
                                 accent="emerald"
-                                styleValue={stageStyleFilters.bundle}
-                                styleOptions={bundleStyleOptions}
-                                onStyleChange={(v) => setStageStyleFilter('bundle', v)}
+                                filterCategory={globalFilterCat}
+                                filterValue={globalFilterVal}
+                                onFilterChange={handleGlobalFilterChange}
+                                woOptions={globalWoOptions}
+                                styleOptions={globalStyleOptions}
+                                buyerOptions={globalBuyerOptions}
                                 scanButton={
                                     <ScanningButton
                                         accent="emerald"
@@ -2388,15 +2649,16 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             >
                 <WireTable
                     columns={[
-                        COL_WAKTU_SCAN,
                         COL_RFID,
+                        COL_QTY,
                         COL_WO,
                         COL_STYLE,
-                        ...GARMENT_TAIL_COLUMNS,
-                        COL_QTY,
+                        COL_BUYER,
+                        COL_WAKTU_SCAN,
+                        COL_STATUS,
                     ]}
                     rows={filteredBundleRows}
-                    emptyText={cuttingTableEmptyText(searchQuery, stageStyleFilters.bundle, trackingLoadFailed)}
+                    emptyText={cuttingTableEmptyText(searchQuery, globalFilterVal, trackingLoadFailed)}
                     onRowClick={(row) => openDetailFromRow('Bundle', row)}
                 />
             </ChartCard>
@@ -2405,14 +2667,42 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 title={
                     <CuttingStageHeader
                         title="Quality Control"
-                        count={filteredQcRows.length}
-                        countClassName="bg-sky-600"
+                        count={
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="inline-flex min-h-[1.85rem] min-w-[2.5rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-sky-50 text-sky-700" title="Qty Data">
+                                    {filteredQcRows.length}
+                                </span>
+                                <span className="inline-flex min-h-[1.85rem] min-w-[2.5rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-emerald-50 text-emerald-700" title="Qty Good">
+                                    {qcTotals.good}
+                                </span>
+                                <span className="inline-flex min-h-[1.85rem] min-w-[2.5rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-amber-50 text-amber-700" title="Qty Repair">
+                                    {qcTotals.repair}
+                                </span>
+                                <span className="inline-flex min-h-[1.85rem] min-w-[2.5rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-rose-50 text-rose-700" title="Qty Reject">
+                                    {qcTotals.reject}
+                                </span>
+                                {!useTrackingData && (
+                                    <>
+                                        <span className="inline-flex min-h-[1.85rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-sky-50 text-sky-700 border border-sky-100" title="Total IN">
+                                            IN {qcInOut.in}
+                                        </span>
+                                        <span className="inline-flex min-h-[1.85rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-amber-50 text-amber-700 border border-amber-100" title="Total OUT">
+                                            OUT {qcInOut.out}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                        }
+                        countClassName="bg-sky-50 text-sky-700"
                         action={
-                            <StageCardActions
+                            <CardFilterActions
                                 accent="sky"
-                                styleValue={stageStyleFilters.qc}
-                                styleOptions={qcStyleOptions}
-                                onStyleChange={(v) => setStageStyleFilter('qc', v)}
+                                filterCategory={globalFilterCat}
+                                filterValue={globalFilterVal}
+                                onFilterChange={handleGlobalFilterChange}
+                                woOptions={globalWoOptions}
+                                styleOptions={globalStyleOptions}
+                                buyerOptions={globalBuyerOptions}
                                 scanButton={<ScanningButton accent="sky" onClick={() => setScanningModal('qc')} />}
                             />
                         }
@@ -2426,18 +2716,19 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             >
                 <WireTable
                     columns={[
-                        COL_WAKTU_SCAN,
                         COL_RFID,
-                        COL_WO,
-                        COL_STYLE,
                         COL_QTY,
                         { key: 'good', label: 'Good', emphasis: 'good', className: 'text-right' },
                         { key: 'repair', label: 'Repair', emphasis: 'repair', className: 'text-right' },
                         { key: 'reject', label: 'Reject', emphasis: 'reject', className: 'text-right' },
-                        ...GARMENT_TAIL_COLUMNS,
+                        COL_WO,
+                        COL_STYLE,
+                        COL_BUYER,
+                        COL_WAKTU_SCAN,
+                        COL_STATUS,
                     ]}
                     rows={filteredQcRows}
-                    emptyText={cuttingTableEmptyText(searchQuery, stageStyleFilters.qc, trackingLoadFailed)}
+                    emptyText={cuttingTableEmptyText(searchQuery, globalFilterVal, trackingLoadFailed)}
                     onRowClick={(row) => openDetailFromRow('Quality Control', row)}
                 />
             </ChartCard>
@@ -2446,15 +2737,36 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 title={
                     <CuttingStageHeader
                         title="Supermarket"
-                        count={filteredStoreRows.length}
-                        countClassName="bg-amber-600"
+                        count={
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="inline-flex min-h-[1.85rem] min-w-[2.5rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-amber-50 text-amber-700" title="Qty Data">
+                                    {filteredStoreRows.length}
+                                </span>
+                                {!useTrackingData && (
+                                    <>
+                                        <span className="inline-flex min-h-[1.85rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-sky-50 text-sky-700 border border-sky-100" title="Total IN">
+                                            IN {storeInOut.in}
+                                        </span>
+                                        <span className="inline-flex min-h-[1.85rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-amber-50 text-amber-700 border border-amber-100" title="Total OUT">
+                                            OUT {storeInOut.out}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                        }
+                        countClassName="bg-amber-50 text-amber-700"
                         action={
-                            <StageCardActions
+                            <CardFilterActions
                                 accent="amber"
-                                styleValue={stageStyleFilters.store}
-                                styleOptions={storeStyleOptions}
-                                onStyleChange={(v) => setStageStyleFilter('store', v)}
-                                scanButton={<ScanningButton accent="amber" onClick={() => setScanningModal('store')} />}
+                                filterCategory={globalFilterCat}
+                                filterValue={globalFilterVal}
+                                onFilterChange={handleGlobalFilterChange}
+                                woOptions={globalWoOptions}
+                                styleOptions={globalStyleOptions}
+                                buyerOptions={globalBuyerOptions}
+                                scanButton={
+                                    <ScanningButton accent="amber" onClick={() => setScanningModal('store')} />
+                                }
                             />
                         }
                     />
@@ -2467,17 +2779,18 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             >
                 <WireTable
                     columns={[
-                        COL_WAKTU_SCAN,
                         COL_RFID,
+                        COL_QTY,
                         COL_WO,
                         COL_STYLE,
+                        COL_BUYER,
                         { key: 'lokasi', label: 'Lokasi', emphasis: 'accent' },
-                        ...GARMENT_TAIL_COLUMNS,
-                        COL_QTY,
                         { key: 'line', label: 'Line', emphasis: 'accent' },
+                        COL_WAKTU_SCAN,
+                        COL_STATUS,
                     ]}
                     rows={filteredStoreRows}
-                    emptyText={cuttingTableEmptyText(searchQuery, stageStyleFilters.store, trackingLoadFailed)}
+                    emptyText={cuttingTableEmptyText(searchQuery, globalFilterVal, trackingLoadFailed)}
                     onRowClick={(row) => openDetailFromRow('Supermarket', row)}
                 />
             </ChartCard>
@@ -2486,16 +2799,37 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 title={
                     <CuttingStageHeader
                         title="Terima Sewing"
-                        count={filteredSupplyRows.length}
-                        countClassName="bg-violet-600"
+                        count={
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="inline-flex min-h-[1.85rem] min-w-[2.5rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-violet-50 text-violet-700" title="Qty Data">
+                                    {filteredSupplyRows.length}
+                                </span>
+                                {!useTrackingData && (
+                                    <>
+                                        <span className="inline-flex min-h-[1.85rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-sky-50 text-sky-700 border border-sky-100" title="Total IN">
+                                            IN {supplyInOut.in}
+                                        </span>
+                                        <span className="inline-flex min-h-[1.85rem] shrink-0 items-center justify-center rounded px-3 font-extrabold tabular-nums leading-none shadow-sm bg-amber-50 text-amber-700 border border-amber-100" title="Total OUT">
+                                            OUT {supplyInOut.out}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                        }
+                        countClassName="bg-violet-50 text-violet-700"
                         action={
                             isSupplySewingEnabled ? (
-                                <StageCardActions
+                                <CardFilterActions
                                     accent="violet"
-                                    styleValue={stageStyleFilters.supply}
-                                    styleOptions={supplyStyleOptions}
-                                    onStyleChange={(v) => setStageStyleFilter('supply', v)}
-                                    scanButton={<ScanningButton accent="violet" onClick={() => setScanningModal('supply')} />}
+                                    filterCategory={globalFilterCat}
+                                    filterValue={globalFilterVal}
+                                    onFilterChange={handleGlobalFilterChange}
+                                    woOptions={globalWoOptions}
+                                    styleOptions={globalStyleOptions}
+                                    buyerOptions={globalBuyerOptions}
+                                    scanButton={
+                                        <ScanningButton accent="violet" onClick={() => setScanningModal('supply')} />
+                                    }
                                 />
                             ) : (
                                 <span className="text-[9px] px-2 py-1 rounded-md border border-slate-300 text-slate-500 bg-slate-100/90 font-semibold">
@@ -2520,31 +2854,20 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 )}
                 <WireTable
                     columns={[
-                        COL_WAKTU_SCAN,
                         COL_RFID,
+                        COL_QTY,
                         COL_WO,
                         COL_STYLE,
-                        COL_QTY,
+                        COL_BUYER,
                         { key: 'line', label: 'Line', emphasis: 'accent' },
                         { key: 'gm', label: 'Location', emphasis: 'accent' },
+                        COL_WAKTU_SCAN,
+                        COL_STATUS,
                     ]}
                     rows={filteredSupplyRows}
-                    emptyText={cuttingTableEmptyText(searchQuery, stageStyleFilters.supply, trackingLoadFailed)}
+                    emptyText={cuttingTableEmptyText(searchQuery, globalFilterVal, trackingLoadFailed)}
                     onRowClick={isSupplySewingEnabled ? (row) => openDetailFromRow('Terima Sewing', row) : undefined}
                 />
-                <div className="px-1.5 py-0.5 border-t border-gray-50 shrink-0 flex justify-end bg-white/90">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            void scanQuery.refetch();
-                            invalidate();
-                        }}
-                        className="text-[9px] text-slate-500 hover:text-violet-700 shrink-0 px-1.5 py-0.5 rounded-md hover:bg-violet-50 transition-colors"
-                        title="Refresh data"
-                    >
-                        ↻ Refresh
-                    </button>
-                </div>
             </ChartCard>
             </div>
 
