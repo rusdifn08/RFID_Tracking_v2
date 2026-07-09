@@ -1,9 +1,14 @@
 import { memo, useMemo, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSidebar } from '../context/SidebarContext';
-import { Home, LogOut } from 'lucide-react';
+import { Home, LogOut, Activity, Scissors, CheckCircle, List, MapPin, Target, LayoutDashboard, Briefcase, Server, PackageOpen, Shirt } from 'lucide-react';
 import headerIcon from '../assets/header.svg';
 import rfidIcon from '../assets/rfid.webp';
+import needleIcon from '../assets/needle.webp';
+import batchIcon from '../assets/batch.webp';
+import machineIcon from '../assets/machine.webp';
+import shipmentIcon from '../assets/shipment.webp';
+import prendiIcon from '../assets/report_detail.webp';
 import { logoutUser } from '../config/api';
 import { preloadLineDetail } from '../utils/preload';
 
@@ -57,20 +62,131 @@ const Sidebar = memo(() => {
     }, [location.pathname]);
 
     // Deteksi halaman aktif - dioptimasi dengan useMemo
-    const isRFIDPage = useMemo(() => 
-        location.pathname.startsWith('/rfid-tracking') ||
-        location.pathname.startsWith('/monitoring-rfid') ||
-        location.pathname.startsWith('/line/') ||
-        location.pathname.startsWith('/dashboard-rfid/') ||
-        location.pathname.startsWith('/daftar-rfid') ||
-        location.pathname.startsWith('/data-rfid') ||
-        location.pathname.startsWith('/list-rfid'),
-        [location.pathname]
-    );
+    // Deteksi halaman aktif - dioptimasi dengan useMemo
+    const isRFIDPage = useMemo(() => {
+        const p = location.pathname;
+        return p.startsWith('/rfid-tracking') ||
+               p.startsWith('/monitoring-rfid') ||
+               p.startsWith('/line/') ||
+               p.startsWith('/dashboard-rfid/') ||
+               p.startsWith('/daftar-rfid') ||
+               p.startsWith('/data-rfid') ||
+               p.startsWith('/list-rfid') ||
+               p.startsWith('/cutting') ||
+               p.startsWith('/dashboard-cutting') ||
+               p.startsWith('/dashboard-supply-sewing-cutting') ||
+               p.startsWith('/dashboard-bundle-cutting') ||
+               p.startsWith('/finishing') ||
+               p.startsWith('/dashboard-rfid-finishing') ||
+               p.startsWith('/dashboard-detail-finishing') ||
+               p.startsWith('/reject-room') ||
+               p.startsWith('/dashboard-rfid-reject') ||
+               p.startsWith('/list-rfid-reject') ||
+               p.startsWith('/dashboard-dryroom') ||
+               p.startsWith('/dashboard-folding') ||
+               p.startsWith('/batch-system') ||
+               p.startsWith('/all-production-line-dashboard') ||
+               p.startsWith('/production-tracking-time') ||
+               p.startsWith('/form-data');
+    }, [location.pathname]);
 
     const isLinePage = useMemo(() => currentLineId !== null, [currentLineId]);
     const isRFIDTrackingPage = useMemo(() => location.pathname === '/rfid-tracking', [location.pathname]);
     const isProductionLinesPage = useMemo(() => location.pathname === '/monitoring-rfid', [location.pathname]);
+
+    const isSewingPage = useMemo(() => {
+        const p = location.pathname;
+        return p.startsWith('/sewing') ||
+               p.startsWith('/dashboard-sewing-line');
+    }, [location.pathname]);
+
+    const sidebarSubNav = useMemo(() => {
+        const p = location.pathname;
+        const items = [];
+        if (!isRFIDPage || p === '/rfid-tracking') return items;
+
+        if (p.startsWith('/cutting') || p.startsWith('/dashboard-cutting') || p.startsWith('/dashboard-supply-sewing-cutting') || p.startsWith('/dashboard-bundle-cutting')) {
+            items.push({ label: 'Cutting Proses', to: '/cutting', icon: <Scissors size={15} /> });
+        } else if (p.startsWith('/finishing') || p.startsWith('/dashboard-rfid-finishing') || p.startsWith('/dashboard-detail-finishing')) {
+            items.push({ label: 'Finishing Proses', to: '/finishing', icon: <CheckCircle size={15} /> });
+        } else if (p.startsWith('/reject-room') || p.startsWith('/dashboard-rfid-reject') || p.startsWith('/list-rfid-reject')) {
+            items.push({ label: 'Reject Proses', to: '/reject-room', icon: <Target size={15} /> });
+        } else if (p.startsWith('/batch-system')) {
+            items.push({ label: 'Batch System', to: '/batch-system', icon: <Server size={15} /> });
+        } else if (p.startsWith('/form-data')) {
+            items.push({ label: 'Form Report', to: '/form-data', icon: <Briefcase size={15} /> });
+        } else if (p.startsWith('/production-tracking-time')) {
+            items.push({ label: 'Tracking Time', to: '/production-tracking-time', icon: <Activity size={15} /> });
+        } else if (p.startsWith('/monitoring-rfid') || p.startsWith('/line/') || p.startsWith('/dashboard-rfid/') || p.startsWith('/daftar-rfid') || p.startsWith('/data-rfid') || p.startsWith('/list-rfid')) {
+            items.push({ label: 'Production Lines', to: '/monitoring-rfid', icon: <LayoutDashboard size={15} /> });
+            if (currentLineId) {
+                items.push({ label: `Line ${currentLineId}`, to: `/line/${currentLineId}`, icon: <MapPin size={15} /> });
+                if (p.startsWith('/dashboard-rfid/')) {
+                    items.push({ label: 'Dashboard RFID', to: p, icon: <LayoutDashboard size={14} /> });
+                } else if (p.startsWith('/daftar-rfid')) {
+                    items.push({ label: 'Daftar RFID', to: p, icon: <PackageOpen size={14} /> });
+                } else if (p.startsWith('/list-rfid')) {
+                    items.push({ label: 'List RFID', to: p, icon: <List size={14} /> });
+                }
+            }
+        }
+        
+        return items;
+    }, [location.pathname, isRFIDPage, currentLineId]);
+
+    const sewingSubNav = useMemo(() => {
+        const p = location.pathname;
+        const items = [];
+        if (!isSewingPage) return items;
+        if (p.startsWith('/sewing') || p.startsWith('/dashboard-sewing-line')) {
+            if (p.match(/\/dashboard-sewing-line\/(\d+)/)) {
+                const m = p.match(/\/dashboard-sewing-line\/(\d+)/);
+                if (m) {
+                    items.push({ label: `Sewing Line ${m[1]}`, to: `/sewing/line/${m[1]}`, icon: <MapPin size={15} /> });
+                    items.push({ label: `Dashboard`, to: p, icon: <LayoutDashboard size={14} /> });
+                }
+            } else if (p.match(/\/sewing\/line\/(\d+)/)) {
+                const m = p.match(/\/sewing\/line\/(\d+)/);
+                if (m) items.push({ label: `Sewing Line ${m[1]}`, to: p, icon: <MapPin size={15} /> });
+            } else if (p.startsWith('/sewing/all')) {
+                items.push({ label: 'All Sewing Line', to: '/sewing/all', icon: <List size={15} /> });
+            }
+        }
+        return items;
+    }, [location.pathname, isSewingPage]);
+
+    const showNeedleManager = useMemo(() => location.pathname.startsWith('/needle-manager'), [location.pathname]);
+
+    const needleSubNav = useMemo(() => {
+        const p = location.pathname;
+        const items = [];
+        if (!showNeedleManager) return items;
+
+        if (p === '/needle-manager/monitoring') {
+            items.push({ label: 'Monitoring Needle', to: '/needle-manager/monitoring', icon: <Activity size={15} /> });
+        } else if (p === '/needle-manager/mesin-kolam') {
+            items.push({ label: 'Dashboard Mesin Kolam', to: '/needle-manager/mesin-kolam', icon: <LayoutDashboard size={15} /> });
+        }
+        return items;
+    }, [location.pathname, showNeedleManager]);
+
+    const showShipment = useMemo(() => location.pathname.startsWith('/monitoring-shipment'), [location.pathname]);
+    
+    const shipmentSubNav = useMemo(() => {
+        const p = location.pathname;
+        const items = [];
+        if (!showShipment) return items;
+
+        if (p.startsWith('/monitoring-shipment/gm1')) {
+            items.push({ label: 'Monitoring Shipment GM 1', to: '/monitoring-shipment/gm1', icon: <Activity size={15} /> });
+        } else if (p.startsWith('/monitoring-shipment/gm2')) {
+            items.push({ label: 'Monitoring Shipment GM 2', to: '/monitoring-shipment/gm2', icon: <Activity size={15} /> });
+        }
+        return items;
+    }, [location.pathname, showShipment]);
+
+    const showMachine = useMemo(() => location.pathname.startsWith('/monitoring-machine'), [location.pathname]);
+    const showVibePrendi = useMemo(() => location.pathname.startsWith('/vibe-prendi'), [location.pathname]);
 
     // Dapatkan data line berdasarkan ID - dioptimasi dengan useMemo
     const currentLineData = useMemo(() => 
@@ -219,9 +335,90 @@ const Sidebar = memo(() => {
                         </div>
                     </Link>
 
+                    {/* SEWING - dengan breadcrumb navigation */}
+                    {isSewingPage && (
+                        <div className="space-y-1">
+                            {/* SEWING Parent Menu - Link biasa */}
+                        <Link
+                            to="/sewing"
+                            className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 font-medium text-sm overflow-hidden min-h-[44px] ${isSewingPage
+                                ? 'bg-white/25 shadow-xl shadow-white/20 border-l-4 border-yellow-400'
+                                : 'hover:bg-white/15 hover:shadow-lg hover:shadow-white/10 border-l-4 border-transparent hover:border-yellow-400/50'
+                                }`}
+                            style={{ 
+                                color: isSewingPage ? '#f7f9fa' : '#e6f2ff' 
+                            }}
+                        >
+                            {/* Active indicator dengan glow */}
+                            {isSewingPage && isOpen && (
+                                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-400 rounded-r-full shadow-lg shadow-yellow-400/70 animate-pulse"></div>
+                            )}
+
+                            {/* Hover effect background dengan gradient */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+
+                            {/* Container untuk icon dan text - icon di kiri */}
+                            <div className={`relative z-10 flex items-center ${isOpen ? 'gap-2 flex-1' : 'justify-center'}`}>
+                                {/* Icon dengan glow effect - di kiri */}
+                                <div className={`transform transition-all duration-500 ease-in-out flex-shrink-0 flex items-center justify-center ${!isOpen ? 'scale-110' : ''}`}>
+                                    <div 
+                                        className="w-[18px] h-[18px] transition-all duration-500 ease-in-out drop-shadow-lg"
+                                        style={{
+                                            maskImage: `url(${batchIcon})`,
+                                            WebkitMaskImage: `url(${batchIcon})`,
+                                            maskSize: 'contain',
+                                            WebkitMaskSize: 'contain',
+                                            maskRepeat: 'no-repeat',
+                                            WebkitMaskRepeat: 'no-repeat',
+                                            maskPosition: 'center',
+                                            WebkitMaskPosition: 'center',
+                                            background: isSewingPage ? '#f7f9fa' : '#e6f2ff',
+                                        }}
+                                    />
+                                </div>
+
+                                {/* Text - lebih kecil */}
+                                {isOpen && (
+                                    <span className="transition-all duration-300 font-semibold tracking-wide flex-1 text-left text-sm">{'SEWING'}</span>
+                                )}
+                            </div>
+                        </Link>
+
+                        {/* Breadcrumb Navigation - Muncul berdasarkan halaman aktif */}
+                        {isSewingPage && sewingSubNav.length > 0 && (
+                            <div className={`mt-2 flex flex-col gap-1 ${isOpen ? 'ml-3' : 'items-center'}`}>
+
+                                {sewingSubNav.map((item, idx) => {
+                                    const isSubActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+                                    return (
+                                        <Link
+                                            key={idx}
+                                            to={item.to}
+                                            className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center w-10'} py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] ${isSubActive
+                                                ? 'bg-white/20 shadow-lg shadow-white/10 border-l-2 border-yellow-400/70'
+                                                : 'hover:bg-white/10 border-l-2 border-transparent hover:border-yellow-400/50'
+                                                }`}
+                                            style={{ color: isSubActive ? '#f7f9fa' : '#e6f2ff' }}
+                                            title={item.label}
+                                        >
+                                            <div className={`flex-shrink-0 ${isSubActive ? 'opacity-100 text-yellow-400' : 'opacity-70 group-hover:opacity-100'}`}>
+                                                {item.icon}
+                                            </div>
+                                            {isOpen && (
+                                                <span className="font-medium tracking-wide text-left">{item.label}</span>
+                                            )}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                    )}
+
                     {/* RFID - dengan breadcrumb navigation */}
-                    <div className="space-y-1">
-                        {/* RFID Parent Menu - Link biasa */}
+                    {isRFIDPage && (
+                        <div className="space-y-1">
+                            {/* RFID Parent Menu - Link biasa */}
                         <Link
                             to="/rfid-tracking"
                             className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 font-medium text-sm overflow-hidden min-h-[44px] ${isRFIDPage
@@ -243,10 +440,7 @@ const Sidebar = memo(() => {
                             {/* Container untuk icon dan text - icon di kiri */}
                             <div className={`relative z-10 flex items-center ${isOpen ? 'gap-2 flex-1' : 'justify-center'}`}>
                                 {/* Icon dengan glow effect - di kiri */}
-                                <div className={`transform transition-all duration-500 ease-in-out flex-shrink-0 ${!isOpen
-                                    ? 'scale-110'
-                                    : ''
-                                    }`}>
+                                <div className={`transform transition-all duration-500 ease-in-out flex-shrink-0 flex items-center justify-center ${!isOpen ? 'scale-110' : ''}`}>
                                     <div 
                                         className="w-[18px] h-[18px] transition-all duration-500 ease-in-out drop-shadow-lg"
                                         style={{
@@ -270,175 +464,269 @@ const Sidebar = memo(() => {
                             </div>
                         </Link>
 
-                        {/* Breadcrumb Navigation - Muncul berdasarkan halaman aktif */}
-                        {isOpen && isRFIDPage && (
-                            <div className="ml-3 space-y-0.5">
-                                {/* RFID Tracking - Muncul jika di halaman rfid-tracking */}
-                                {isRFIDTrackingPage && (
-                                    <div className="px-3 py-1.5 font-medium text-xs border-l-2 border-white/30"
-                                        style={{ color: '#e6f2ff' }}
-                                    >
-                                        RFID Tracking
-                                    </div>
-                                )}
+                        {/* Breadcrumb Navigation - Muncul berdasarkan halaman aktif (BISA DILIHAT SAAT COLLAPSED) */}
+                        {isRFIDPage && sidebarSubNav.length > 0 && (
+                            <div className={`mt-2 flex flex-col gap-1 ${isOpen ? 'ml-3' : 'items-center'}`}>
 
-                                {/* Production Lines - Muncul jika di halaman monitoring-rfid atau lebih dalam */}
-                                {isProductionLinesPage && (
-                                    <div className="ml-3 space-y-0.5">
+                                {sidebarSubNav.map((item, idx) => {
+                                    const isSubActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+                                    return (
                                         <Link
-                                            to="/rfid-tracking"
-                                            className="group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full hover:bg-white/8 border-l-2 border-transparent hover:border-yellow-400/40"
-                                            style={{ color: '#e6f2ff' }}
-                                            onMouseEnter={(e) => e.currentTarget.style.color = '#f7f9fa'}
-                                            onMouseLeave={(e) => e.currentTarget.style.color = '#e6f2ff'}
-                                        >
-                                            <span className="font-medium tracking-wide text-left">RFID Tracking</span>
-                                        </Link>
-                                        <div className="px-3 py-1.5 font-medium text-xs border-l-2 border-white/30"
-                                            style={{ color: '#e6f2ff' }}
-                                        >
-                                            Production Lines
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Line Detail - Muncul jika di halaman line atau lebih dalam (untuk semua line) */}
-                                {isLinePage && currentLineData && (
-                                    <div className="ml-3 space-y-0.5"
-                                        
-                                    >
-                                        {/* Link ke RFID Tracking */}
-                                        <Link
-                                            to="/rfid-tracking"
-                                            className="group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full hover:bg-white/8 border-l-2 border-transparent hover:border-yellow-400/40"
-                                            style={{ color: '#e6f2ff' }}
-                                            onMouseEnter={(e) => e.currentTarget.style.color = '#f7f9fa'}
-                                            onMouseLeave={(e) => e.currentTarget.style.color = '#e6f2ff'}
-                                        >
-                                            <span className="font-medium tracking-wide text-left">RFID Tracking</span>
-                                        </Link>
-                                        {/* Link ke Production Lines jika belum di halaman tersebut */}
-                                        {!isProductionLinesPage && (
-                                            <Link
-                                                to="/monitoring-rfid"
-                                                className="group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full hover:bg-white/8 border-l-2 border-transparent hover:border-yellow-400/40"
-                                                style={{ color: '#e6f2ff' }}
-                                                onMouseEnter={(e) => e.currentTarget.style.color = '#f7f9fa'}
-                                                onMouseLeave={(e) => e.currentTarget.style.color = '#e6f2ff'}
-                                            >
-                                                <span className="font-medium tracking-wide text-left">Production Lines</span>
-                                            </Link>
-                                        )}
-
-                                        {/* Current Line */}
-                                        <Link
-                                            to={`/line/${currentLineId}`}
-                                            className={`group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 text-[10px] overflow-hidden min-h-[32px] w-full ${location.pathname === `/line/${currentLineId}`
+                                            key={idx}
+                                            to={item.to}
+                                            className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center w-10'} py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] ${isSubActive
                                                 ? 'bg-white/20 shadow-lg shadow-white/10 border-l-2 border-yellow-400/70'
                                                 : 'hover:bg-white/10 border-l-2 border-transparent hover:border-yellow-400/50'
                                                 }`}
-                                            style={{ 
-                                                color: location.pathname === `/line/${currentLineId}` ? '#f7f9fa' : '#e6f2ff',
-                                                fontFamily: 'Poppins, sans-serif',
-                                                fontWeight: 'bold'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                preloadLineDetail();
-                                                if (location.pathname !== `/line/${currentLineId}`) {
-                                                    e.currentTarget.style.color = '#f7f9fa';
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                if (location.pathname !== `/line/${currentLineId}`) {
-                                                    e.currentTarget.style.color = '#e6f2ff';
-                                                }
-                                            }}
+                                            style={{ color: isSubActive ? '#f7f9fa' : '#e6f2ff' }}
+                                            title={item.label}
                                         >
-                                            <span className="tracking-wide text-left" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>{currentLineData.title}</span>
-                                        </Link>
-
-                                        {/* Submenu - Muncul jika di halaman detail line atau dashboard/daftar/list */}
-                                        {(location.pathname === `/line/${currentLineId}` ||
-                                            location.pathname === `/dashboard-rfid/${currentLineId}` ||
-                                            (location.pathname === '/daftar-rfid' && currentLineId === '1') ||
-                                            (location.pathname === '/data-rfid' && currentLineId === '1') ||
-                                            (location.pathname === '/list-rfid' && currentLineId === '1')) && (
-                                                <div className="ml-3 space-y-0.5">
-                                                    {/* DAFTAR RFID - hanya untuk line 1 */}
-                                                    {currentLineId === '1' && (
-                                                        <Link
-                                                            to="/daftar-rfid"
-                                                            className={`group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full ${location.pathname === '/daftar-rfid'
-                                                                ? 'bg-white/15 shadow-md border-l-2 border-purple-400'
-                                                                : 'hover:bg-white/8 border-l-2 border-transparent hover:border-purple-400/40'
-                                                                }`}
-                                                            style={{ color: location.pathname === '/daftar-rfid' ? '#f7f9fa' : '#e6f2ff' }}
-                                                            onMouseEnter={(e) => {
-                                                                if (location.pathname !== '/daftar-rfid') {
-                                                                    e.currentTarget.style.color = '#f7f9fa';
-                                                                }
-                                                            }}
-                                                            onMouseLeave={(e) => {
-                                                                if (location.pathname !== '/daftar-rfid') {
-                                                                    e.currentTarget.style.color = '#e6f2ff';
-                                                                }
-                                                            }}
-                                                        >
-                                                            <span className="font-medium tracking-wide text-left">DAFTAR RFID</span>
-                                                        </Link>
-                                                    )}
-
-                                                    {/* DASHBOARD RFID - untuk semua line */}
-                                                    <Link
-                                                        to={`/dashboard-rfid/${currentLineId}`}
-                                                        className={`group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full ${location.pathname === `/dashboard-rfid/${currentLineId}`
-                                                            ? 'bg-white/15 shadow-md border-l-2 border-pink-400'
-                                                            : 'hover:bg-white/8 border-l-2 border-transparent hover:border-pink-400/40'
-                                                            }`}
-                                                        style={{ color: location.pathname === `/dashboard-rfid/${currentLineId}` ? '#f7f9fa' : '#e6f2ff' }}
-                                                        onMouseEnter={(e) => {
-                                                            if (location.pathname !== `/dashboard-rfid/${currentLineId}`) {
-                                                                e.currentTarget.style.color = '#f7f9fa';
-                                                            }
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            if (location.pathname !== `/dashboard-rfid/${currentLineId}`) {
-                                                                e.currentTarget.style.color = '#e6f2ff';
-                                                            }
-                                                        }}
-                                                    >
-                                                        <span className="font-medium tracking-wide text-left">DASHBOARD RFID</span>
-                                                    </Link>
-
-                                                    {/* LIST RFID - untuk semua line */}
-                                                    <Link
-                                                        to={`/list-rfid/${currentLineId}`}
-                                                        className={`group relative flex items-center justify-start gap-2 px-3 py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] w-full ${location.pathname === `/list-rfid/${currentLineId}` || location.pathname.startsWith('/list-rfid')
-                                                            ? 'bg-white/15 shadow-md border-l-2 border-orange-400'
-                                                            : 'hover:bg-white/8 border-l-2 border-transparent hover:border-orange-400/40'
-                                                            }`}
-                                                        style={{ color: (location.pathname === `/list-rfid/${currentLineId}` || location.pathname.startsWith('/list-rfid')) ? '#f7f9fa' : '#e6f2ff' }}
-                                                        onMouseEnter={(e) => {
-                                                            if (location.pathname !== `/list-rfid/${currentLineId}` && !location.pathname.startsWith('/list-rfid')) {
-                                                                e.currentTarget.style.color = '#f7f9fa';
-                                                            }
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            if (location.pathname !== `/list-rfid/${currentLineId}` && !location.pathname.startsWith('/list-rfid')) {
-                                                                e.currentTarget.style.color = '#e6f2ff';
-                                                            }
-                                                        }}
-                                                    >
-                                                        <span className="font-medium tracking-wide text-left">LIST RFID</span>
-                                                    </Link>
-                                                </div>
+                                            <div className={`flex-shrink-0 ${isSubActive ? 'opacity-100 text-yellow-400' : 'opacity-70 group-hover:opacity-100'}`}>
+                                                {item.icon}
+                                            </div>
+                                            {isOpen && (
+                                                <span className="font-medium tracking-wide text-left">{item.label}</span>
                                             )}
-                                    </div>
-                                )}
+                                        </Link>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
+                    )}
 
+                    {/* NEEDLE MANAGER - dengan breadcrumb navigation */}
+                    {showNeedleManager && (
+                        <div className="space-y-1">
+                            {/* Needle Manager Parent Menu */}
+                            <Link
+                                to="/needle-manager"
+                                className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 font-medium text-sm overflow-hidden min-h-[44px] ${showNeedleManager
+                                    ? 'bg-white/25 shadow-xl shadow-white/20 border-l-4 border-yellow-400'
+                                    : 'hover:bg-white/15 hover:shadow-lg hover:shadow-white/10 border-l-4 border-transparent hover:border-yellow-400/50'
+                                    }`}
+                                style={{ 
+                                    color: showNeedleManager ? '#f7f9fa' : '#e6f2ff' 
+                                }}
+                            >
+                                {/* Active indicator dengan glow */}
+                                {showNeedleManager && isOpen && (
+                                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-400 rounded-r-full shadow-lg shadow-yellow-400/70 animate-pulse"></div>
+                                )}
+
+                                {/* Hover effect background dengan gradient */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+
+                                {/* Container untuk icon dan text - icon di kiri */}
+                                <div className={`relative z-10 flex items-center ${isOpen ? 'gap-2 flex-1' : 'justify-center'}`}>
+                                    {/* Icon dengan glow effect - di kiri */}
+                                    <div className={`transform transition-all duration-500 ease-in-out flex-shrink-0 flex items-center justify-center ${!isOpen ? 'scale-110' : ''}`}>
+                                        <div 
+                                            className="w-[18px] h-[18px] transition-all duration-500 ease-in-out drop-shadow-lg"
+                                            style={{
+                                                maskImage: `url(${needleIcon})`,
+                                                WebkitMaskImage: `url(${needleIcon})`,
+                                                maskSize: 'contain',
+                                                WebkitMaskSize: 'contain',
+                                                maskRepeat: 'no-repeat',
+                                                WebkitMaskRepeat: 'no-repeat',
+                                                maskPosition: 'center',
+                                                WebkitMaskPosition: 'center',
+                                                background: showNeedleManager ? '#f7f9fa' : '#e6f2ff',
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Text */}
+                                    {isOpen && (
+                                        <span className="transition-all duration-300 font-semibold tracking-wide flex-1 text-left text-sm">NEEDLE</span>
+                                    )}
+                                </div>
+                            </Link>
+
+                            {/* Breadcrumb Navigation - Muncul berdasarkan halaman aktif */}
+                            {showNeedleManager && needleSubNav.length > 0 && (
+                                <div className={`mt-2 flex flex-col gap-1 ${isOpen ? 'ml-3' : 'items-center'}`}>
+                                    {needleSubNav.map((item, idx) => {
+                                        const isSubActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+                                        return (
+                                            <Link
+                                                key={idx}
+                                                to={item.to}
+                                                className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center w-10'} py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] ${isSubActive
+                                                    ? 'bg-white/20 shadow-lg shadow-white/10 border-l-2 border-yellow-400/70'
+                                                    : 'hover:bg-white/10 border-l-2 border-transparent hover:border-yellow-400/50'
+                                                    }`}
+                                                style={{ color: isSubActive ? '#f7f9fa' : '#e6f2ff' }}
+                                                title={item.label}
+                                            >
+                                                <div className={`flex-shrink-0 ${isSubActive ? 'opacity-100 text-yellow-400' : 'opacity-70 group-hover:opacity-100'}`}>
+                                                    {item.icon}
+                                                </div>
+                                                {isOpen && (
+                                                    <span className="font-medium tracking-wide text-left">{item.label}</span>
+                                                )}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* SHIPMENT */}
+                    {showShipment && (
+                        <div className="space-y-1">
+                            <Link
+                                to="/monitoring-shipment"
+                                className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 font-medium text-sm overflow-hidden min-h-[44px] ${location.pathname.startsWith('/monitoring-shipment')
+                                    ? 'bg-white/25 shadow-xl shadow-white/20 border-l-4 border-yellow-400'
+                                    : 'hover:bg-white/15 hover:shadow-lg hover:shadow-white/10 border-l-4 border-transparent hover:border-yellow-400/50'
+                                    }`}
+                                style={{ 
+                                    color: location.pathname.startsWith('/monitoring-shipment') ? '#f7f9fa' : '#e6f2ff' 
+                                }}
+                            >
+                                {(location.pathname.startsWith('/monitoring-shipment')) && isOpen && (
+                                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-400 rounded-r-full shadow-lg shadow-yellow-400/70 animate-pulse"></div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                                <div className={`relative z-10 flex items-center ${isOpen ? 'gap-2 flex-1' : 'justify-center'}`}>
+                                    <div className={`transform transition-all duration-500 ease-in-out flex-shrink-0 flex items-center justify-center ${!isOpen ? 'scale-110' : ''}`}>
+                                        <div 
+                                            className="w-[18px] h-[18px] transition-all duration-500 ease-in-out drop-shadow-lg"
+                                            style={{
+                                                maskImage: `url(${shipmentIcon})`,
+                                                WebkitMaskImage: `url(${shipmentIcon})`,
+                                                maskSize: 'contain',
+                                                WebkitMaskSize: 'contain',
+                                                maskRepeat: 'no-repeat',
+                                                WebkitMaskRepeat: 'no-repeat',
+                                                maskPosition: 'center',
+                                                WebkitMaskPosition: 'center',
+                                                background: location.pathname.startsWith('/monitoring-shipment') ? '#f7f9fa' : '#e6f2ff',
+                                            }}
+                                        />
+                                    </div>
+                                    {isOpen && (
+                                        <span className="transition-all duration-300 font-semibold tracking-wide flex-1 text-left text-sm">{'SHIPMENT'}</span>
+                                    )}
+                                </div>
+                            </Link>
+
+                            {/* Breadcrumb Navigation - Muncul berdasarkan halaman aktif */}
+                            {showShipment && shipmentSubNav.length > 0 && (
+                                <div className={`mt-2 flex flex-col gap-1 ${isOpen ? 'ml-3' : 'items-center'}`}>
+                                    {shipmentSubNav.map((item, idx) => {
+                                        const isSubActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+                                        return (
+                                            <Link
+                                                key={idx}
+                                                to={item.to}
+                                                className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center w-10'} py-1.5 rounded-md transition-all duration-300 font-medium text-[10px] overflow-hidden min-h-[32px] ${isSubActive
+                                                    ? 'bg-white/20 shadow-lg shadow-white/10 border-l-2 border-yellow-400/70'
+                                                    : 'hover:bg-white/10 border-l-2 border-transparent hover:border-yellow-400/50'
+                                                    }`}
+                                                style={{ color: isSubActive ? '#f7f9fa' : '#e6f2ff' }}
+                                                title={item.label}
+                                            >
+                                                <div className={`flex-shrink-0 ${isSubActive ? 'opacity-100 text-yellow-400' : 'opacity-70 group-hover:opacity-100'}`}>
+                                                    {item.icon}
+                                                </div>
+                                                {isOpen && (
+                                                    <span className="font-medium tracking-wide text-left">{item.label}</span>
+                                                )}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* MACHINE */}
+                    {showMachine && (
+                        <div className="space-y-1">
+                            <Link
+                                to="/monitoring-machine"
+                                className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 font-medium text-sm overflow-hidden min-h-[44px] ${location.pathname.startsWith('/monitoring-machine')
+                                    ? 'bg-white/25 shadow-xl shadow-white/20 border-l-4 border-yellow-400'
+                                    : 'hover:bg-white/15 hover:shadow-lg hover:shadow-white/10 border-l-4 border-transparent hover:border-yellow-400/50'
+                                    }`}
+                                style={{ 
+                                    color: location.pathname.startsWith('/monitoring-machine') ? '#f7f9fa' : '#e6f2ff' 
+                                }}
+                            >
+                                {(location.pathname.startsWith('/monitoring-machine')) && isOpen && (
+                                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-400 rounded-r-full shadow-lg shadow-yellow-400/70 animate-pulse"></div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                                <div className={`relative z-10 flex items-center ${isOpen ? 'gap-2 flex-1' : 'justify-center'}`}>
+                                    <div className={`transform transition-all duration-500 ease-in-out flex-shrink-0 flex items-center justify-center ${!isOpen ? 'scale-110' : ''}`}>
+                                        <div 
+                                            className="w-[18px] h-[18px] transition-all duration-500 ease-in-out drop-shadow-lg"
+                                            style={{
+                                                maskImage: `url(${machineIcon})`,
+                                                WebkitMaskImage: `url(${machineIcon})`,
+                                                maskSize: 'contain',
+                                                WebkitMaskSize: 'contain',
+                                                maskRepeat: 'no-repeat',
+                                                WebkitMaskRepeat: 'no-repeat',
+                                                maskPosition: 'center',
+                                                WebkitMaskPosition: 'center',
+                                                background: location.pathname.startsWith('/monitoring-machine') ? '#f7f9fa' : '#e6f2ff',
+                                            }}
+                                        />
+                                    </div>
+                                    {isOpen && (
+                                        <span className="transition-all duration-300 font-semibold tracking-wide flex-1 text-left text-sm">{'MACHINE'}</span>
+                                    )}
+                                </div>
+                            </Link>
+                        </div>
+                    )}
+
+                    {/* VIBE PRENDI */}
+                    {showVibePrendi && (
+                        <div className="space-y-1">
+                            <Link
+                                to="/vibe-prendi"
+                                className={`group relative flex items-center ${isOpen ? 'justify-start gap-2 px-3' : 'justify-center px-0'} py-2.5 rounded-lg transition-all duration-300 font-medium text-sm overflow-hidden min-h-[44px] ${location.pathname.startsWith('/vibe-prendi')
+                                    ? 'bg-white/25 shadow-xl shadow-white/20 border-l-4 border-yellow-400'
+                                    : 'hover:bg-white/15 hover:shadow-lg hover:shadow-white/10 border-l-4 border-transparent hover:border-yellow-400/50'
+                                    }`}
+                                style={{ 
+                                    color: location.pathname.startsWith('/vibe-prendi') ? '#f7f9fa' : '#e6f2ff' 
+                                }}
+                            >
+                                {(location.pathname.startsWith('/vibe-prendi')) && isOpen && (
+                                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-yellow-400 rounded-r-full shadow-lg shadow-yellow-400/70 animate-pulse"></div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                                <div className={`relative z-10 flex items-center ${isOpen ? 'gap-2 flex-1' : 'justify-center'}`}>
+                                    <div className={`transform transition-all duration-500 ease-in-out flex-shrink-0 flex items-center justify-center ${!isOpen ? 'scale-110' : ''}`}>
+                                        <div 
+                                            className="w-[18px] h-[18px] transition-all duration-500 ease-in-out drop-shadow-lg"
+                                            style={{
+                                                maskImage: `url(${prendiIcon})`,
+                                                WebkitMaskImage: `url(${prendiIcon})`,
+                                                maskSize: 'contain',
+                                                WebkitMaskSize: 'contain',
+                                                maskRepeat: 'no-repeat',
+                                                WebkitMaskRepeat: 'no-repeat',
+                                                maskPosition: 'center',
+                                                WebkitMaskPosition: 'center',
+                                                background: location.pathname.startsWith('/vibe-prendi') ? '#f7f9fa' : '#e6f2ff',
+                                            }}
+                                        />
+                                    </div>
+                                    {isOpen && (
+                                        <span className="transition-all duration-300 font-semibold tracking-wide flex-1 text-left text-sm">{'REPORT DETAIL'}</span>
+                                    )}
+                                </div>
+                            </Link>
+                        </div>
+                    )}
                 </nav>
 
                 {/* Divider Line dengan efek */}

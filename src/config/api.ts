@@ -233,19 +233,20 @@ export interface SupervisorDataPayload {
     displayTitles?: Record<string, string>;
 }
 
-const supervisorDataCache: Partial<Record<BackendEnvironment, SupervisorDataPayload>> = {};
-const supervisorDataPromise: Partial<Record<BackendEnvironment, Promise<SupervisorDataPayload | null>>> = {};
+const supervisorDataCache: Partial<Record<string, SupervisorDataPayload>> = {};
+const supervisorDataPromise: Partial<Record<string, Promise<SupervisorDataPayload | null>>> = {};
 
 /**
  * Ambil supervisor data dari API. Satu request per environment; pemanggil berikutnya dapat cache/promise yang sama.
  * Panggil invalidateSupervisorDataCache(env) setelah POST update agar data segar.
  */
-export async function getSupervisorDataFromAPI(environment: BackendEnvironment): Promise<SupervisorDataPayload | null> {
-    if (supervisorDataCache[environment]) return supervisorDataCache[environment];
-    if (supervisorDataPromise[environment]) return supervisorDataPromise[environment]!;
+export async function getSupervisorDataFromAPI(environment: BackendEnvironment, pageType: 'sewing' | 'production' = 'production'): Promise<SupervisorDataPayload | null> {
+    const cacheKey = `${environment}_${pageType}`;
+    if (supervisorDataCache[cacheKey]) return supervisorDataCache[cacheKey];
+    if (supervisorDataPromise[cacheKey]) return supervisorDataPromise[cacheKey]!;
     const prom = (async (): Promise<SupervisorDataPayload | null> => {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/supervisor-data?environment=${environment}`, {
+            const res = await fetch(`${API_BASE_URL}/api/supervisor-data?environment=${environment}&pageType=${pageType}&_t=${Date.now()}`, {
                 headers: getDefaultHeaders(),
             });
             if (!res.ok) return null;
@@ -273,20 +274,23 @@ export async function getSupervisorDataFromAPI(environment: BackendEnvironment):
                     }
                 });
             }
-            supervisorDataCache[environment] = payload;
+            supervisorDataCache[cacheKey] = payload;
             return payload;
-        } catch {
-            return null;
+        } catch (e) {
+            console.warn('[SUPERVISOR] Fetch failed:', e);
+        } finally {
+            delete supervisorDataPromise[cacheKey];
         }
+        return null;
     })();
-    supervisorDataPromise[environment] = prom;
+    supervisorDataPromise[cacheKey] = prom;
     return prom;
 }
 
 /** Invalidasi cache supervisor data (panggil setelah simpan/edit) agar refetch berikutnya dapat data terbaru. */
-export function invalidateSupervisorDataCache(environment: BackendEnvironment): void {
-    delete supervisorDataCache[environment];
-    delete supervisorDataPromise[environment];
+export function invalidateSupervisorDataCache(environment: BackendEnvironment, pageType: 'sewing' | 'production' = 'production'): void {
+    const cacheKey = `${environment}_${pageType}`;
+    delete supervisorDataCache[cacheKey];
 }
 
 // Fungsi untuk mendapatkan default branch berdasarkan environment
@@ -568,6 +572,9 @@ export interface HomeDashboardItem {
     updated_at?: string;
     waktu?: string;
     at?: string;
+    qty_good?: number | null;
+    qty_repair?: number | null;
+    qty_reject?: number | null;
     [key: string]: unknown;
 }
 
@@ -671,7 +678,6 @@ export interface HomeDashboardTrackingBuckets {
     bundle?: HomeDashboardTrackingItem[];
     qc?: HomeDashboardTrackingItem[];
     smarket?: HomeDashboardTrackingItem[];
-    supply_sewing?: HomeDashboardTrackingItem[];
     sewing?: HomeDashboardTrackingItem[];
 }
 
@@ -683,7 +689,6 @@ export interface HomeDashboardTrackingResponse {
         bundle?: number;
         qc?: number;
         smarket?: number;
-        supply_sewing?: number;
         sewing?: number;
     };
     data?: HomeDashboardTrackingBuckets;

@@ -29,12 +29,11 @@ export default function Home() {
 
                 {/* Content - dengan margin untuk header fixed (h-16 = 64px) dan padding untuk spacing */}
                 <main
-                    className="flex-1 w-full overflow-y-auto relative"
+                    className="flex-1 w-full overflow-y-auto relative custom-scrollbar"
                     style={{
                         padding: 'clamp(0.5rem, 2vw, 2rem) clamp(0.5rem, 3vw, 1rem)',
                         paddingTop: 'clamp(4rem, 8vh, 6rem)',
                         paddingBottom: '5rem',
-                        overflow: 'hidden',
                     }}
                 >
                     <HomeContent />

@@ -45,7 +45,7 @@ export const useSewingBatchDashboardQuery = (
       if (tanggalfrom) params.append('tanggalfrom', tanggalfrom);
       if (tanggalto) params.append('tanggalto', tanggalto);
 
-      const url = `${API_BASE_URL}/api/sewing/dashboard?${params.toString()}`;
+      const url = `/api/sewing/dashboard?${params.toString()}`;
       const headers = {
         ...getDefaultHeaders(),
         'rfid-key': '0011779933',
@@ -58,6 +58,15 @@ export const useSewingBatchDashboardQuery = (
       });
 
       if (!response.ok) {
+        if (response.status === 404) {
+          return {
+            code: 404,
+            status: 'error',
+            messages: 'Data not found',
+            count: 0,
+            data: [],
+          };
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 

@@ -39,7 +39,7 @@ export default function SewingLine() {
                         marginTop: '0',
                     }}
                 >
-                    <RFIDLineContent linePathPrefix="/sewing" allPath="/sewing/all" />
+                    <RFIDLineContent linePathPrefix="/sewing" allPath="/sewing/all" pageType="sewing" />
                 </main>
 
                 <Footer />

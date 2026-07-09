@@ -15,6 +15,7 @@ interface EditSupervisorShiftModalProps {
     currentDisplayTitle?: string;
     defaultLineTitle?: string;
     environment: BackendEnvironment;
+    pageType?: 'sewing' | 'production';
     onUpdate: () => void; // Callback setelah update berhasil
 }   
 
@@ -30,6 +31,7 @@ export default function EditSupervisorShiftModal({
     currentDisplayTitle = '',
     defaultLineTitle,
     environment,
+    pageType = 'production',
     onUpdate
 }: EditSupervisorShiftModalProps) {
     const [supervisor, setSupervisor] = useState(currentSupervisor);
@@ -85,7 +87,8 @@ export default function EditSupervisorShiftModal({
                     startTime: startTime.trim(),
                     target: typeof target === 'number' && target >= 0 ? target : 0,
                     displayTitle: displayTitle.trim(),
-                    environment
+                    environment,
+                    pageType
                 })
             });
 

@@ -34,9 +34,11 @@ export interface RFIDLineContentProps {
     linePathPrefix?: string;
     /** Path untuk "All" card, e.g. '/all-production-line' atau '/sewing/all' */
     allPath?: string;
+    /** Jenis halaman untuk isolasi data supervisor dan susunan kartu */
+    pageType?: 'sewing' | 'production';
 }
 
-export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-production-line' }: RFIDLineContentProps = {}) {
+export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-production-line', pageType = 'production' }: RFIDLineContentProps = {}) {
     const navigate = useNavigate();
     const [hoveredCard, setHoveredCard] = useState<number | null>(null);
     const [environment, setEnvironment] = useState<BackendEnvironment>(getInitialEnvironment);
@@ -85,21 +87,21 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
 
     const loadCustomAndHiddenLines = () => {
         if (!environment) return;
-        const savedOrder = localStorage.getItem(`rfid_line_order_${environment}`);
+        const savedOrder = localStorage.getItem(`rfid_line_order_${environment}_${pageType}`);
         if (savedOrder) {
             try {
                 setCardOrder(JSON.parse(savedOrder));
             } catch { /* ignore */ }
         }
 
-        const savedCustom = localStorage.getItem(`rfid_custom_lines_${environment}`);
+        const savedCustom = localStorage.getItem(`rfid_custom_lines_${environment}_${pageType}`);
         if (savedCustom) {
             try {
                 setCustomLines(JSON.parse(savedCustom));
             } catch { /* ignore */ }
         }
 
-        const savedHidden = localStorage.getItem(`rfid_hidden_lines_${environment}`);
+        const savedHidden = localStorage.getItem(`rfid_hidden_lines_${environment}_${pageType}`);
         if (savedHidden) {
             try {
                 setHiddenLines(JSON.parse(savedHidden));
@@ -177,7 +179,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
             if (draggedIdx > -1 && targetIdx > -1) {
                 newOrder.splice(draggedIdx, 1);
                 newOrder.splice(targetIdx, 0, draggedId);
-                localStorage.setItem(`rfid_line_order_${environment}`, JSON.stringify(newOrder));
+                localStorage.setItem(`rfid_line_order_${environment}_${pageType}`, JSON.stringify(newOrder));
                 return newOrder;
             }
             return currentOrder;
@@ -230,7 +232,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
 
         const updatedCustom = [...customLines, newLineObj];
         setCustomLines(updatedCustom);
-        localStorage.setItem(`rfid_custom_lines_${environment}`, JSON.stringify(updatedCustom));
+        localStorage.setItem(`rfid_custom_lines_${environment}_${pageType}`, JSON.stringify(updatedCustom));
         
         // Simpan data pelengkap ke API supervisor-data
         try {
@@ -243,11 +245,12 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
                     startTime: newLineStartTime,
                     target: newLineTarget > 0 ? newLineTarget : undefined,
                     displayTitle: newTitle,
-                    environment: environment
+                    environment: environment,
+                    pageType: pageType
                 })
             });
             await loadSupervisorData();
-            invalidateSupervisorDataCache(environment);
+            invalidateSupervisorDataCache(environment, pageType);
         } catch(e) {
             // silent
         }
@@ -308,7 +311,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
     // Load supervisor data (1x shared request per env via getSupervisorDataFromAPI)
     const loadSupervisorData = async () => {
         if (!environment) return;
-        const data = await getSupervisorDataFromAPI(environment);
+        const data = await getSupervisorDataFromAPI(environment, pageType);
         if (data) {
             setSupervisorData(data.supervisors || {});
             setStartTimesData(data.startTimes || {});
@@ -322,7 +325,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
         if (!environment) return;
 
         try {
-            const url = `${API_BASE_URL}/api/shift-data?environment=${environment}`;
+            const url = `${API_BASE_URL}/api/shift-data?environment=${environment}&_t=${Date.now()}`;
             const response = await fetch(url, {
                 headers: getDefaultHeaders()
             });
@@ -439,7 +442,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
 
     // Handler untuk update setelah edit (invalidate cache agar data segar)
     const handleUpdate = () => {
-        invalidateSupervisorDataCache(environment);
+        invalidateSupervisorDataCache(environment, pageType);
         loadSupervisorData();
         loadShiftData();
         window.dispatchEvent(new CustomEvent('supervisorUpdated'));
@@ -672,9 +675,14 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
                     const isAllLine = line.id === 0 || line.id === 111 || line.id === 112 || line.id === 113;
                     const hasCustomTitle = !!displayTitlesData[line.id.toString()]?.trim();
                     const resolvedTitle = resolveLineDisplayTitle(line.id, line.title, displayTitlesData);
-                    const cardTitle = linePathPrefix === '/sewing' && !hasCustomTitle
+                    let finalTitle = linePathPrefix === '/sewing' && !hasCustomTitle
                         ? (isAllLine ? 'All Sewing Line' : resolvedTitle.replace(/^Production Line /i, 'Sewing Line '))
                         : resolvedTitle;
+                        
+                    // Auto-fix for old data where "Sewing Line" was accidentally saved to the production key
+                    if (pageType === 'production' && finalTitle.match(/^Sewing Line /i)) {
+                        finalTitle = finalTitle.replace(/^Sewing Line /i, 'Production Line ');
+                    }
 
                     return (
                         <div
@@ -853,7 +861,7 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
                                 <div className="flex items-center justify-center flex-1" style={{ minHeight: 0 }}>
                                     <h3 className={`text-[10px] xs:text-xs sm:text-sm md:text-base lg:text-lg tracking-tight text-center truncate w-full transition-colors duration-300 ${isHovered ? 'text-white' : 'text-[#0073ee]'
                                         }`} style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 550, textTransform: 'capitalize' }}>
-                                        {cardTitle}
+                                        {finalTitle}
                                     </h3>
                                 </div>
 
@@ -1104,9 +1112,24 @@ export default function RFIDLineContent({ linePathPrefix = '', allPath = '/all-p
                         setEditModalOpen(false);
                         setSelectedLine(null);
                     }}
-                    lineId={selectedLine.id}
-                    lineTitle={resolveLineDisplayTitle(selectedLine.id, selectedLine.title, displayTitlesData)}
-                    currentDisplayTitle={displayTitlesData[selectedLine.id.toString()] || ''}
+                    lineId={selectedLine.id.toString()}
+                    environment={environment}
+                    pageType={pageType}
+                    onUpdate={handleUpdate}
+                    lineTitle={(() => {
+                        let title = resolveLineDisplayTitle(selectedLine.id, selectedLine.title, displayTitlesData);
+                        if (pageType === 'production' && title.match(/^Sewing Line /i)) {
+                            title = title.replace(/^Sewing Line /i, 'Production Line ');
+                        }
+                        return title;
+                    })()}
+                    currentDisplayTitle={(() => {
+                        let current = displayTitlesData[selectedLine.id.toString()] || '';
+                        if (pageType === 'production' && current.match(/^Sewing Line /i)) {
+                            current = current.replace(/^Sewing Line /i, 'Production Line ');
+                        }
+                        return current;
+                    })()}
                     defaultLineTitle={selectedLine.title}
                     currentSupervisor={(() => {
                         const supervisorFromAPI = supervisorData[selectedLine.id.toString()];

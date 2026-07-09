@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import SewingPageShell from '../../components/sewing/SewingPageShell';
 import { BatchOverviewCard } from '../../components/sewing/SewingBatchCards';
@@ -7,6 +7,7 @@ import SewingBatchHourlyChart from '../../components/sewing/SewingBatchHourlyCha
 import SewingBatchOverviewKpi from '../../components/sewing/SewingBatchOverviewKpi';
 import CommandCenterHeader from '../../components/sewing/CommandCenterHeader';
 import { useSewingBatchDashboardQuery, type SewingBatchData } from '../../hooks/useSewingBatchDashboardQuery';
+import { getEnvironmentFromAPI, getSupervisorDataFromAPI } from '../../config/api';
 import { exportSewingBatchToExcel } from '../../utils/exportSewingBatchToExcel';
 import batchData from '../../data/sewing/sewing-batch-dashboard.json';
 import flowData from '../../data/sewing/sewing-flow-detail.json';
@@ -25,7 +26,36 @@ import { SEWING_DASHBOARD_BATCH_DEFAULT } from '../../utils/sewingBatchVisibilit
 
 const SewingBatchDashboardPage = memo(() => {
   const { id } = useParams<{ id: string }>();
-  const lineId = id ?? '1';
+  const urlLineId = id ?? '1';
+
+  const [apiLineId, setApiLineId] = useState(urlLineId);
+  const [displayLineTitle, setDisplayLineTitle] = useState(urlLineId);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const env = await getEnvironmentFromAPI();
+        const data = await getSupervisorDataFromAPI(env, 'sewing');
+        if (!isMounted) return;
+        
+        let customTitle = urlLineId;
+        if (data && data.displayTitles) {
+          customTitle = data.displayTitles[urlLineId] || urlLineId;
+        }
+        
+        // Ekstrak angka dari nama line (misal: "Sewing Line 10" -> "10")
+        const match = customTitle.match(/\d+/);
+        const resolvedLineId = match ? match[0] : urlLineId;
+        
+        setApiLineId(resolvedLineId);
+        setDisplayLineTitle(resolvedLineId);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [urlLineId]);
 
   // Dummy data fallback untuk line 12 jika API kosong
   const DUMMY_LINE12_ORDER = {
@@ -54,7 +84,7 @@ const SewingBatchDashboardPage = memo(() => {
 
   // Fetch real-time API data
   const { data: apiResponse, isLoading } = useSewingBatchDashboardQuery(
-    lineId,
+    apiLineId,
     undefined,
     undefined,
     appliedDateFrom,
@@ -69,9 +99,9 @@ const SewingBatchDashboardPage = memo(() => {
       return apiResponse.data[0].batch;
     }
     // Fallback dummy untuk line 12
-    if (lineId === '12') return DUMMY_LINE12_BATCHES;
+    if (apiLineId === '12') return DUMMY_LINE12_BATCHES;
     return [];
-  }, [apiResponse, lineId]);
+  }, [apiResponse, apiLineId]);
 
   const order = useMemo(() => {
     if (apiResponse?.data?.[0]) {
@@ -89,7 +119,7 @@ const SewingBatchDashboardPage = memo(() => {
       }
     }
     // Fallback dummy untuk line 12
-    if (lineId === '12') return DUMMY_LINE12_ORDER;
+    if (apiLineId === '12') return DUMMY_LINE12_ORDER;
     return {
       wo: '—',
       style: '—',
@@ -98,7 +128,7 @@ const SewingBatchDashboardPage = memo(() => {
       item: '—',
       color: '—',
     };
-  }, [apiResponse, lineId]);
+  }, [apiResponse, apiLineId]);
 
   const batchOverviewList = useMemo(() => {
     if (batchesFromApi.length === 0) return [];
@@ -244,13 +274,13 @@ const SewingBatchDashboardPage = memo(() => {
 
   const handleExportExcel = useCallback(() => {
     exportSewingBatchToExcel(
-      lineId,
+      apiLineId,
       order,
       batchesFromApi,
       appliedDateFrom || 'Semua Tanggal',
       appliedDateTo || 'Semua Tanggal'
     );
-  }, [lineId, order, batchesFromApi, appliedDateFrom, appliedDateTo]);
+  }, [apiLineId, order, batchesFromApi, appliedDateFrom, appliedDateTo]);
 
   if (isLoading) {
     return (
@@ -272,7 +302,7 @@ const SewingBatchDashboardPage = memo(() => {
         <div className="grid h-full min-h-0 grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-[clamp(0.25rem,0.6vh,0.5rem)]">
           <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-[clamp(0.25rem,0.6vh,0.5rem)]">
             <CommandCenterHeader
-              line={`Line ${lineId}`}
+              line={displayLineTitle}
               order={order}
               filterDateFrom={filterDateFrom}
               filterDateTo={filterDateTo}

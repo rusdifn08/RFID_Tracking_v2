@@ -14,6 +14,7 @@ import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import backgroundImage from '../assets/background.jpg';
+import PrendiReportTab from '../components/report/PrendiReportTab';
 import { apiGet, getBackendEnvironment } from '../config/api';
 import {
   HIDE_FORM_EXPORT_CARD_DONE,
@@ -114,19 +115,6 @@ const normalizeLineKeys = (targets: Record<string, unknown>): string[] =>
 
 const REPORT_CARDS: ReportCard[] = [
   {
-    id: 'line-production-targets',
-    title: 'Target Produksi per Line',
-    subtitle: 'Target/hari, target/jam, SPV, NIK (master line)',
-    endpoint: '/api/line-production-targets',
-    tone: {
-      accent: 'from-rose-500 via-pink-500 to-fuchsia-600',
-      chip: 'bg-rose-50 text-rose-700 border-rose-200',
-      button: 'from-rose-600 to-fuchsia-600',
-      buttonHover: 'hover:from-rose-500 hover:to-fuchsia-500',
-      glow: 'group-hover:shadow-rose-100/80',
-    },
-  },
-  {
     id: 'wip-all-lines',
     title: 'WIP All Lines',
     subtitle: 'Rekap WIP semua line',
@@ -216,25 +204,6 @@ const REPORT_CARDS: ReportCard[] = [
     },
   },
   {
-    id: 'output-per-jam',
-    title: 'Output Per Jam',
-    subtitle: 'Output semua line per jam (tanggal from-to, format jam_00 sampai jam_23)',
-    endpoint: '/wira/detail',
-    paramsBuilder: (from, to) => ({
-      status: 'output_sewing',
-      line: 'all',
-      ...(from ? { tanggal_from: from } : {}),
-      ...(to ? { tanggal_to: to } : {}),
-    }),
-    tone: {
-      accent: 'from-indigo-500 via-violet-500 to-purple-600',
-      chip: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      button: 'from-indigo-600 to-purple-600',
-      buttonHover: 'hover:from-indigo-500 hover:to-purple-500',
-      glow: 'group-hover:shadow-indigo-100/80',
-    },
-  },
-  {
     id: 'finishing-summary',
     title: 'Finishing Summary',
     subtitle: 'Ringkasan Dryroom/Folding/Reject',
@@ -321,6 +290,7 @@ function isFormExportCardHidden(cardId: string): boolean {
 }
 
 export default function FormData() {
+  const [activeTab, setActiveTab] = useState<'default' | 'prendi'>('default');
   const [dateFrom, setDateFrom] = useState(getTodayIso());
   const [dateTo, setDateTo] = useState(getTodayIso());
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -505,7 +475,7 @@ export default function FormData() {
             marginTop: 'clamp(3rem, 6vh, 4rem)',
           }}
         >
-          <div className="w-full space-y-4">
+          <div className="w-full max-w-7xl mx-auto space-y-4">
             <div className="relative overflow-hidden bg-white/95 border border-slate-200 rounded-2xl p-4 shadow-sm">
               <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.16),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(37,99,235,0.10),transparent_40%)]" />
               <div className="relative flex items-center justify-between gap-3 mb-3">
@@ -518,10 +488,29 @@ export default function FormData() {
                     <p className="text-xs text-slate-500">Generate report sesuai data API secara cepat</p>
                   </div>
                 </div>
+                <div className="flex bg-slate-100 p-1 rounded-lg">
+                  <button 
+                    onClick={() => setActiveTab('default')} 
+                    className={`px-6 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'default' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    DEFAULT
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('prendi')} 
+                    className={`px-6 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'prendi' ? 'bg-white shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    PRENDI
+                  </button>
+                </div>
               </div>
-              <p className="relative text-sm text-slate-600 mb-3">
-                Pilih report yang sudah siap lalu export ke Excel sesuai format data API.
-              </p>
+            </div>
+
+            {activeTab === 'default' ? (
+              <>
+                <div className="relative overflow-hidden bg-white/95 border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <p className="relative text-sm text-slate-600 mb-3">
+                    Pilih report yang sudah siap lalu export ke Excel sesuai format data API.
+                  </p>
               <div className="relative grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="rounded-xl border border-blue-100 bg-gradient-to-b from-blue-50/80 to-white p-3 shadow-sm">
                   <label className="flex items-center gap-1.5 text-xs font-semibold text-blue-800 mb-1">
@@ -644,6 +633,10 @@ export default function FormData() {
                 );
               })}
             </div>
+            </>
+            ) : (
+              <PrendiReportTab />
+            )}
           </div>
         </main>
         <Footer />

@@ -34,7 +34,10 @@ export const HIDE_HOME_CARD_MONITORING_MACHINE = false;
 /** Kartu Monitoring Shipment di home */
 export const HIDE_HOME_CARD_MONITORING_SHIPMENT = false;
 
-export type HomeCardId = 'rfid-tracking' | 'needle-manager' | 'sewing-proses' | 'monitoring-machine' | 'monitoring-shipment';
+/** Kartu Vibe Prendi di home */
+export const HIDE_HOME_CARD_VIBE_PRENDI = false;
+
+export type HomeCardId = 'rfid-tracking' | 'needle-manager' | 'sewing-proses' | 'monitoring-machine' | 'monitoring-shipment' | 'vibe-prendi';
 
 /** Cek apakah kartu home disembunyikan berdasarkan id modul. */
 export function isHomeCardHidden(cardId: HomeCardId): boolean {
@@ -49,6 +52,8 @@ export function isHomeCardHidden(cardId: HomeCardId): boolean {
             return HIDE_HOME_CARD_MONITORING_MACHINE;
         case 'monitoring-shipment':
             return HIDE_HOME_CARD_MONITORING_SHIPMENT;
+        case 'vibe-prendi':
+            return HIDE_HOME_CARD_VIBE_PRENDI;
         default:
             return false;
     }

@@ -47,6 +47,11 @@ const SewingLayoutPage = lazy(() => import('../pages/sewing/SewingLayoutPage.tsx
 const SewingPositioningPage = lazy(() => import('../pages/sewing/SewingPositioningPage.tsx'));
 const BatchSystemHub = lazy(() => import('../pages/BatchSystemHub.tsx'));
 const BatchSystemModule = lazy(() => import('../pages/BatchSystemModule.tsx'));
+const MonitoringShipmentHub = lazy(() => import('../pages/MonitoringShipmentHub.tsx'));
+const MonitoringShipment = lazy(() => import('../pages/MonitoringShipment.tsx'));
+const MonitoringShipment2 = lazy(() => import('../pages/MonitoringShipment2.tsx'));
+const MonitoringMachine = lazy(() => import('../pages/MonitoringMachine.tsx'));
+const VibePrendi = lazy(() => import('../pages/VibePrendi.tsx'));
 
 // Loading component untuk Suspense (ringan agar paint cepat)
 const PageLoader = () => (
@@ -586,6 +591,56 @@ const router = createBrowserRouter([
             <ProtectedRoute>
                 <LazyWrapper>
                     <DashboardMesinKolam />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/monitoring-shipment',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <MonitoringShipmentHub />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/monitoring-shipment/gm1/*',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <MonitoringShipment />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/monitoring-shipment/gm2/*',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <MonitoringShipment2 />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/monitoring-machine/*',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <MonitoringMachine />
+                </LazyWrapper>
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/vibe-prendi/*',
+        element: (
+            <ProtectedRoute>
+                <LazyWrapper>
+                    <VibePrendi />
                 </LazyWrapper>
             </ProtectedRoute>
         ),

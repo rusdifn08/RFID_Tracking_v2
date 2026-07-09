@@ -304,6 +304,31 @@ function mapHomeItemToStoreRow(item: HomeDashboardItem) {
     };
 }
 
+function mapHomeItemToSupplyRow(item: HomeDashboardItem) {
+    const qty = Math.max(1, Number(item.qty_batch ?? 1));
+    const ts = homeItemRawTimestamp(item);
+    const lineStr = item.line != null && String(item.line).trim() !== '' ? String(item.line) : '—';
+    const locRaw = String(item.lokasi ?? '').trim();
+    return {
+        rfid: item.rfid_bundles ?? '—',
+        wo: item.wo ?? '—',
+        line: lineStr,
+        gm: locRaw || '—',
+        qty,
+        style: item.style ?? '—',
+        buyer: item.buyer ?? '—',
+        item: item.item ?? '—',
+        color: item.warna ?? '—',
+        size: item.size ?? '—',
+        waktu: formatRowTime(ts),
+        location: 'supply_sewing',
+        timestamp: ts ?? item.barcode ?? '—',
+        last_status: item.last_status,
+        id_bundles: item.id_bundles,
+        barcode: item.barcode,
+    };
+}
+
 type TrackingBucketKey = 'bundle' | 'qc' | 'smarket' | 'sewing';
 
 function trackingBucketRawTimestamp(item: HomeDashboardTrackingItem, bucket: TrackingBucketKey): string | undefined {
@@ -1866,7 +1891,10 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         if (homeDashboardApi) {
             if (!useRekapData) return [];
             if (!homeItemsFiltered.length) return [];
-            return homeItemsFiltered.map(mapHomeItemToBundleRow);
+            const bundleStatuses = new Set(['OUTPUT_BUNDLE', 'BUNDLE']);
+            return homeItemsFiltered
+                .filter((it) => bundleStatuses.has(normCuttingLastStatus(it.last_status)))
+                .map(mapHomeItemToBundleRow);
         }
         return (displayDoc?.bundle?.history ?? []).map((h) => ({
             rfid: h.rfid_garment,
@@ -1938,7 +1966,14 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
             const items = trackingBuckets?.sewing ?? [];
             return items.map(mapTrackingItemToSupplyRow);
         }
-        if (homeDashboardApi && !useRekapData) return [];
+        if (homeDashboardApi) {
+            if (!useRekapData) return [];
+            if (!homeItemsFiltered.length) return [];
+            const supplyStatuses = new Set(['SEWING', 'TERIMA_SEWING', 'SUPPLY_SEWING']);
+            return homeItemsFiltered
+                .filter((it) => supplyStatuses.has(normCuttingLastStatus(it.last_status)))
+                .map(mapHomeItemToSupplyRow);
+        }
         return (displayDoc?.supply.history ?? []).map((h) => ({
             rfid: h.rfid_garment,
             wo: h.wo ?? '—',
@@ -1960,9 +1995,12 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
     const storeRfids = useMemo(() => new Set(storeRows.map(r => String(r.rfid))), [storeRows]);
     const supplyRfids = useMemo(() => new Set(supplyRows.map(r => String(r.rfid))), [supplyRows]);
 
+    const outFromBundleRfids = useMemo(() => new Set([...qcRfids, ...storeRfids, ...supplyRfids]), [qcRfids, storeRfids, supplyRfids]);
+    const outFromQcRfids = useMemo(() => new Set([...storeRfids, ...supplyRfids]), [storeRfids, supplyRfids]);
+
     const filteredBundleRows = useMemo(
-        () => applyStageTableFilters(bundleRows.map((r) => ({ ...r, qty: String(r.qty) })), globalFilterCat, globalFilterVal, searchQuery, useTrackingData, qcRfids),
-        [bundleRows, searchQuery, globalFilterCat, globalFilterVal, useTrackingData, qcRfids],
+        () => applyStageTableFilters(bundleRows.map((r) => ({ ...r, qty: String(r.qty) })), globalFilterCat, globalFilterVal, searchQuery, useTrackingData, outFromBundleRfids),
+        [bundleRows, searchQuery, globalFilterCat, globalFilterVal, useTrackingData, outFromBundleRfids],
     );
 
     const filteredQcRows = useMemo(
@@ -1979,9 +2017,9 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
                 globalFilterVal,
                 searchQuery,
                 useTrackingData,
-                storeRfids
+                outFromQcRfids
             ),
-        [qcRows, searchQuery, globalFilterCat, globalFilterVal, useTrackingData, storeRfids],
+        [qcRows, searchQuery, globalFilterCat, globalFilterVal, useTrackingData, outFromQcRfids],
     );
 
     const qcTotals = useMemo(() => {
@@ -2003,11 +2041,11 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         let inCount = 0;
         let outCount = 0;
         for (const r of filteredBundleRows) {
-            if (qcRfids.has(String(r.rfid ?? ''))) outCount++;
+            if (outFromBundleRfids.has(String(r.rfid ?? ''))) outCount++;
             else inCount++;
         }
         return { in: inCount, out: outCount };
-    }, [filteredBundleRows, qcRfids]);
+    }, [filteredBundleRows, outFromBundleRfids]);
 
     const storeInOut = useMemo(() => {
         let inCount = 0;
@@ -2032,11 +2070,11 @@ const CuttingProcessSection = memo(function CuttingProcessSection({
         let inCount = 0;
         let outCount = 0;
         for (const r of filteredQcRows) {
-            if (storeRfids.has(String(r.rfid ?? ''))) outCount++;
+            if (outFromQcRfids.has(String(r.rfid ?? ''))) outCount++;
             else inCount++;
         }
         return { in: inCount, out: outCount };
-    }, [filteredQcRows, storeRfids]);
+    }, [filteredQcRows, outFromQcRfids]);
 
     const filteredSupplyRows = useMemo(
         () => applyStageTableFilters(supplyRows.map((r) => ({ ...r, qty: String(r.qty) })), globalFilterCat, globalFilterVal, searchQuery, useTrackingData),

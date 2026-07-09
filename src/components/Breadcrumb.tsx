@@ -27,6 +27,7 @@ export default function Breadcrumb() {
     const [editingDisplayTitle, setEditingDisplayTitle] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
     const [environment, setEnvironment] = useState<BackendEnvironment>(getInitialEnvironment);
+    const pageType = location.pathname.includes('/sewing') || location.pathname.includes('/dashboard-sewing') ? 'sewing' : 'production';
 
     // --- DELETE MODAL STATE ---
     const [deleteModalStep, setDeleteModalStep] = useState<0 | 1 | 2 | 3>(0);
@@ -42,7 +43,7 @@ export default function Breadcrumb() {
         if (!environment) return;
         const loadDisplayTitles = async () => {
             try {
-                const data = await getSupervisorDataFromAPI(environment);
+                const data = await getSupervisorDataFromAPI(environment, pageType);
                 if (data?.displayTitles) {
                     setDisplayTitlesData(data.displayTitles);
                 }
@@ -82,7 +83,7 @@ export default function Breadcrumb() {
                 path: '/needle-manager',
             });
             breadcrumbs.push({
-                label: 'Monitoring needle',
+                label: 'Monitoring Needle',
                 isActive: true,
             });
         } else if (path.startsWith('/needle-manager/mesin-kolam')) {
@@ -177,15 +178,7 @@ export default function Breadcrumb() {
                 '5': 'Sewing Line 5', '6': 'Sewing Line 6', '7': 'Sewing Line 7', '8': 'Sewing Line 8', '9': 'Sewing Line 9',
             };
             breadcrumbs.push({
-                label: 'RFID Tracking',
-                path: '/rfid-tracking',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Proses',
-                path: '/sewing',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Lines',
+                label: 'Sewing',
                 path: '/sewing',
             });
             const defaultSewingLabel = lineTitles[lineId || '1'] || `Sewing Line ${lineId}`;
@@ -195,15 +188,7 @@ export default function Breadcrumb() {
             });
         } else if (path.startsWith('/sewing/all')) {
             breadcrumbs.push({
-                label: 'RFID Tracking',
-                path: '/rfid-tracking',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Proses',
-                path: '/sewing',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Lines',
+                label: 'Sewing',
                 path: '/sewing',
             });
             breadcrumbs.push({
@@ -212,15 +197,7 @@ export default function Breadcrumb() {
             });
         } else if (path.startsWith('/sewing')) {
             breadcrumbs.push({
-                label: 'RFID Tracking',
-                path: '/rfid-tracking',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Proses',
-                path: '/sewing',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Lines',
+                label: 'Sewing',
                 isActive: true,
             });
         } else if (path.startsWith('/line/')) {
@@ -329,11 +306,7 @@ export default function Breadcrumb() {
             });
         } else if (path.startsWith('/sewing/rfid-identity')) {
             breadcrumbs.push({
-                label: 'RFID Tracking',
-                path: '/rfid-tracking',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Proses',
+                label: 'Sewing',
                 path: '/sewing',
             });
             breadcrumbs.push({
@@ -344,15 +317,7 @@ export default function Breadcrumb() {
             const dashboardLineMatch = path.match(/\/dashboard-sewing-line\/(\d+)/);
             const dashboardLineId = dashboardLineMatch?.[1] ?? '1';
             breadcrumbs.push({
-                label: 'RFID Tracking',
-                path: '/rfid-tracking',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Proses',
-                path: '/sewing',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Lines',
+                label: 'Sewing',
                 path: '/sewing',
             });
             breadcrumbs.push({
@@ -365,11 +330,7 @@ export default function Breadcrumb() {
             });
         } else if (path.startsWith('/sewing/report/')) {
             breadcrumbs.push({
-                label: 'RFID Tracking',
-                path: '/rfid-tracking',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Proses',
+                label: 'Sewing',
                 path: '/sewing',
             });
             breadcrumbs.push({
@@ -380,15 +341,7 @@ export default function Breadcrumb() {
             const layoutLineMatch = path.match(/\/sewing\/layout\/(\d+)/);
             const layoutLineId = layoutLineMatch?.[1] ?? '1';
             breadcrumbs.push({
-                label: 'RFID Tracking',
-                path: '/rfid-tracking',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Proses',
-                path: '/sewing',
-            });
-            breadcrumbs.push({
-                label: 'Sewing Lines',
+                label: 'Sewing',
                 path: '/sewing',
             });
             breadcrumbs.push({
@@ -481,6 +434,29 @@ export default function Breadcrumb() {
                 label: 'List RFID Reject',
                 isActive: true,
             });
+        } else if (path === '/monitoring-shipment' || path === '/monitoring-shipment/') {
+            breadcrumbs.push({
+                label: 'Monitoring Shipment',
+                isActive: true,
+            });
+        } else if (path.startsWith('/monitoring-shipment/gm1')) {
+            breadcrumbs.push({
+                label: 'Monitoring Shipment',
+                path: '/monitoring-shipment',
+            });
+            breadcrumbs.push({
+                label: 'Monitoring Shipment GM 1',
+                isActive: true,
+            });
+        } else if (path.startsWith('/monitoring-shipment/gm2')) {
+            breadcrumbs.push({
+                label: 'Monitoring Shipment',
+                path: '/monitoring-shipment',
+            });
+            breadcrumbs.push({
+                label: 'Monitoring Shipment GM 2',
+                isActive: true,
+            });
         }
 
         return breadcrumbs;
@@ -500,7 +476,7 @@ export default function Breadcrumb() {
             setIsLoading(true);
             const currentEnv = environment || await getEnvironmentFromAPI();
             if (currentEnv !== environment) setEnvironment(currentEnv);
-            const data = await getSupervisorDataFromAPI(currentEnv);
+            const data = await getSupervisorDataFromAPI(currentEnv, pageType);
             if (data) {
                 setSupervisorData(data.supervisors || {});
                 setStartTimesData(data.startTimes || {});
@@ -536,7 +512,8 @@ export default function Breadcrumb() {
                     startTime: startTime,
                     target: typeof target === 'number' && target >= 0 ? target : undefined,
                     displayTitle: displayTitle !== undefined ? displayTitle.trim() : undefined,
-                    environment: environment
+                    environment: environment,
+                    pageType: pageType
                 })
             });
             if (response.ok) {
@@ -554,14 +531,14 @@ export default function Breadcrumb() {
                     setEditingStartTime('07:30');
                     setEditingTarget(0);
                     setEditingDisplayTitle('');
-                    invalidateSupervisorDataCache(environment);
+                    invalidateSupervisorDataCache(environment, pageType);
                     await loadSupervisorData();
                     // Dispatch custom event agar RFIDLineContent & device lain refetch (real-time)
                     window.dispatchEvent(new CustomEvent('supervisorUpdated', {
-                        detail: { lineId, supervisor, environment }
+                        detail: { lineId, supervisor, environment, pageType }
                     }));
                     window.dispatchEvent(new CustomEvent('targetUpdated', {
-                        detail: { lineId, target: typeof target === 'number' ? target : 0, environment }
+                        detail: { lineId, target: typeof target === 'number' ? target : 0, environment, pageType }
                     }));
                 }
             }

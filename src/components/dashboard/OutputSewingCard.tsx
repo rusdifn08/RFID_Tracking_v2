@@ -1,7 +1,8 @@
 import { memo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import outputIcon from '../../../assets/output.png';
 import targetIcon from '../../assets/target.webp';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, ArrowLeft } from 'lucide-react';
 
 interface OutputSewingCardProps {
   outputLine: number;
@@ -14,6 +15,12 @@ const COUNT_FONT_SIZE = 'clamp(1.4rem, 3.6vw + 0.4rem, 4rem)';
 
 const OutputSewingCard = memo(({ outputLine, targetOutput, onClick }: OutputSewingCardProps) => {
   const targetMet = targetOutput !== undefined && targetOutput > 0 && (outputLine || 0) >= targetOutput;
+  const navigate = useNavigate();
+
+  const handleBack = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(-1);
+  };
 
   return (
     <div
@@ -23,6 +30,13 @@ const OutputSewingCard = memo(({ outputLine, targetOutput, onClick }: OutputSewi
         padding: 'clamp(0.25rem, 0.6vw + 0.15rem, 0.75rem)',
       }}
     >
+      <button 
+        onClick={handleBack}
+        className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-tr from-blue-600 to-blue-500 text-white shadow-md shadow-blue-500/30 hover:shadow-lg hover:shadow-blue-500/40 hover:-translate-y-0.5 hover:scale-105 transition-all duration-300 border border-blue-400/20"
+        title="Kembali"
+      >
+        <ArrowLeft size={18} strokeWidth={2.5} />
+      </button>
       <div
         className="flex flex-col items-center justify-center flex-1 w-full min-h-0"
         style={{ gap: 'clamp(0.12rem, 0.035vw + 0.1rem, 0.5rem)' }}

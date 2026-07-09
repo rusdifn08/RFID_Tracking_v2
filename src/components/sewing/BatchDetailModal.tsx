@@ -96,7 +96,7 @@ const BatchDetailModal = memo(
       if (!batch || !lane) return null;
 
       const simLane = sim?.batches.find((b) => b.batchNo === batch.batch);
-      const orderBundleCount = parseOrderBundleCount(lane.demoQty);
+      const orderBundleCount = 0; // Removed parseOrderBundleCount(lane.demoQty) which was dummy data
 
       const metrics: BatchInOutMetrics = inOutMetrics ?? {
         pcsIn: 0,
@@ -115,37 +115,24 @@ const BatchDetailModal = memo(
         ? (inOutMetrics as any).currentBundle
         : resolveCurrentBundle(batch.batch, batch, simLane, useLiveSim);
 
-      // Jika ada data dari API (inOutMetrics), buat list sederhana dari jumlah IN/OUT aktual
-      // tanpa data dummy (waktu scan, durasi, RFID palsu).
-      let bundleStatusList: BatchBundleStatus[];
-      if (inOutMetrics) {
-        const totalBundles = Math.max(bundleIn, bundleOut);
-        bundleStatusList = Array.from({ length: totalBundles }, (_, i) => {
-          const bundleNo = i + 1;
-          const scannedIn = bundleNo <= bundleIn;
-          const scannedOut = bundleNo <= bundleOut;
-          return {
-            bundleNo,
-            rfid: '—',
-            scannedIn,
-            scannedOut,
-            outputPcs: scannedOut ? pcsPerBundle : 0,
-            targetPcs: pcsPerBundle,
-            persentase: scannedOut ? 100 : 0,
-            scanInAt: null,
-            scanOutAt: null,
-            durationLabel: scannedOut ? 'Selesai' : scannedIn ? 'Dalam proses' : null,
-          } satisfies BatchBundleStatus;
-        });
-      } else {
-        bundleStatusList = buildBatchBundleStatusList(
-          batch.batch,
-          lane,
-          simLane,
-          !!useLiveSim,
-          pcsPerBundle
-        );
-      }
+      const totalBundles = Math.max(bundleIn, bundleOut);
+      const bundleStatusList = Array.from({ length: totalBundles }, (_, i) => {
+        const bundleNo = i + 1;
+        const scannedIn = bundleNo <= bundleIn;
+        const scannedOut = bundleNo <= bundleOut;
+        return {
+          bundleNo,
+          rfid: '—',
+          scannedIn,
+          scannedOut,
+          outputPcs: scannedOut ? pcsPerBundle : 0,
+          targetPcs: pcsPerBundle,
+          persentase: scannedOut ? 100 : 0,
+          scanInAt: null,
+          scanOutAt: null,
+          durationLabel: scannedOut ? 'Selesai' : scannedIn ? 'Dalam proses' : null,
+        } satisfies BatchBundleStatus;
+      });
 
       return {
         currentBundle,
@@ -230,31 +217,23 @@ const BatchDetailModal = memo(
               <div>
                 <span className={modalLabel}>Bundle Sedang Dikerjakan</span>
                 <strong className={modalStrong}>
-                  {inOutMetrics ? (
-                    bundleIn === 0 ? '—' : bundleIn === bundleOut ? 'Selesai' : `Ke-${bundleOut + 1}`
-                  ) : (
-                    `Ke-${currentBundle}`
-                  )}
+                  {bundleIn === 0 ? '—' : bundleIn === bundleOut ? 'Selesai' : `Ke-${bundleOut + 1}`}
                 </strong>
               </div>
               <div>
                 <span className={modalLabel}>Total Output (pcs)</span>
                 <strong className={modalStrong}>{outputPcs} pcs</strong>
               </div>
-              {!inOutMetrics && (
-                <>
-                  <div>
-                    <span className={modalLabel}>Jenis Output</span>
-                    <strong className={modalStrong}>{lane.outputTag}</strong>
-                  </div>
-                  <div>
-                    <span className={modalLabel}>Total Bundle Order</span>
-                    <strong className={modalStrong}>
-                      {orderBundleCount > 0 ? `${orderBundleCount} bundle` : lane.demoQty}
-                    </strong>
-                  </div>
-                </>
-              )}
+              <div>
+                <span className={modalLabel}>Jenis Output</span>
+                <strong className={modalStrong}>{lane.outputTag}</strong>
+              </div>
+              <div>
+                <span className={modalLabel}>Total Bundle Order</span>
+                <strong className={modalStrong}>
+                  {orderBundleCount > 0 ? `${orderBundleCount} bundle` : '—'}
+                </strong>
+              </div>
             </div>
           </section>
 

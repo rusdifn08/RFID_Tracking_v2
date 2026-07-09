@@ -45,9 +45,7 @@ const ChartSkeleton = () => (
 );
 
 // Line IDs yang punya halaman Dashboard RFID (sesuai Sidebar production lines)
-const DASHBOARD_RFID_LINE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-const MIN_LINE = Math.min(...DASHBOARD_RFID_LINE_IDS);
-const MAX_LINE = Math.max(...DASHBOARD_RFID_LINE_IDS);
+// Constant variables removed, we'll use dynamic IDs
 
 export default function DashboardRFID() {
     const { id } = useParams<{ id: string }>();
@@ -159,16 +157,40 @@ export default function DashboardRFID() {
         window.setTimeout(() => setScanResultToast(null), 4500);
     }, []);
 
-    // Navigasi prev/next untuk pindah ke Dashboard RFID line lain
+    // Navigasi prev/next untuk pindah ke Dashboard RFID line lain dengan looping
+    const validLineIds = useMemo(() => {
+        return productionLines
+            .map(l => parseInt(l.line || '', 10))
+            .filter(n => !isNaN(n))
+            .sort((a, b) => a - b);
+    }, [productionLines]);
+
     const currentLineNum = useMemo(() => parseInt(lineId, 10) || 1, [lineId]);
-    const hasPrevLine = currentLineNum > MIN_LINE;
-    const hasNextLine = currentLineNum < MAX_LINE;
+    
+    const hasPrevLine = true; // Selalu true karena looping
+    const hasNextLine = true; // Selalu true karena looping
+    
     const handlePrevLine = useCallback(() => {
-        if (hasPrevLine) navigate(`/dashboard-rfid/${currentLineNum - 1}`);
-    }, [hasPrevLine, currentLineNum, navigate]);
+        if (validLineIds.length === 0) return;
+        const currentIndex = validLineIds.indexOf(currentLineNum);
+        if (currentIndex > 0) {
+            navigate(`/dashboard-rfid/${validLineIds[currentIndex - 1]}`);
+        } else {
+            // Loop ke terakhir
+            navigate(`/dashboard-rfid/${validLineIds[validLineIds.length - 1]}`);
+        }
+    }, [validLineIds, currentLineNum, navigate]);
+    
     const handleNextLine = useCallback(() => {
-        if (hasNextLine) navigate(`/dashboard-rfid/${currentLineNum + 1}`);
-    }, [hasNextLine, currentLineNum, navigate]);
+        if (validLineIds.length === 0) return;
+        const currentIndex = validLineIds.indexOf(currentLineNum);
+        if (currentIndex !== -1 && currentIndex < validLineIds.length - 1) {
+            navigate(`/dashboard-rfid/${validLineIds[currentIndex + 1]}`);
+        } else {
+            // Loop ke pertama
+            navigate(`/dashboard-rfid/${validLineIds[0]}`);
+        }
+    }, [validLineIds, currentLineNum, navigate]);
 
     // State untuk WO filter
     const [availableWOList, setAvailableWOList] = useState<string[]>([]);
@@ -1128,16 +1150,10 @@ export default function DashboardRFID() {
                                 WebkitOverflowScrolling: 'touch' // Smooth scrolling untuk iOS
                             }}
                         >
-                            {/* BAGIAN ATAS: Baris 1 - Distribusi Data dan Data Output */}
+                            {/* BAGIAN ATAS: Baris 1 - Data Output */}
                             <div className="flex-none w-full">
-                                <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
-                                    {/* Grid 1: Overview Data RFID - Chart distribusi data saja */}
-                                    <div className="w-full min-h-[200px] sm:min-h-[250px]">
-                                        <Suspense fallback={<ChartSkeleton />}>
-                                            <OverviewChart pieData={pieData} outputLine={outputLine} targetForPercentage={targetOutput} />
-                                        </Suspense>
-                                    </div>
-                                    {/* Grid 2: Data Output Sewing - Output sewing saja */}
+                                <div className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4">
+                                    {/* Grid 1: Data Output Sewing - Output sewing saja */}
                                     <div className="w-full min-h-[200px] sm:min-h-[250px] overflow-visible">
                                         <Suspense fallback={<ChartSkeleton />}>
                                             <OutputSewingCard outputLine={outputLine} targetOutput={targetOutput} onClick={fetchOutputDetail} />
@@ -1222,30 +1238,24 @@ export default function DashboardRFID() {
                                     gap: 'clamp(0.25rem, 0.6vw + 0.15rem, 0.625rem)'
                                 }}
                             >
-                                {/* Bagian Kiri: 2 square cards */}
+                                {/* Bagian Kiri: 1 square card */}
                                 <div
-                                    className="flex-[2] min-w-0 flex flex-row overflow-visible"
+                                    className="flex-[3] min-w-0 flex flex-row overflow-visible"
                                     style={{
-                                        flex: '2 1 40%',
-                                        maxWidth: '40%',
+                                        flex: '3 1 30%',
+                                        maxWidth: '30%',
                                         gap: 'clamp(0.25rem, 0.6vw + 0.15rem, 0.625rem)'
                                     }}
                                 >
-                                    {/* Grid 1: Overview Data RFID - Chart distribusi data saja */}
-                                    <div className="flex-[1] min-w-0 overflow-hidden" style={{ flex: '1 1 50%', maxWidth: '50%' }}>
-                                        <Suspense fallback={<ChartSkeleton />}>
-                                            <OverviewChart pieData={pieData} outputLine={outputLine} targetForPercentage={targetOutput} />
-                                        </Suspense>
-                                    </div>
-                                    {/* Grid 2: Data Output Sewing - Output sewing saja */}
-                                    <div className="flex-[1] min-w-0 overflow-visible" style={{ flex: '1 1 50%', maxWidth: '50%' }}>
+                                    {/* Grid 1: Data Output Sewing - Output sewing saja */}
+                                    <div className="flex-[1] min-w-0 overflow-visible" style={{ flex: '1 1 100%', maxWidth: '100%' }}>
                                         <Suspense fallback={<ChartSkeleton />}>
                                             <OutputSewingCard outputLine={outputLine} targetOutput={targetOutput} onClick={fetchOutputDetail} />
                                         </Suspense>
                                     </div>
                                 </div>
                                 {/* Bagian Kanan: 1 wide card (Data Line) */}
-                                <div className="flex-[3] min-w-0 overflow-hidden" style={{ flex: '3 1 60%', maxWidth: '60%' }}>
+                                <div className="flex-[7] min-w-0 overflow-hidden" style={{ flex: '7 1 70%', maxWidth: '70%' }}>
                                     <Suspense fallback={<ChartSkeleton />}>
                                         <DataLineCard
                                             lineTitle={lineTitle}

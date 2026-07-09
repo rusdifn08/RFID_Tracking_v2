@@ -2,15 +2,17 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import rfidIcon from '../assets/rfid.webp';
 import needleIcon from '../assets/needle.webp';
-import sewingIcon from '../assets/sewing.webp';
-import machineIcon from '../assets/robot.svg';
-import shipmentIcon from '../assets/container.webp';
+import batchIcon from '../assets/batch.webp';
+import machineIcon from '../assets/machine.webp';
+import shipmentIcon from '../assets/shipment.webp';
+import prendiIcon from '../assets/report_detail.webp';
 import {
     HIDE_HOME_CARD_NEEDLE_MANAGER,
     HIDE_HOME_CARD_RFID_SEWING_PROSES,
     HIDE_HOME_CARD_RFID_TRACKING,
     HIDE_HOME_CARD_MONITORING_MACHINE,
     HIDE_HOME_CARD_MONITORING_SHIPMENT,
+    HIDE_HOME_CARD_VIBE_PRENDI,
     isHomeCardHidden,
     type HomeCardId,
 } from '../config/hide';
@@ -38,6 +40,15 @@ export default function HomeContent() {
             bgEnd: 'to-blue-800',
         },
         {
+            id: 'sewing-proses',
+            title: 'RFID Batch Proses',
+            subtitle: 'Monitoring proses sewing per batch',
+            path: '/sewing',
+            icon: batchIcon,
+            bgStart: 'from-sky-400',
+            bgEnd: 'to-blue-800',
+        },
+        {
             id: 'needle-manager',
             title: 'Needle Manager',
             subtitle: 'Monitoring picking and putting needle',
@@ -45,15 +56,6 @@ export default function HomeContent() {
             icon: needleIcon,
             bgStart: 'from-blue-400',
             bgEnd: 'to-blue-700',
-        },
-        {
-            id: 'sewing-proses',
-            title: 'RFID Sewing Proses',
-            subtitle: 'Monitor dan kelola proses sewing',
-            path: '/sewing',
-            icon: sewingIcon,
-            bgStart: 'from-sky-400',
-            bgEnd: 'to-blue-800',
         },
         {
             id: 'monitoring-machine',
@@ -67,11 +69,20 @@ export default function HomeContent() {
         {
             id: 'monitoring-shipment',
             title: 'Monitoring Shipment',
-            subtitle: 'Pantau pengiriman dan logistik',
+            subtitle: 'Proses Serah Terima dan Monitoring Shipment',
             path: '/monitoring-shipment',
             icon: shipmentIcon,
             bgStart: 'from-indigo-400',
             bgEnd: 'to-purple-800',
+        },
+        {
+            id: 'vibe-prendi',
+            title: 'Report Detail',
+            subtitle: 'Dashboard Report Detail',
+            path: '/vibe-prendi',
+            icon: prendiIcon,
+            bgStart: 'from-amber-400',
+            bgEnd: 'to-orange-700',
         },
     ];
 
@@ -83,6 +94,7 @@ export default function HomeContent() {
             HIDE_HOME_CARD_RFID_SEWING_PROSES,
             HIDE_HOME_CARD_MONITORING_MACHINE,
             HIDE_HOME_CARD_MONITORING_SHIPMENT,
+            HIDE_HOME_CARD_VIBE_PRENDI,
         ]
     );
 
@@ -139,27 +151,35 @@ export default function HomeContent() {
                                 paddingTop: 'clamp(0.25rem, 1.5vh, 0.75rem)',
                             
                             }}>
-                                {/* ICON (Centered & Big) - target.webp warna asli file */}
+                                {/* ICON (Centered & Big) */}
                                 <div className="relative mb-1 xs:mb-1.5 sm:mb-2 md:mb-2.5 lg:mb-3 flex items-center justify-center transform transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6 flex-shrink-0">
                                     <div className="relative" style={{ 
                                         width: 'clamp(2.5rem, 6vw, 5rem)',
                                         height: 'clamp(2.5rem, 6vw, 5rem)'
                                     }}>
-                                        <div 
-                                            className="w-full h-full"
-                                            style={{
-                                                maskImage: `url(${module.icon})`,
-                                                WebkitMaskImage: `url(${module.icon})`,
-                                                maskSize: 'contain',
-                                                WebkitMaskSize: 'contain',
-                                                maskRepeat: 'no-repeat',
-                                                WebkitMaskRepeat: 'no-repeat',
-                                                maskPosition: 'center',
-                                                WebkitMaskPosition: 'center',
-                                                background: `linear-gradient(135deg, #38bdf8 0%, #1e40af 100%)`,
-                                                filter: 'drop-shadow(0 0 2px rgba(30, 64, 175, 0.3)) drop-shadow(0 0 4px rgba(56, 189, 248, 0.2))',
-                                            }}
-                                        />
+                                        {module.id === 'rfid-tracking' || module.id === 'vibe-prendi' ? (
+                                            <div 
+                                                className="w-full h-full"
+                                                style={{
+                                                    maskImage: `url(${module.icon})`,
+                                                    WebkitMaskImage: `url(${module.icon})`,
+                                                    maskSize: 'contain',
+                                                    WebkitMaskSize: 'contain',
+                                                    maskRepeat: 'no-repeat',
+                                                    WebkitMaskRepeat: 'no-repeat',
+                                                    maskPosition: 'center',
+                                                    WebkitMaskPosition: 'center',
+                                                    background: `linear-gradient(135deg, #38bdf8 0%, #1e40af 100%)`,
+                                                    filter: 'drop-shadow(0 0 2px rgba(30, 64, 175, 0.3)) drop-shadow(0 0 4px rgba(56, 189, 248, 0.2))',
+                                                }}
+                                            />
+                                        ) : (
+                                            <img 
+                                                src={module.icon} 
+                                                alt={module.title}
+                                                className="w-full h-full object-contain filter drop-shadow-md"
+                                            />
+                                        )}
                                     </div>
                                 </div>
 
