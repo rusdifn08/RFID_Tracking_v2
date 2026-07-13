@@ -1,7 +1,39 @@
 {
-  "supervisors": {},
-  "startTimes": {},
+  "supervisors": {
+    "MJL_1": "DATI&SUSI",
+    "MJL_2": "DALENA",
+    "MJL_3": "DEDE ROSIAH",
+    "MJL_4": "IYAH",
+    "MJL_5": "TITIN",
+    "MJL_6": "TINI",
+    "MJL_7": "WIDYA",
+    "MJL_8": "LINA",
+    "MJL_9": "MIA",
+    "MJL_10": "YUSNI",
+    "MJL_11": "SITI",
+    "MJL_12": "TINI (STIO DOWN)",
+    "MJL_13": "DEDE WINDY",
+    "MJL_21": "Dudung",
+    "MJL_111": "Rusdi"
+  },
+  "startTimes": {
+    "MJL_1": "07:30",
+    "MJL_2": "07:30",
+    "MJL_3": "07:30",
+    "MJL_4": "07:30",
+    "MJL_5": "07:30",
+    "MJL_6": "07:30",
+    "MJL_7": "07:30",
+    "MJL_8": "07:30",
+    "MJL_9": "07:30",
+    "MJL_10": "07:30",
+    "MJL_11": "07:30",
+    "MJL_12": "07:30",
+    "MJL_13": "07:30",
+    "MJL_21": "07:30",
+    "MJL_111": "07:30"
+  },
   "targets": {},
-  "lastUpdated": "2026-07-13T00:57:32.029Z",
-  "description": "Data supervisor, jam masuk, dan target untuk production lines. Key adalah line ID (0 untuk All Production Line CLN, 111 untuk All Production Line MJL, 1-15 untuk Production Line 1-15)"
+  "lastUpdated": "2026-07-13T01:18:18.655Z",
+  "description": "Data supervisor, jam masuk, dan target untuk production lines."
 }
