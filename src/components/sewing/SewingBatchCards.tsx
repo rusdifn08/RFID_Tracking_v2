@@ -276,10 +276,12 @@ export const BatchOverviewCard = memo(
     /** Output pcs: pakai nilai aktual dari API jika tersedia, fallback = bundle OUT × pcs per bundle */
     const outputPcs = (batch.outputPcs != null && batch.outputPcs > 0) ? batch.outputPcs : pcsToBundleCount(batch.pcsOut, pcsPerBundle) * pcsPerBundle;
     const progressPct = Math.min(100, batch.outProgressPct);
-    const isAssembly = batch.type === 'ASSEMBLY';
+    const isAssembly = batch.type.toUpperCase().includes('ASSEMBLY') || batch.type.toUpperCase().includes('ASSEMBLING');
     const badges = batchHeaderBadges(highlight, currentBundle, isAssembly);
 
     const cardBorderHover = isAssembly ? 'hover:border-emerald-300 focus-visible:outline-emerald-600' : 'hover:border-blue-300 focus-visible:outline-blue-600';
+    const cardBorder = isAssembly ? 'border-emerald-200/80' : 'border-blue-100/80';
+    const cardShadowHover = isAssembly ? 'hover:shadow-[0_6px_20px_rgba(16,185,129,0.12)]' : 'hover:shadow-[0_6px_20px_rgba(37,99,235,0.12)]';
     const headerBorder = isAssembly ? 'border-emerald-50' : 'border-blue-50';
     const headerBg = isAssembly ? 'from-emerald-50/90' : 'from-blue-50/90';
     const headerTypeColor = isAssembly ? 'text-emerald-700' : 'text-blue-700';
@@ -295,7 +297,9 @@ export const BatchOverviewCard = memo(
         data-batch-card
         className={cn(
           'flex h-full min-h-0 cursor-pointer flex-col overflow-hidden rounded-xl',
-          'border border-blue-100/80 bg-white shadow-sm transition-all duration-200 hover:shadow-[0_6px_20px_rgba(37,99,235,0.12)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+          'border bg-white shadow-sm transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+          cardBorder,
+          cardShadowHover,
           cardBorderHover
         )}
         role="button"

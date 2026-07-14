@@ -248,7 +248,8 @@ const SewingBatchDashboardPage = memo(() => {
   }, [batchesFromApi, pcsPerBundle]);
 
   const overviewKpi = useMemo(() => {
-    const production = batchOverviewList.filter((b) => b.batch >= 1 && b.batch <= 5);
+    // Hitung seluruh batch KECUALI batch assembly/assembling
+    const production = batchOverviewList.filter((b) => !b.type.toUpperCase().includes('ASSEMBLY') && !b.type.toUpperCase().includes('ASSEMBLING'));
     const prosesBatch = production.length > 0 ? Math.max(...production.map((b) => b.pcsIn / pcsPerBundle)) : 0;
     const finishBatch = production.length > 0 ? Math.min(...production.map((b) => b.pcsOut / pcsPerBundle)) : 0;
     const wip = Math.max(0, prosesBatch - finishBatch);
@@ -431,7 +432,7 @@ const SewingBatchDashboardPage = memo(() => {
             if (batchNo > TARGET_BATCH_COUNT) {
               return (
                 <div key={`empty-slot-${batchNo}`} className="flex items-center justify-center p-6 bg-white/40 rounded-[1.25rem] border-2 border-dashed border-slate-200/60 shadow-[inset_0_2px_10px_rgba(0,0,0,0.01)] backdrop-blur-sm transition-all duration-300 hover:bg-white/60">
-                  <img src={logo} alt="Gistex Logo" className="w-24 h-auto opacity-[0.15] grayscale transition-opacity duration-300 hover:opacity-30" />
+                  <img src={logo} alt="Gistex Logo" className="w-32 xs:w-40 sm:w-48 md:w-56 lg:w-64 h-auto opacity-[0.25] grayscale transition-opacity duration-300 hover:opacity-[0.4]" />
                 </div>
               );
             }
